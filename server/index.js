@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenAI } from '@google/genai';
+import { createStorage } from './storage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -34,6 +35,9 @@ const AR_WORDS = {
 };
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
+
+// Media storage seam — local disk today; swappable to Google Drive in Phase 1.
+const storage = createStorage(DATA_DIR);
 
 // ── API clients (lazily validated) ──────────────────────────────────────────
 const anthropic = process.env.ANTHROPIC_API_KEY
@@ -85,16 +89,8 @@ function projMetaPath(pid) { return path.join(projDir(pid), 'project.json'); }
 function imagesDir(pid) { return path.join(projDir(pid), 'images'); }
 function uploadsDir(pid) { return path.join(projDir(pid), 'uploads'); }
 
-// Persist a base64 image (chat attachment or generation reference) to the
-// project's uploads/ folder so nothing that flows through the app is lost.
-async function saveUpload(pid, b64, mimeType) {
-  await fsp.mkdir(uploadsDir(pid), { recursive: true });
-  const mt = mimeType || 'image/jpeg';
-  const ext = mt.includes('png') ? 'png' : mt.includes('webp') ? 'webp' : mt.includes('gif') ? 'gif' : 'jpg';
-  const fname = `${id()}.${ext}`;
-  await fsp.writeFile(path.join(uploadsDir(pid), fname), Buffer.from(b64, 'base64'));
-  return { file: fname, mimeType: mt };
-}
+// Uploads & generated images are persisted via the storage seam (server/storage.js):
+//   storage.saveUpload(pid, base64, mimeType) · storage.saveImage(pid, imgId, buffer, mimeType)
 
 async function loadProject(pid) {
   const raw = await fsp.readFile(projMetaPath(pid), 'utf8');
@@ -257,7 +253,7 @@ Describe only what you can actually see; do not invent. Keep values concise.`;
 
     // Persist the first reference as the project's saved look reference.
     let styleRef = null;
-    if (images[0]) styleRef = await saveUpload(p.id, images[0].data, images[0].mimeType);
+    if (images[0]) styleRef = await storage.saveUpload(p.id, images[0].data, images[0].mimeType);
 
     const FIELDS = ['look', 'lighting', 'lens', 'palette', 'environment', 'aspectRatio', 'wardrobe', 'extra'];
     const builder = {};
@@ -324,7 +320,7 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
     // persist any attached images to disk so they survive reloads
     const savedImgs = [];
     for (const img of images) {
-      savedImgs.push(await saveUpload(p.id, img.data, img.mimeType));
+      savedImgs.push(await storage.saveUpload(p.id, img.data, img.mimeType));
     }
 
     // persist chat (including saved attachment references)
@@ -361,13 +357,12 @@ app.post('/api/projects/:pid/generate', async (req, res) => {
     // Resolve the model from the UI toggle (allowlisted); fall back to the .env default.
     const model = NB_MODELS[req.body.model] || NB2_MODEL;
     const p = await loadProject(req.params.pid);
-    await fsp.mkdir(imagesDir(p.id), { recursive: true });
 
     const contents = [];
     const savedRefs = [];
     for (const r of refImages) {
       contents.push({ inlineData: { mimeType: r.mimeType || 'image/jpeg', data: r.data } });
-      savedRefs.push(await saveUpload(p.id, r.data, r.mimeType));
+      savedRefs.push(await storage.saveUpload(p.id, r.data, r.mimeType));
     }
     // Reinforce the target aspect ratio in the prompt text. With a reference image the model
     // otherwise tends to copy the reference's shape and ignore the requested ratio.
@@ -399,11 +394,9 @@ app.post('/api/projects/:pid/generate', async (req, res) => {
       const parts = s.value?.candidates?.[0]?.content?.parts || [];
       const imgPart = parts.find(pt => pt.inlineData);
       if (!imgPart) { errors.push('No image returned in one generation.'); continue; }
-      const buf = Buffer.from(imgPart.inlineData.data, 'base64');
-      const ext = (imgPart.inlineData.mimeType || 'image/png').includes('jpeg') ? 'jpg' : 'png';
       const imgId = id();
-      const fname = `${imgId}.${ext}`;
-      await fsp.writeFile(path.join(imagesDir(p.id), fname), buf);
+      const buf = Buffer.from(imgPart.inlineData.data, 'base64');
+      const { file: fname } = await storage.saveImage(p.id, imgId, buf, imgPart.inlineData.mimeType);
       const rec = {
         id: imgId, prompt, file: fname, createdAt: Date.now(), favorite: false, note: '',
         aspectRatio: aspectRatio || null, size: NB2_IMAGE_SIZE, model,
@@ -449,7 +442,7 @@ app.delete('/api/projects/:pid/images/:imgId', async (req, res) => {
     const idx = p.images.findIndex(x => x.id === req.params.imgId);
     if (idx === -1) return res.status(404).json({ error: 'Image not found' });
     const [im] = p.images.splice(idx, 1);
-    await fsp.rm(path.join(imagesDir(p.id), im.file), { force: true });
+    await storage.deleteImage(p.id, im.file);
     p.updatedAt = Date.now();
     await saveProject(p);
     res.json({ ok: true });
