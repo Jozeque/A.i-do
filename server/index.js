@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenAI } from '@google/genai';
 import { createStorage } from './storage.js';
+import { createDataStore } from './data.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -38,6 +39,9 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 
 // Media storage seam — local disk today; swappable to Google Drive in Phase 1.
 const storage = createStorage(DATA_DIR);
+
+// Project metadata seam — local JSON today; swappable to a database in Phase 1.
+const data = createDataStore(DATA_DIR);
 
 // ── API clients (lazily validated) ──────────────────────────────────────────
 const anthropic = process.env.ANTHROPIC_API_KEY
@@ -84,22 +88,14 @@ function compileNbFramesDirection(b) {
 const id = () => crypto.randomBytes(8).toString('hex');
 const slug = (s) => (s || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'project';
 
-function projDir(pid) { return path.join(DATA_DIR, pid); }
-function projMetaPath(pid) { return path.join(projDir(pid), 'project.json'); }
-function imagesDir(pid) { return path.join(projDir(pid), 'images'); }
-function uploadsDir(pid) { return path.join(projDir(pid), 'uploads'); }
+// Project/image/upload paths now live in the seams (server/data.js, server/storage.js).
 
 // Uploads & generated images are persisted via the storage seam (server/storage.js):
 //   storage.saveUpload(pid, base64, mimeType) · storage.saveImage(pid, imgId, buffer, mimeType)
 
-async function loadProject(pid) {
-  const raw = await fsp.readFile(projMetaPath(pid), 'utf8');
-  return JSON.parse(raw);
-}
-async function saveProject(p) {
-  await fsp.mkdir(projDir(p.id), { recursive: true });
-  await fsp.writeFile(projMetaPath(p.id), JSON.stringify(p, null, 2));
-}
+// Thin adapters over the data seam (see server/data.js) — call sites stay unchanged.
+const loadProject = (pid) => data.getProject(pid);
+const saveProject = (p) => data.saveProject(p);
 
 // ── express setup ─────────────────────────────────────────────────────────────
 const app = express();
@@ -126,19 +122,7 @@ app.get('/api/health', (req, res) => {
 // ── PROJECTS ──────────────────────────────────────────────────────────────────
 app.get('/api/projects', async (req, res) => {
   try {
-    const entries = await fsp.readdir(DATA_DIR, { withFileTypes: true });
-    const projects = [];
-    for (const e of entries) {
-      if (!e.isDirectory()) continue;
-      try {
-        const p = await loadProject(e.name);
-        const imageCount = (p.images || []).length;
-        const chatCount = Object.values(p.chats || {}).reduce((n, arr) => n + (arr?.length || 0), 0);
-        projects.push({ id: p.id, name: p.name, createdAt: p.createdAt, updatedAt: p.updatedAt, imageCount, chatCount });
-      } catch { /* skip */ }
-    }
-    projects.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    res.json(projects);
+    res.json(await data.listProjects());
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -159,7 +143,6 @@ app.post('/api/projects', async (req, res) => {
       chats: { 'nb-frames': [], 'kling': [], 'nb-advisor': [] },
       images: [], // {id, prompt, file, createdAt, favorite, note}
     };
-    await fsp.mkdir(imagesDir(pid), { recursive: true });
     await saveProject(project);
     res.json(project);
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -191,7 +174,7 @@ app.patch('/api/projects/:pid', async (req, res) => {
 
 app.delete('/api/projects/:pid', async (req, res) => {
   try {
-    await fsp.rm(projDir(req.params.pid), { recursive: true, force: true });
+    await data.deleteProject(req.params.pid);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
