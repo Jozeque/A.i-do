@@ -54,6 +54,7 @@ const toast = (msg, err = false) => {
 const GEM_META = {
   'nb-frames': { name: 'NB Frames', blurb: 'Attach a reference image + describe the scene. Returns <b>3</b> cinematic Nano Banana 2 prompts.' },
   'kling': { name: 'Kling Prompter', blurb: 'Attach your still + describe the motion. Returns <b>3</b> Kling 3.0 video prompts (fidelity / physics / cinematic).' },
+  'kling-advisor': { name: 'Kling Advisor', blurb: 'Describe your source clip + the change you want. Returns the best Kling 3.0 Omni <b>video-to-video</b> prompt (restyle / relight / transform) with why &amp; what to watch.' },
   'nb-advisor': { name: 'NB Advisor', blurb: 'Attach image(s) + say what to change. Returns the best Nano Banana 2 edit prompt with a quick rationale.' },
 };
 
@@ -485,6 +486,7 @@ function chatPlaceholder(gemId) {
   return {
     'nb-frames': 'Describe the scene & action (the reference image carries identity)…',
     'kling': 'Describe the motion you want from the attached still…',
+    'kling-advisor': 'Describe your source clip + how to restyle / transform it…',
     'nb-advisor': 'What do you want to change in the attached image?',
   }[gemId];
 }
@@ -659,7 +661,7 @@ function renderAssistant(text, refImgs = []) {
       const enc = encodeURIComponent(seg.trimEnd());
       html += `<pre><button class="copy-block" data-text="${enc}">copy</button>${escapeHtml(seg.trimEnd())}</pre>` +
         `<div class="pc-actions"><button class="reuse-prompt" data-text="${enc}" ${imgsAttr}>↻ Reuse prompt</button>` +
-        (state.activeTab !== 'kling' ? `<button class="gen-link" data-text="${enc}" ${imgsAttr}>⚡ Send to Nano Banana 2</button>` : '') +
+        (!state.activeTab.startsWith('kling') ? `<button class="gen-link" data-text="${enc}" ${imgsAttr}>⚡ Send to Nano Banana 2</button>` : '') +
         `</div>`;
     } else {
       html += formatProse(seg, imgsAttr);

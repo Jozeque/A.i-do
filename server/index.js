@@ -55,6 +55,7 @@ const genai = process.env.GEMINI_API_KEY
 const GEM_FILES = {
   'nb-frames': 'nb-frames.txt',
   'kling': 'kling.txt',
+  'kling-advisor': 'kling-advisor.txt',
   'nb-advisor': 'nb-advisor.txt',
 };
 async function readGem(gemId) {
@@ -158,10 +159,10 @@ app.post('/api/projects', async (req, res) => {
       createdAt: now,
       updatedAt: now,
       // per-project gem overrides (start from defaults; editable in UI)
-      gemOverrides: { 'nb-frames': '', 'kling': '', 'nb-advisor': '' },
+      gemOverrides: { 'nb-frames': '', 'kling': '', 'kling-advisor': '', 'nb-advisor': '' },
       // structured builder inputs (NB Frames) that compile into gemOverrides
       gemBuilders: { 'nb-frames': {} },
-      chats: { 'nb-frames': [], 'kling': [], 'nb-advisor': [] },
+      chats: { 'nb-frames': [], 'kling': [], 'kling-advisor': [], 'nb-advisor': [] },
       images: [], // {id, prompt, file, createdAt, favorite, note}
     };
     await saveProject(project);
