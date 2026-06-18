@@ -100,6 +100,27 @@ const saveProject = (p) => data.saveProject(p);
 // ── express setup ─────────────────────────────────────────────────────────────
 const app = express();
 app.use(express.json({ limit: '60mb' }));
+
+// Optional shared-password gate (HTTP Basic). Active ONLY when APP_PASSWORD is set,
+// so local dev stays open. On a public host it stops anyone with the URL from using
+// the app (and burning your API keys). Interim until the Google 2-user login lands.
+// /api/health is exempt so the host's uptime check can still reach it.
+const APP_PASSWORD = process.env.APP_PASSWORD;
+const APP_USER = process.env.APP_USER || 'studio';
+if (APP_PASSWORD) {
+  app.use((req, res, next) => {
+    if (req.path === '/api/health') return next();
+    const hdr = req.headers.authorization || '';
+    if (hdr.startsWith('Basic ')) {
+      const [u, p] = Buffer.from(hdr.slice(6), 'base64').toString().split(':');
+      if (u === APP_USER && p === APP_PASSWORD) return next();
+    }
+    res.set('WWW-Authenticate', 'Basic realm="AI Video Studio"');
+    return res.status(401).send('Authentication required.');
+  });
+  console.log('  🔒 Shared-password protection ON (APP_PASSWORD set)');
+}
+
 // Never cache the app shell (index.html / app.js / styles.css) so UI updates always load.
 app.use(express.static(PUBLIC_DIR, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-store') }));
 // serve saved images (these are immutable by filename — fine to cache)

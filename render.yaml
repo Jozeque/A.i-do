@@ -1,0 +1,27 @@
+# Render deploy config (Blueprint). In Render: New → Blueprint → pick the A.i-do repo.
+# Render reads this file and creates the service. You then set the secret env vars
+# (marked sync:false) in the dashboard.
+#
+# NOTE on storage: on the free plan the disk is EPHEMERAL — projects/images reset on
+# every redeploy or sleep. That's fine as a live preview. Persistent data comes when
+# we wire Google Drive + a database (next step), or by upgrading to a paid plan + disk.
+services:
+  - type: web
+    name: ai-video-studio
+    runtime: node
+    plan: free                 # upgrade to "starter" ($7/mo) for always-on (no sleep)
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # --- secrets: set these in the Render dashboard, not in the repo ---
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: APP_USER         # username for the password gate (e.g. "studio")
+        sync: false
+      - key: APP_PASSWORD     # a long random password — locks the public URL
+        sync: false
