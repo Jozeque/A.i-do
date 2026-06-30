@@ -11,43 +11,192 @@
 //   deleteProject(pid) -> void
 import fsp from 'fs/promises';
 import path from 'path';
+import { getAdminApp } from './firebase.js';
 
 function createLocalDataStore(dataDir) {
   const projDir = (pid) => path.join(dataDir, pid);
   const metaPath = (pid) => path.join(projDir(pid), 'project.json');
-  return {
-    backend: 'local',
-    async getProject(pid) {
-      return JSON.parse(await fsp.readFile(metaPath(pid), 'utf8'));
-    },
-    async saveProject(p) {
-      await fsp.mkdir(projDir(p.id), { recursive: true });
-      await fsp.writeFile(metaPath(p.id), JSON.stringify(p, null, 2));
-      return p;
-    },
-    async listProjects() {
-      const entries = await fsp.readdir(dataDir, { withFileTypes: true });
-      const projects = [];
-      for (const e of entries) {
-        if (!e.isDirectory()) continue;
-        try {
-          const p = JSON.parse(await fsp.readFile(metaPath(e.name), 'utf8'));
-          const imageCount = (p.images || []).length;
-          const chatCount = Object.values(p.chats || {}).reduce((n, arr) => n + (arr?.length || 0), 0);
-          projects.push({ id: p.id, name: p.name, createdAt: p.createdAt, updatedAt: p.updatedAt, imageCount, chatCount });
-        } catch { /* skip dirs that aren't projects */ }
+
+  async function getProject(pid) {
+    return JSON.parse(await fsp.readFile(metaPath(pid), 'utf8'));
+  }
+
+  async function saveProject(p) {
+    await fsp.mkdir(projDir(p.id), { recursive: true });
+    // Atomic write: write a temp file then rename over the target, so a crash/kill mid-write
+    // can never truncate project.json (which would lose the whole project's metadata).
+    const dest = metaPath(p.id);
+    const tmp = `${dest}.tmp`;
+    await fsp.writeFile(tmp, JSON.stringify(p, null, 2));
+    await fsp.rename(tmp, dest);
+    return p;
+  }
+
+  // ── Per-project write serialization ────────────────────────────────────────
+  // Each project's read-modify-write runs in a queue keyed by pid, so two concurrent
+  // requests can't both read the same project.json and then clobber each other's changes
+  // (the race that was silently dropping generated images from the library). The mutator
+  // gets a FRESH read inside the lock and the result is written before the lock frees.
+  const queues = new Map(); // pid -> tail promise
+  async function update(pid, mutator) {
+    const prev = queues.get(pid) || Promise.resolve();
+    const run = prev.then(async () => {
+      const p = await getProject(pid);
+      const out = await mutator(p);
+      const toSave = out || p;
+      await saveProject(toSave);
+      return toSave;
+    });
+    const tail = run.catch(() => {});           // keep the chain alive past a failed mutator
+    queues.set(pid, tail);
+    tail.then(() => { if (queues.get(pid) === tail) queues.delete(pid); });
+    return run;
+  }
+
+  async function listProjects() {
+    const entries = await fsp.readdir(dataDir, { withFileTypes: true });
+    const projects = [];
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      try {
+        const p = JSON.parse(await fsp.readFile(metaPath(e.name), 'utf8'));
+        const imageCount = (p.images || []).length;
+        const chatCount = Object.values(p.chats || {}).reduce((n, arr) => n + (arr?.length || 0), 0);
+        projects.push({ id: p.id, name: p.name, createdAt: p.createdAt, updatedAt: p.updatedAt, imageCount, chatCount });
+      } catch { /* skip dirs that aren't projects */ }
+    }
+    projects.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    return projects;
+  }
+
+  async function deleteProject(pid) {
+    await fsp.rm(projDir(pid), { recursive: true, force: true });
+  }
+
+  return { backend: 'local', getProject, saveProject, update, listProjects, deleteProject };
+}
+
+// ── Firestore backend (subcollections) ──────────────────────────────────────
+// A project is split across documents so no single doc can hit Firestore's 1 MiB
+// limit and concurrent writes can't clobber a shared array:
+//   projects/{pid}                — light meta (name, gem settings, timestamps, cached counts)
+//   projects/{pid}/chats/{gemId}  — one doc per tab, holding that tab's message array
+//   projects/{pid}/images/{imgId} — one doc per generated image
+// getProject reassembles the full blob the routes already expect, so route code is
+// unchanged. Writes go through a per-pid queue (single-instance lock, like the local
+// backend); saveProject diffs the image docs so only new/changed ones are written.
+const GEM_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor'];
+
+function createFirestoreDataStore() {
+  let _db = null, _col = null;
+  async function init() {
+    if (_col) return;
+    const { getFirestore } = await import('firebase-admin/firestore');
+    _db = getFirestore(await getAdminApp());
+    // Mirror JSON semantics: silently drop undefined fields instead of throwing.
+    try { _db.settings({ ignoreUndefinedProperties: true }); } catch { /* already configured */ }
+    _col = _db.collection('projects');
+  }
+
+  // Reassemble the full project blob from the meta doc + chats + images subcollections.
+  async function getProject(pid) {
+    await init();
+    const ref = _col.doc(pid);
+    const metaSnap = await ref.get();
+    if (!metaSnap.exists) throw new Error(`Project not found: ${pid}`);
+    const { imageCount, chatCount, ...meta } = metaSnap.data(); // counts are internal cache
+    const chats = {};
+    for (const g of GEM_TABS) chats[g] = [];
+    (await ref.collection('chats').get()).forEach((d) => { chats[d.id] = d.data().messages || []; });
+    const images = (await ref.collection('images').get()).docs
+      .map((d) => d.data())
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return { ...meta, chats, images };
+  }
+
+  // Persist the blob: meta + per-tab chat docs in one batch, then image docs DIFFED
+  // (only new/changed written, removed deleted), chunked under the 500-op batch limit.
+  async function saveProject(p) {
+    await init();
+    const ref = _col.doc(p.id);
+    const { chats = {}, images = [], ...meta } = p;
+    meta.imageCount = images.length;
+    meta.chatCount = Object.values(chats).reduce((n, a) => n + (a?.length || 0), 0);
+
+    const head = _db.batch();
+    head.set(ref, meta);
+    for (const [gemId, msgs] of Object.entries(chats)) head.set(ref.collection('chats').doc(gemId), { messages: msgs || [] });
+    await head.commit();
+
+    const existing = await ref.collection('images').get();
+    const prevById = new Map(existing.docs.map((d) => [d.id, d.data()]));
+    const ops = [];
+    const keep = new Set();
+    for (const img of images) {
+      const id = String(img.id);
+      keep.add(id);
+      const prev = prevById.get(id);
+      if (!prev || JSON.stringify(prev) !== JSON.stringify(img)) ops.push(['set', ref.collection('images').doc(id), img]);
+    }
+    for (const id of prevById.keys()) if (!keep.has(id)) ops.push(['del', ref.collection('images').doc(id)]);
+    for (let i = 0; i < ops.length; i += 450) {
+      const batch = _db.batch();
+      for (const [kind, docRef, data] of ops.slice(i, i + 450)) kind === 'set' ? batch.set(docRef, data) : batch.delete(docRef);
+      await batch.commit();
+    }
+    return p;
+  }
+
+  // Serialized per-pid read-modify-write — single-instance lock, like the local backend.
+  const queues = new Map();
+  async function update(pid, mutator) {
+    const prev = queues.get(pid) || Promise.resolve();
+    const run = prev.then(async () => {
+      const p = await getProject(pid);
+      const out = await mutator(p);
+      const toSave = out || p;
+      await saveProject(toSave);
+      return toSave;
+    });
+    const tail = run.catch(() => {});
+    queues.set(pid, tail);
+    tail.then(() => { if (queues.get(pid) === tail) queues.delete(pid); });
+    return run;
+  }
+
+  // Fast: reads only the light meta docs (counts are cached on them).
+  async function listProjects() {
+    await init();
+    const snap = await _col.get();
+    const projects = [];
+    snap.forEach((doc) => {
+      const p = doc.data();
+      projects.push({ id: p.id, name: p.name, createdAt: p.createdAt, updatedAt: p.updatedAt, imageCount: p.imageCount || 0, chatCount: p.chatCount || 0 });
+    });
+    projects.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    return projects;
+  }
+
+  // Delete the meta doc + every chats/images subdoc (chunked).
+  async function deleteProject(pid) {
+    await init();
+    const ref = _col.doc(pid);
+    for (const sub of ['chats', 'images']) {
+      const docs = (await ref.collection(sub).get()).docs;
+      for (let i = 0; i < docs.length; i += 450) {
+        const batch = _db.batch();
+        docs.slice(i, i + 450).forEach((d) => batch.delete(d.ref));
+        await batch.commit();
       }
-      projects.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-      return projects;
-    },
-    async deleteProject(pid) {
-      await fsp.rm(projDir(pid), { recursive: true, force: true });
-    },
-  };
+    }
+    await ref.delete();
+  }
+
+  return { backend: 'firestore', getProject, saveProject, update, listProjects, deleteProject };
 }
 
 export function createDataStore(dataDir, { backend = process.env.DATA_BACKEND || 'local' } = {}) {
   if (backend === 'local') return createLocalDataStore(dataDir);
-  // Phase 1: if (backend === 'postgres') return createPostgresDataStore(...);
-  throw new Error(`Unknown DATA_BACKEND "${backend}" (expected "local")`);
+  if (backend === 'firestore') return createFirestoreDataStore();
+  throw new Error(`Unknown DATA_BACKEND "${backend}" (expected "local" or "firestore")`);
 }

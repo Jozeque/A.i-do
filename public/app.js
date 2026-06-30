@@ -1,8 +1,22 @@
 // ── AI Video Studio — frontend ────────────────────────────────────────────────
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+// Auth: when Google sign-in is on, every request carries the current user's Firebase
+// ID token. _firebaseAuth is set by initAuth(); it stays null in open (local) mode,
+// so authHeader() is a no-op and nothing changes for local development.
+let _firebaseAuth = null;
+async function authHeader() {
+  const u = _firebaseAuth?.currentUser;
+  if (!u) return {};
+  try { return { Authorization: `Bearer ${await u.getIdToken()}` }; } catch { return {}; }
+}
+// fetch() that carries the auth token — for non-JSON requests (image/media blobs).
+async function mediaFetch(url, opts = {}) {
+  return fetch(url, { ...opts, headers: { ...(await authHeader()), ...(opts.headers || {}) } });
+}
 const api = async (url, opts = {}) => {
-  const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  const r = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', ...(await authHeader()), ...(opts.headers || {}) } });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || `Request failed (${r.status})`);
   return data;
@@ -62,7 +76,7 @@ const GEM_META = {
 const BUILDER_OPTS = {
   look: ['High-gloss beauty', 'Clinical-luxe', 'Editorial documentary', 'Moody cinematic', 'Product hero', 'Warm lifestyle', 'Cultural editorial'],
   lighting: ['Clamshell beauty (soft 5600K)', 'Soft window / natural', 'Golden-hour warmth', 'Hard chiaroscuro', 'High-key bright & even', 'Overcast soft'],
-  lens: ['85mm f/1.4 (beauty isolation, creamy bokeh)', '50mm f/1.8 (natural)', '35mm (environmental)', '100mm macro (detail)', 'ARRI Alexa + Leica Summilux'],
+  lens: ['Short telephoto ~70–135mm, shallow DOF, creamy bokeh', 'Normal ~40–60mm, natural perspective', 'Wide ~24–35mm, environmental depth', 'Macro register for detail', 'Cinema look (e.g. Alexa + fast primes), modular focal range'],
   palette: ['Vibrant high-key', 'Muted pastel', 'Teal & orange', 'Warm earthy', 'Desaturated editorial', 'Clean clinical whites'],
   wardrobe: ['Describe wardrobe richly in prose', 'Keep wardrobe as in the reference', 'Minimal styling direction'],
 };
@@ -85,18 +99,18 @@ function gemEditorBody(gemId, meta) {
   if (gemId === 'nb-frames') {
     return `
       <div class="bf-analyze">
-        <span class="field-label">Build from a reference image — attach or paste a look/style frame and let the model read its cinematography into the fields below.</span>
+        <span class="field-label">Build from a reference image — attach or paste a look/style frame and let the model read its cinematography into the fields below as a reusable look (adaptable ranges, not this frame's exact settings).</span>
         <div class="bf-analyze-row">
           <div class="ref-row" id="bfRefRow"><button class="ref-add" id="bfRefAdd" type="button">＋</button><input type="file" id="bfRefInput" accept="image/*" multiple hidden /></div>
           <button class="mini-btn primary" id="bfAnalyze" type="button">✨ Analyze &amp; build</button>
         </div>
       </div>
-      <span class="field-label">Cinematography fields — these compile into the direction layered on the base NB Frames gem (for this project only). Analyze fills them; edit any by hand.</span>
+      <span class="field-label">Cinematography fields — these compile into the direction layered on the base NB Frames gem (for this project only). Analyze fills them; edit any by hand. Describe each as an adaptable range or family (e.g. a focal-length range, not one exact lens) so the look stays modular across different shots and frame sizes.</span>
       <div class="builder-grid">
         <label class="bf">Campaign / subject<input id="bf_campaign" placeholder="e.g. Clalit Smile dental campaign" /></label>
         <label class="bf">Look &amp; vibe<input id="bf_look" list="dl_look" placeholder="e.g. Clinical-luxe" /></label>
         <label class="bf">Lighting style<input id="bf_lighting" list="dl_lighting" placeholder="e.g. High-key bright &amp; even" /></label>
-        <label class="bf">Lens &amp; camera<input id="bf_lens" list="dl_lens" placeholder="e.g. 85mm f/1.4, creamy bokeh" /></label>
+        <label class="bf">Lens &amp; camera<input id="bf_lens" list="dl_lens" placeholder="e.g. short-telephoto ~70–135mm, shallow DOF (a range, not one lens)" /></label>
         <label class="bf">Color &amp; palette<input id="bf_palette" list="dl_palette" placeholder="e.g. Clean clinical whites" /></label>
         <label class="bf">Environment bias<input id="bf_environment" placeholder="e.g. bright airy modern clinics" /></label>
         <label class="bf">Default aspect ratio
@@ -255,6 +269,7 @@ const state = {
   refImages: [],        // for generate panel
   klingMode: localStorage.getItem('avs:klingMode') || 'single',  // 'single' (3 variations) | 'multi' (multi-shot)
   nbModel: localStorage.getItem('avs:nbModel') || 'nb2',         // 'nb2' (flash) | 'pro' (Nano Banana Pro)
+  genAR: localStorage.getItem('avs:genAR') ?? '16:9',            // generator aspect ratio — defaults to 16:9, remembers last pick
 };
 
 // ── boot ──────────────────────────────────────────────────────────────────────
@@ -284,6 +299,7 @@ function renderKeyStatus() {
 function wireGlobal() {
   $('#newProjectBtn').onclick = newProject;
   $('#newProjectBtn2').onclick = newProject;
+  $('#showcaseBtn').onclick = openShowcase;
   $('#lightboxClose').onclick = () => $('#lightbox').classList.add('hidden');
   $('#lightbox').onclick = (e) => { if (e.target.id === 'lightbox') $('#lightbox').classList.add('hidden'); };
   $('#lightboxPrev').onclick = (e) => { e.stopPropagation(); lightboxNav(-1); };
@@ -345,6 +361,7 @@ async function openProject(pid) {
   state.attachments = {};
   state.refImages = [];
   $('#emptyState').classList.add('hidden');
+  $('#showcaseView').classList.add('hidden');
   $('#workspace').classList.remove('hidden');
   $('#projectNameInput').value = state.current.name;
   $('#wsMeta').textContent = `created ${new Date(state.current.createdAt).toLocaleDateString()}`;
@@ -353,7 +370,84 @@ async function openProject(pid) {
 }
 function showEmpty() {
   $('#workspace').classList.add('hidden');
+  $('#showcaseView').classList.add('hidden');
   $('#emptyState').classList.remove('hidden');
+}
+
+// ── Showcase (global): upload portfolio videos that power the public landing page ──
+async function openShowcase() {
+  $('#emptyState').classList.add('hidden');
+  $('#workspace').classList.add('hidden');
+  const view = $('#showcaseView');
+  view.classList.remove('hidden');
+  view.innerHTML = `
+    <div class="showcase-head">
+      <h1>Showcase</h1>
+      <p>Upload finished videos here — they appear in the Work section of your <a href="/landing" target="_blank" rel="noopener">public landing page</a>.</p>
+    </div>
+    <form class="sc-upload" id="scForm">
+      <label class="sc-file"><input type="file" id="scFile" accept="video/*" required /><span>Choose video…</span></label>
+      <input type="text" id="scTitle" class="sc-input" placeholder="Title (e.g. Bubble Express)" />
+      <input type="text" id="scCaption" class="sc-input" placeholder="Caption (e.g. Concept spot)" />
+      <button type="submit" class="new-project-btn" id="scUpload">Upload</button>
+      <span class="sc-status" id="scStatus"></span>
+    </form>
+    <div class="showcase-list" id="scList"></div>`;
+  $('#scForm').addEventListener('submit', uploadShowcase);
+  $('#scFile').addEventListener('change', (e) => {
+    $('#scFile').closest('.sc-file').querySelector('span').textContent = e.target.files[0]?.name || 'Choose video…';
+  });
+  await renderShowcaseList();
+}
+
+async function renderShowcaseList() {
+  const list = $('#scList');
+  let items = [];
+  try { items = await api('/api/showcase'); } catch {}
+  if (!items.length) { list.innerHTML = '<div class="sc-empty">No videos yet — upload your first above.</div>'; return; }
+  list.innerHTML = '';
+  for (const it of items) {
+    const card = document.createElement('div');
+    card.className = 'sc-card';
+    card.innerHTML = `
+      <video src="${it.url}" muted loop playsinline preload="metadata"></video>
+      <div class="sc-card-meta"><div class="sc-card-title"></div><div class="sc-card-cap"></div></div>
+      <button class="sc-del" title="Remove">✕</button>`;
+    card.querySelector('.sc-card-title').textContent = it.title || 'Untitled';
+    card.querySelector('.sc-card-cap').textContent = it.caption || '';
+    const v = card.querySelector('video');
+    card.addEventListener('mouseenter', () => v.play().catch(() => {}));
+    card.addEventListener('mouseleave', () => { v.pause(); v.currentTime = 0; });
+    card.querySelector('.sc-del').addEventListener('click', async () => {
+      if (!confirm('Remove this video from the showcase?')) return;
+      try { await api(`/api/showcase/${it.id}`, { method: 'DELETE' }); await renderShowcaseList(); }
+      catch (e) { toast('Delete failed: ' + e.message); }
+    });
+    list.appendChild(card);
+  }
+}
+
+async function uploadShowcase(e) {
+  e.preventDefault();
+  const file = $('#scFile').files[0];
+  if (!file) return;
+  const status = $('#scStatus'), btn = $('#scUpload');
+  status.textContent = 'Uploading…'; btn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('video', file);
+    fd.append('title', $('#scTitle').value || '');
+    fd.append('caption', $('#scCaption').value || '');
+    const r = await fetch('/api/showcase', { method: 'POST', headers: await authHeader(), body: fd });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `Upload failed (${r.status})`);
+    status.textContent = 'Uploaded ✓';
+    $('#scForm').reset();
+    $('#scFile').closest('.sc-file').querySelector('span').textContent = 'Choose video…';
+    await renderShowcaseList();
+  } catch (err) {
+    status.textContent = 'Failed: ' + err.message;
+  } finally { btn.disabled = false; }
 }
 
 // ── tabs ──────────────────────────────────────────────────────────────────────
@@ -523,7 +617,7 @@ function renderFavPickerInto(picker, onPick) {
 // Fetch a saved favorite image into an attachment object {name, mimeType, data, url}.
 async function favoriteToAttachment(im) {
   const url = `/media/${state.current.id}/images/${im.file}`;
-  const blob = await (await fetch(url)).blob();
+  const blob = await (await mediaFetch(url)).blob();
   const data = await fileToB64(blob);
   return { name: im.file, mimeType: blob.type || 'image/jpeg', data, url };
 }
@@ -594,7 +688,7 @@ async function reusePromptInComposer(btn) {
     const url = `/media/${state.current.id}/uploads/${im.file}`;
     if (state.attachments[gemId].some(r => r.url === url)) continue;
     try {
-      const blob = await (await fetch(url)).blob();
+      const blob = await (await mediaFetch(url)).blob();
       const data = await fileToB64(blob);
       state.attachments[gemId].push({ name: im.file, mimeType: im.mimeType || blob.type || 'image/jpeg', data, url });
       added++;
@@ -611,6 +705,9 @@ function sendPromptToGenerator(btn) {
   const prompt = decodeURIComponent(btn.dataset.text || '');
   let imgs = [];
   try { imgs = JSON.parse(decodeURIComponent(btn.dataset.imgs || '%5B%5D')); } catch {}
+  // "Send to NB" REPLACES the generator: drop any previously attached reference(s) up front,
+  // then load only this prompt's text + its own reference image(s).
+  state.refImages = [];
   switchTab('generate');
   setTimeout(async () => {
     const t = $('#genPrompt');
@@ -618,15 +715,15 @@ function sendPromptToGenerator(btn) {
     let added = 0;
     for (const im of imgs) {
       const url = `/media/${state.current.id}/uploads/${im.file}`;
-      if (state.refImages.some(r => r.url === url)) continue;
       try {
-        const blob = await (await fetch(url)).blob();
+        const blob = await (await mediaFetch(url)).blob();
         const data = await fileToB64(blob);
         state.refImages.push({ name: im.file, mimeType: im.mimeType || blob.type || 'image/jpeg', data, url });
         added++;
       } catch { /* skip an image that can't be fetched */ }
     }
-    if (added) { renderRefImages(); toast(`Prompt + ${added} reference image${added > 1 ? 's' : ''} sent.`); }
+    renderRefImages();
+    toast(added ? `Prompt + ${added} reference image${added > 1 ? 's' : ''} sent (generator reset).` : 'Prompt sent (generator reset).');
   }, 60);
 }
 
@@ -677,12 +774,12 @@ function formatProse(seg, imgsAttr = '') {
   const promptSplit = seg.split(/(?=PROMPT\s*\d\s*[—\-:])/g);
   if (promptSplit.length > 1) {
     return promptSplit.map(chunk => {
-      const m = chunk.match(/^PROMPT\s*\d\s*[—\-:].*$/m);
-      if (!m) return inlineFmt(chunk);
+      const m = chunk.match(/^\**PROMPT\s*\d\s*[—\-:].*$/m);
+      if (!m) return chunk.replace(/[\s*]/g, '') ? inlineFmt(chunk) : '';   // skip stray "**"/blank chunks
       const headLine = m[0];
-      const bodyText = chunk.replace(headLine, '').trim();
+      const bodyText = chunk.replace(headLine, '').trim().replace(/^\*+|\*+$/g, '').trim();
       const enc = encodeURIComponent(bodyText);
-      return `<div class="prompt-card"><div class="pc-head">${escapeHtml(headLine.replace(/^PROMPT\s*/i, 'Prompt '))}</div>` +
+      return `<div class="prompt-card"><div class="pc-head">${escapeHtml(headLine.replace(/\*+/g, '').replace(/^PROMPT\s*/i, 'Prompt '))}</div>` +
         `<pre style="margin:8px 14px"><button class="copy-block" data-text="${enc}">copy</button>${escapeHtml(bodyText)}</pre>` +
         `<div class="pc-actions"><button class="reuse-prompt" data-text="${enc}" ${imgsAttr}>↻ Reuse prompt</button>` +
         `<button class="gen-link" data-text="${enc}" ${imgsAttr}>⚡ Send to Nano Banana 2</button></div></div>`;
@@ -793,9 +890,9 @@ function renderGenerate(body) {
         <div>
           <span class="field-label">Variations</span>
           <select id="genCount">
-            <option value="3" selected>3 images</option>
-            <option value="1">1 image</option>
+            <option value="1" selected>1 image</option>
             <option value="2">2 images</option>
+            <option value="3">3 images</option>
             <option value="4">4 images</option>
           </select>
         </div>
@@ -810,6 +907,13 @@ function renderGenerate(body) {
   body.appendChild(panel);
 
   renderRefImages();
+  // Aspect-ratio selector remembers the last choice (persists across generations & sessions),
+  // so you set it once instead of resetting to "model default" (which lets the model pick 16:9).
+  const arSel = $('#genAR');
+  if (arSel) {
+    arSel.value = state.genAR || '';
+    arSel.onchange = () => { state.genAR = arSel.value; try { localStorage.setItem('avs:genAR', state.genAR); } catch {} };
+  }
   $('#refAdd').onclick = () => $('#refInput').click();
   $('#refInput').onchange = async (e) => {
     for (const f of e.target.files) {
@@ -1014,4 +1118,63 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-boot().catch(e => { console.error(e); document.body.innerHTML = `<div style="padding:40px;font-family:monospace;color:#e2685f">Failed to start: ${e.message}</div>`; });
+// ── Sign-in (Google, allowlisted) ─────────────────────────────────────────────
+// Resolves when access is confirmed, so boot() runs only for an allowed account.
+// In open (local) mode the server reports authEnabled:false and this returns at once.
+async function initAuth() {
+  let cfg;
+  try { cfg = await (await fetch('/api/auth-config')).json(); }
+  catch { return; } // server unreachable — let boot() surface the real error
+  if (!cfg.authEnabled || !cfg.firebase) return; // open mode — no sign-in needed
+
+  const overlay = $('#authOverlay'), btn = $('#googleSignInBtn');
+  const status = $('#authStatus'), outBtn = $('#authSignOut');
+  const setStatus = (m) => { if (status) status.textContent = m || ''; };
+  overlay?.classList.remove('hidden');
+  setStatus('Loading…');
+
+  // Firebase SDK from CDN (ESM) — no build step.
+  const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js');
+  const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut,
+          setPersistence, browserLocalPersistence } =
+    await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js');
+  _firebaseAuth = getAuth(initializeApp(cfg.firebase));
+  await setPersistence(_firebaseAuth, browserLocalPersistence).catch(() => {});
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+
+  btn?.addEventListener('click', async () => {
+    setStatus('Opening Google…'); btn.classList.add('hidden');
+    try { await signInWithPopup(_firebaseAuth, provider); }
+    catch (e) {
+      btn.classList.remove('hidden');
+      setStatus(e?.code === 'auth/popup-closed-by-user' ? '' : 'Sign-in failed — please try again.');
+    }
+  });
+  outBtn?.addEventListener('click', () => signOut(_firebaseAuth));
+
+  return new Promise((resolve) => {
+    let done = false;
+    onAuthStateChanged(_firebaseAuth, async (user) => {
+      if (!user) { // signed out — show the button
+        outBtn?.classList.add('hidden'); btn?.classList.remove('hidden'); setStatus('');
+        return;
+      }
+      btn?.classList.add('hidden'); setStatus('Checking access…');
+      // Confirm the account is on the allowlist by hitting a protected route.
+      let ok = false;
+      try { await api('/api/projects'); ok = true; } catch { ok = false; }
+      if (ok) {
+        overlay?.classList.add('hidden');
+        if (!done) { done = true; resolve(); }
+      } else {
+        setStatus(`${user.email} isn't on the allowlist for this studio.`);
+        outBtn?.classList.remove('hidden');
+      }
+    });
+  });
+}
+
+initAuth()
+  .then(() => boot())
+  .catch(e => { console.error(e); document.body.innerHTML = `<div style="padding:40px;font-family:monospace;color:#e2685f">Failed to start: ${e.message}</div>`; });

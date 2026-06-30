@@ -19,6 +19,11 @@ function uploadExt(mt) {
   mt = mt || '';
   return mt.includes('png') ? 'png' : mt.includes('webp') ? 'webp' : mt.includes('gif') ? 'gif' : 'jpg';
 }
+// Showcase videos live under a single virtual project id "showcase" / bucket "videos".
+function videoExt(mt) {
+  mt = mt || '';
+  return mt.includes('webm') ? 'webm' : (mt.includes('quicktime') || mt.includes('mov')) ? 'mov' : 'mp4';
+}
 
 function createLocalStorage(dataDir) {
   const uploadsDir = (pid) => path.join(dataDir, pid, 'uploads');
@@ -43,11 +48,118 @@ function createLocalStorage(dataDir) {
     async deleteImage(pid, file) {
       await fsp.rm(path.join(imagesDir(pid), file), { force: true });
     },
+    async saveShowcase(id, buffer, mimeType) {
+      const dir = path.join(dataDir, 'showcase', 'videos');
+      await fsp.mkdir(dir, { recursive: true });
+      const file = `${id}.${videoExt(mimeType)}`;
+      await fsp.writeFile(path.join(dir, file), buffer);
+      return { file, url: `/media/showcase/videos/${file}` };
+    },
+    async deleteShowcase(file) {
+      await fsp.rm(path.join(dataDir, 'showcase', 'videos', file), { force: true });
+    },
+  };
+}
+
+// ── Google Drive backend ─────────────────────────────────────────────────────
+// Writes media into the OWNER's personal Drive (so it counts against their 2 TB) by
+// acting as that Google account via OAuth + a stored refresh token — a service account
+// can't use a consumer Drive's quota. Scope: drive.file (the app only ever touches
+// files it creates). Layout: <DRIVE_ROOT>/<pid>/<bucket>/<file>. The returned `file`
+// is the Drive file id; the /media route streams it back (proxy in server/index.js).
+function createDriveStorage() {
+  let _drive = null, _Readable = null;
+  async function drive() {
+    if (_drive) return _drive;
+    const { google } = await import('googleapis');
+    ({ Readable: _Readable } = await import('stream'));
+    const oauth = new google.auth.OAuth2(
+      process.env.GOOGLE_OAUTH_CLIENT_ID,
+      process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+    );
+    oauth.setCredentials({ refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN });
+    _drive = google.drive({ version: 'v3', auth: oauth });
+    return _drive;
+  }
+
+  const ROOT = process.env.DRIVE_ROOT_FOLDER || 'AI Video Studio';
+  const folderCache = new Map(); // "parent/name" -> folderId
+
+  // Cache the in-flight PROMISE (not just the id) so concurrent uploads to the same
+  // project/bucket reuse one folder-creation instead of racing to create duplicates.
+  function folder(name, parentId) {
+    const key = `${parentId || 'root'}/${name}`;
+    let pending = folderCache.get(key);
+    if (pending) return pending;
+    pending = (async () => {
+      const d = await drive();
+      const q = [
+        `name='${name.replace(/'/g, "\\'")}'`,
+        "mimeType='application/vnd.google-apps.folder'",
+        'trashed=false',
+        parentId ? `'${parentId}' in parents` : null,
+      ].filter(Boolean).join(' and ');
+      const res = await d.files.list({ q, fields: 'files(id)', spaces: 'drive' });
+      let id = res.data.files?.[0]?.id;
+      if (!id) {
+        const created = await d.files.create({
+          requestBody: { name, mimeType: 'application/vnd.google-apps.folder', parents: parentId ? [parentId] : undefined },
+          fields: 'id',
+        });
+        id = created.data.id;
+      }
+      return id;
+    })();
+    folderCache.set(key, pending);
+    return pending;
+  }
+
+  async function upload(pid, bucket, name, buffer, mimeType) {
+    const d = await drive();
+    const root = await folder(ROOT, null);
+    const proj = await folder(pid, root);
+    const parent = await folder(bucket, proj);
+    const res = await d.files.create({
+      requestBody: { name, parents: [parent] },
+      media: { mimeType: mimeType || 'application/octet-stream', body: _Readable.from(buffer) },
+      fields: 'id',
+    });
+    return res.data.id;
+  }
+
+  return {
+    backend: 'drive',
+    async saveUpload(pid, b64, mimeType) {
+      const mt = mimeType || 'image/jpeg';
+      const file = await upload(pid, 'uploads', `${rid()}.${uploadExt(mt)}`, Buffer.from(b64, 'base64'), mt);
+      return { file, mimeType: mt, url: `/media/${pid}/uploads/${file}` };
+    },
+    async saveImage(pid, imgId, buffer, mimeType) {
+      const ext = (mimeType || 'image/png').includes('jpeg') ? 'jpg' : 'png';
+      const file = await upload(pid, 'images', `${imgId}.${ext}`, buffer, mimeType);
+      return { file, url: `/media/${pid}/images/${file}` };
+    },
+    async deleteImage(pid, file) {
+      try { await (await drive()).files.delete({ fileId: file }); } catch { /* already gone */ }
+    },
+    async saveShowcase(id, buffer, mimeType) {
+      const file = await upload('showcase', 'videos', `${id}.${videoExt(mimeType)}`, buffer, mimeType);
+      return { file, url: `/media/showcase/videos/${file}` };
+    },
+    async deleteShowcase(file) {
+      try { await (await drive()).files.delete({ fileId: file }); } catch { /* already gone */ }
+    },
+    // Stream a Drive file's bytes back (used by the /media proxy). Returns {stream, mimeType}.
+    async readFile(fileId) {
+      const d = await drive();
+      const res = await d.files.get({ fileId, alt: 'media' }, { responseType: 'stream' });
+      return { stream: res.data, mimeType: res.headers?.['content-type'] || 'application/octet-stream' };
+    },
   };
 }
 
 export function createStorage(dataDir, { backend = process.env.STORAGE_BACKEND || 'local' } = {}) {
   if (backend === 'local') return createLocalStorage(dataDir);
-  // Phase 1: if (backend === 'drive') return createDriveStorage(dataDir, ...);
-  throw new Error(`Unknown STORAGE_BACKEND "${backend}" (expected "local")`);
+  if (backend === 'drive') return createDriveStorage();
+  throw new Error(`Unknown STORAGE_BACKEND "${backend}" (expected "local" or "drive")`);
 }

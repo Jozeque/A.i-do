@@ -23,6 +23,7 @@ DRAFTING RULES
 - Positive phrasing: describe what you DO want. Name what stays ("keep the original motion, framing, and pacing") and what changes.
 - One clear transformation per prompt; don't stack unrelated changes.
 - Anchor the new look with concrete texture/lighting nouns (film grain, hard chiaroscuro shadows, neon rim light, wet asphalt) so the restyle reads strongly without overpowering the motion.
+- Describe the new look CONCRETELY, never as a label: the actual colour temperature, named hues, grade behaviour (film grain, contrast, lifted blacks, highlight roll-off), and light/texture — never a bare style label or a reference to "the project" / "the project's look" (the model can't render those). Translate any look shorthand into what it literally looks like. Always be detailed and cinematic.
 - Negative prompt: ALWAYS offer one short line for Kling's separate Negative Prompt field, focused on preserving motion and avoiding artifacts — e.g. "morphing, warping, flicker, distorted face, warped hands, drifting off the original motion." Keep it short; never contradict the positive prompt.
 - Audio: only when asked. Dialogue as `The man says: "…"` (1-2 lines max); ambient as a short cue.
 

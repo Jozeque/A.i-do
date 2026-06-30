@@ -1,0 +1,21 @@
+CINEMATOGRAPHY KIT — expert craft reference (light · lens · depth · focus)
+
+This is ground-truth craft knowledge for a senior cinematographer. Use it to READ a reference image accurately and to SPECIFY shots precisely. Apply it silently — never quote it, label it, or output it as a list; it informs your choices, it is not text to repeat. Specify each attribute as the look's character/range and adapt it to each brief (a daylight reference does not force daylight).
+
+LIGHT
+- Quality is set by the source's RELATIVE size: large / close / diffused = SOFT (gradual shadow edges, gentle falloff, low specularity); small / distant / bare = HARD (crisp shadow edges, bright speculars). Diffusion, bounce, clouds soften; bare bulbs, midday sun, spots harden.
+- Direction & height: frontal (flat, shadowless), 45° loop (small nose shadow), side / Rembrandt (cheek triangle), split (half-lit), edge / rim & backlight (separation, hair light), top, and underlight (uneasy). Always name the key's angle and height.
+- Contrast = key-to-fill RATIO. Low ratio (~2:1) reads bright and even ("high-key"); high ratio (~8:1+) reads shaped and moody ("low-key"). Fill, bounce, or negative fill set it. Falloff obeys the inverse-square law — closer sources fall off faster, giving moodier gradients.
+- Classic schemes: butterfly / paramount & clamshell (beauty: soft frontal key + under-fill, bright catchlights), Rembrandt & loop (portrait), split & chiaroscuro (drama), high-key (clean commercial), low-key (noir).
+- MOTIVATE every light from a believable in-scene source (window, practical lamp, sun, fire, screen, neon). Note colour temperature — ~1800K candle, 3200K tungsten, ~4300K mixed, 5600K daylight, 7000K+ open shade — and any mixed-temperature interplay (warm practical against cool ambient). Read catchlights and speculars to infer the source's size, shape, and position.
+
+LENS & PERSPECTIVE (full-frame-equivalent focal lengths)
+- Ultra-wide ≤24mm: expansive, deep, edge distortion, exaggerated near/far size. Wide 24–35mm: environmental, mild expansion. Normal 40–58mm (~50mm): natural, eye-like. Short-tele / portrait 85–135mm: flattering facial compression, easy isolation. Tele 135–300mm+: strong compression, background pulled forward and isolated.
+- PERSPECTIVE is set by camera DISTANCE; focal length then frames from there. Long lens + far back = compressed, flattering, stacked planes. Wide lens + close = stretched, dynamic, deep. Wide enlarges what's near and shrinks the background; tele flattens and enlarges the background.
+- Character: barrel distortion (wide), pincushion (tele); anamorphic = oval bokeh + horizontal flares + ~2.39:1 squeeze; spherical = round bokeh; vintage glass = lower contrast, gentle flares, characterful bokeh.
+
+DEPTH OF FIELD & FOCUS
+- DOF (zone of acceptable sharpness) is SHALLOWER with a wider aperture (smaller f-number), longer focal length, and closer subject; DEEPER with a smaller aperture (larger f-number), wider lens, and greater distance.
+- Intent by stop: f/1.4–f/2.8 = thin plane, creamy bokeh, strong isolation (portrait/beauty); f/4–f/5.6 = subject sharp with readable context; f/8–f/16 = deep focus (environment / landscape / architecture). Always name the focal PLANE (what is tack-sharp) and what falls off.
+- Bokeh quality comes from aperture-blade count/shape and lens design (smooth vs busy, round vs cat-eye at the edges); out-of-focus speculars render as bokeh balls.
+- Build DEPTH with layered foreground / midground / background, overlap, and atmospheric perspective (haze and particulates lighten and desaturate distance). Selective focus directs the eye; deep focus invites exploration.

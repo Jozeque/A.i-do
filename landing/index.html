@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A.I Duo — AI Video Lab</title>
+<meta name="description" content="A.I Duo is a two-person AI video lab turning briefs into cinematic film — concept, frames, motion, and sound, start to finish." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* lifted straight from the app so the site is its sibling */
+    --bg: #0c0b10;
+    --bg-2: #131119;
+    --panel: #17151f;
+    --panel-2: #1d1a27;
+    --line: #2a2735;
+    --line-soft: #221f2d;
+    --ink: #f4f1ea;
+    --ink-dim: #a39db0;
+    --ink-faint: #6f6a7d;
+    --accent: #e8b04b;     /* warm gold — the gloss cue */
+    --accent-2: #c8643c;   /* burnt amber */
+    --violet: #9a86ff;
+    --teal: #5fd6c2;
+    --wa: #25d366;         /* whatsapp green, used only as a faint signal */
+    --maxw: 1180px;
+    --font: 'Rubik', system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  img, video { display: block; max-width: 100%; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+  .wrap { max-width: var(--maxw); margin-inline: auto; padding-inline: 26px; }
+  .eyebrow {
+    font-size: .72rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .24em; color: var(--accent);
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before { content: ""; width: 24px; height: 1px; background: var(--accent); }
+
+  /* ── nav ───────────────────────────────────────────── */
+  header {
+    position: fixed; inset: 0 0 auto 0; z-index: 50;
+    transition: background .3s ease, border-color .3s ease, backdrop-filter .3s ease;
+    border-bottom: 1px solid transparent;
+  }
+  header.scrolled {
+    background: rgba(12,11,16,.72);
+    backdrop-filter: blur(14px) saturate(120%);
+    border-bottom-color: var(--line);
+  }
+  .nav { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .brand { display: flex; align-items: center; gap: 11px; font-weight: 700; letter-spacing: .02em; }
+  .mark {
+    font-size: 26px; line-height: 1; color: var(--accent);
+    transform: translateY(1px);
+  }
+  .brand b { font-weight: 800; }
+  .nav-links { display: flex; align-items: center; gap: 34px; }
+  .nav-links a.link {
+    font-size: .95rem; font-weight: 500; color: var(--ink-dim);
+    transition: color .18s ease; position: relative; padding: 4px 0;
+  }
+  .nav-links a.link::after {
+    content: ""; position: absolute; left: 0; right: 100%; bottom: -2px; height: 1px;
+    background: var(--accent); transition: right .22s ease;
+  }
+  .nav-links a.link:hover { color: var(--ink); }
+  .nav-links a.link:hover::after { right: 0; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: var(--font); font-weight: 600; font-size: .95rem; letter-spacing: .01em;
+    border-radius: 11px; padding: 11px 18px; cursor: pointer; border: 1px solid transparent;
+    transition: transform .14s ease, background .2s ease, border-color .2s ease, color .2s ease;
+    white-space: nowrap;
+  }
+  .btn svg { width: 17px; height: 17px; flex: none; }
+  .btn-primary { background: var(--accent); color: #18120a; border-color: var(--accent); }
+  .btn-primary:hover { background: var(--gold); border-color: var(--gold); transform: translateY(-2px); }
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+  .btn-lg { font-size: 1.06rem; padding: 16px 26px; border-radius: 13px; }
+
+  .menu-btn { display: none; background: none; border: 0; color: var(--ink); cursor: pointer; padding: 8px; }
+  .menu-btn svg { width: 26px; height: 26px; }
+
+  /* ── hero ──────────────────────────────────────────── */
+  .hero { position: relative; padding: 168px 0 96px; overflow: hidden; }
+  /* hero stays flat — no vignette */
+  .hero-frame { position: relative; max-width: 940px; padding: clamp(26px, 5vw, 54px) clamp(6px, 3vw, 30px); }
+  .cnr { position: absolute; width: clamp(26px, 4vw, 40px); height: clamp(26px, 4vw, 40px); pointer-events: none;
+         border-color: var(--accent); opacity: .9; }
+  .cnr.tl { top: 0; left: 0; border-top: 2px solid; border-left: 2px solid; }
+  .cnr.tr { top: 0; right: 0; border-top: 2px solid; border-right: 2px solid; }
+  .cnr.bl { bottom: 0; left: 0; border-bottom: 2px solid; border-left: 2px solid; }
+  .cnr.br { bottom: 0; right: 0; border-bottom: 2px solid; border-right: 2px solid; }
+
+  .hero h1 {
+    font-weight: 800; letter-spacing: -.03em; line-height: 1.0;
+    font-size: clamp(2.7rem, 7.4vw, 5.6rem); margin: 20px 0 0;
+  }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero .lead {
+    margin-top: 22px; max-width: 620px; font-size: clamp(1.05rem, 1.6vw, 1.28rem);
+    color: var(--ink-dim); font-weight: 400;
+  }
+  .hero-cta { margin-top: 34px; display: flex; flex-wrap: wrap; gap: 14px; }
+  .hero-meta {
+    margin-top: 24px; font-size: .82rem; color: var(--ink-faint); letter-spacing: .02em;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .hero-meta .dot { width: 6px; height: 6px; background: var(--accent); transform: rotate(45deg); }
+
+  /* ── generic section ───────────────────────────────── */
+  .section { padding: clamp(72px, 12vh, 132px) 0; position: relative; scroll-margin-top: 80px; }
+  .section > .wrap > .head { max-width: 680px; margin-bottom: 46px; }
+  .head h2 { font-size: clamp(1.9rem, 4vw, 3rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.08; margin-top: 16px; }
+  .head p { margin-top: 14px; color: var(--ink-dim); font-size: 1.05rem; }
+  .rule { height: 1px; background: var(--line); }
+
+  /* ── work grid ─────────────────────────────────────── */
+  .work-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; }
+  .card { grid-column: span 2; border-radius: 16px; overflow: hidden; border: 1px solid var(--line);
+          background: var(--panel); position: relative; isolation: isolate; transition: transform .25s ease, border-color .25s ease; }
+  .card.feature { grid-column: span 4; grid-row: span 2; }
+  .card:hover { transform: translateY(-4px); border-color: var(--accent); }
+  /* poster: swap this <div> for <img src> or <video poster> with the same class to drop in real work */
+  .poster { aspect-ratio: 16 / 9; width: 100%; transition: transform .45s cubic-bezier(.2,.7,.2,1); }
+  .card.feature .poster { aspect-ratio: 16 / 10; height: 100%; }
+  .card:hover .poster { transform: scale(1.045); }
+  /* flat muted placeholder tones — swap the whole .poster div for real <img>/<video> */
+  .poster.a { background: #241c30; }
+  .poster.b { background: #2c2116; }
+  .poster.c { background: #15252a; }
+  .poster.d { background: #2a201a; }
+  .poster.e { background: #271a28; }
+  .poster.f { background: #17251f; }
+  .card-meta { position: absolute; inset: auto 0 0 0; z-index: 2; padding: 15px 18px;
+               background: rgba(8,7,11,.62); border-top: 1px solid rgba(244,241,234,.1);
+               display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .card-meta h3 { font-size: 1.06rem; font-weight: 600; letter-spacing: -.01em; }
+  .card.feature .card-meta h3 { font-size: 1.5rem; font-weight: 700; }
+  .card-meta .tag { font-size: .76rem; color: var(--ink-dim); margin-top: 3px; letter-spacing: .02em; }
+  .chip { font-size: .72rem; font-weight: 600; color: var(--ink); background: rgba(244,241,234,.1);
+          border: 1px solid rgba(244,241,234,.16); padding: 4px 9px; border-radius: 999px; backdrop-filter: blur(4px); white-space: nowrap; }
+  .play { position: absolute; top: 14px; left: 14px; z-index: 2; width: 38px; height: 38px; border-radius: 50%;
+          display: grid; place-items: center; background: rgba(12,11,16,.5); border: 1px solid rgba(244,241,234,.22);
+          backdrop-filter: blur(4px); transition: background .2s ease, transform .2s ease; }
+  .card:hover .play { background: var(--accent); transform: scale(1.06); }
+  .play svg { width: 14px; height: 14px; color: var(--ink); transition: color .2s; margin-left: 2px; }
+  .card:hover .play svg { color: #1a1206; }
+
+  /* ── clients ───────────────────────────────────────── */
+  .clients-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 36px; }
+  /* replace each wordmark with a logo <img> (keep height ~26px, opacity styling) */
+  .logo { font-weight: 700; font-size: 1.18rem; letter-spacing: .04em; color: var(--ink-faint);
+          opacity: .82; transition: color .2s ease, opacity .2s ease; }
+  .logo:hover { color: var(--ink); opacity: 1; }
+
+  /* ── testimonials ──────────────────────────────────── */
+  .quotes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .quote { border: 1px solid var(--line); background: var(--panel);
+           border-radius: 16px; padding: 28px 26px; display: flex; flex-direction: column; gap: 18px; }
+  .quote .qmark { font-family: Georgia, serif; font-size: 2.6rem; line-height: .5; color: var(--accent); height: 18px; }
+  .quote p { font-size: 1.04rem; color: var(--ink); }
+  .quote .who { margin-top: auto; display: flex; align-items: center; gap: 12px; }
+  .quote .ava { width: 36px; height: 36px; border-radius: 50%; flex: none;
+                background: var(--panel-2); border: 1px solid var(--line);
+                display: grid; place-items: center; font-size: .74rem; font-weight: 700; color: var(--accent); letter-spacing: .02em; }
+  .quote .who b { display: block; font-size: .92rem; font-weight: 600; }
+  .quote .who span { font-size: .8rem; color: var(--ink-faint); }
+
+  /* ── contact ───────────────────────────────────────── */
+  .contact { text-align: center; }
+  .contact .hero-frame { margin-inline: auto; max-width: 760px; text-align: center; }
+  .contact h2 { font-size: clamp(2.1rem, 5vw, 3.6rem); font-weight: 800; letter-spacing: -.025em; line-height: 1.04; }
+  .contact h2 em { font-style: normal; color: var(--accent); }
+  .contact p { margin: 18px auto 0; max-width: 480px; color: var(--ink-dim); font-size: 1.08rem; }
+  .contact-cta { margin-top: 32px; display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; }
+  /* contact CTA uses the standard primary hover — no glow */
+  .contact small { display: block; margin-top: 20px; color: var(--ink-faint); font-size: .82rem; }
+
+  /* ── footer ────────────────────────────────────────── */
+  footer { border-top: 1px solid var(--line); padding: 40px 0; }
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  .foot .brand { font-size: .98rem; }
+  .foot-links { display: flex; gap: 22px; font-size: .9rem; color: var(--ink-dim); }
+  .foot-links a:hover { color: var(--accent); }
+  .foot .cr { font-size: .82rem; color: var(--ink-faint); }
+
+  /* ── reveal-on-scroll ──────────────────────────────── */
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* ── responsive ────────────────────────────────────── */
+  @media (max-width: 860px) {
+    .nav-links { position: fixed; inset: 72px 0 auto 0; flex-direction: column; align-items: stretch; gap: 0;
+                 background: rgba(12,11,16,.97); backdrop-filter: blur(16px); border-bottom: 1px solid var(--line);
+                 padding: 10px 26px 22px; transform: translateY(-130%); transition: transform .3s ease; }
+    .nav-links.open { transform: none; }
+    .nav-links a.link { padding: 15px 0; border-bottom: 1px solid var(--line-soft); color: var(--ink); }
+    .nav-links a.link::after { display: none; }
+    .nav-links .btn { margin-top: 14px; justify-content: center; }
+    .menu-btn { display: inline-flex; }
+    .work-grid { grid-template-columns: 1fr 1fr; }
+    .card, .card.feature { grid-column: span 2; grid-row: auto; }
+    .quotes { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 540px) {
+    .work-grid { grid-template-columns: 1fr; gap: 14px; }
+    .card { grid-column: span 1; }
+    .hero { padding-top: 132px; }
+    .foot { flex-direction: column; align-items: flex-start; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+    .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+<!-- ════════════════════════════════════════════════════════════════════
+     A.I Duo — landing page (placeholder content marked TODO).
+     • WhatsApp number: set WA_NUMBER in the <script> at the bottom (one place).
+     • Work cards: replace each <div class="poster …"> with <img>/<video> of real work.
+     • Client logos: replace the .logo wordmarks with <img> logos.
+     • Testimonials: swap in real quotes/names.
+   ════════════════════════════════════════════════════════════════════ -->
+
+<header id="hdr">
+  <div class="wrap nav">
+    <a class="brand" href="#top" aria-label="A.I Duo home"><span class="mark" aria-hidden="true">◐</span> A.I&nbsp;<b>Duo</b></a>
+    <nav class="nav-links" id="navlinks" aria-label="Primary">
+      <a class="link" href="#work">Work</a>
+      <a class="link" href="#clients">Clients</a>
+      <a class="link" href="#words">Words</a>
+      <a class="link" href="#contact">Contact</a>
+      <a class="btn btn-primary" data-wa href="#contact">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M.06 24l1.69-6.16A11.87 11.87 0 010 11.9C0 5.33 5.36 0 11.95 0a11.9 11.9 0 018.46 3.5 11.74 11.74 0 013.5 8.4c0 6.57-5.36 11.9-11.96 11.9a12 12 0 01-5.72-1.45L.06 24zM6.6 20.2l.36.22a9.9 9.9 0 005.04 1.38c5.48 0 9.95-4.43 9.95-9.9a9.8 9.8 0 00-2.9-7A9.85 9.85 0 0011.95 2C6.47 2 2 6.43 2 11.9c0 1.88.53 3.7 1.52 5.28l.24.38-1 3.64 3.84-1zm11.43-5.55c-.07-.12-.27-.2-.57-.35-.3-.15-1.76-.86-2.03-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.26-.46-2.4-1.47-.88-.78-1.48-1.76-1.65-2.05-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.53.15-.18.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.67-1.6-.92-2.2-.24-.58-.49-.5-.67-.5l-.57-.01c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.22 3.08.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.69.63.71.22 1.36.2 1.87.12.57-.08 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41z"/></svg>
+        WhatsApp
+      </a>
+    </nav>
+    <button class="menu-btn" id="menuBtn" aria-label="Menu" aria-expanded="false" aria-controls="navlinks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+  <!-- ── hero ───────────────────────────────────────── -->
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-frame">
+        <span class="cnr tl" aria-hidden="true"></span><span class="cnr tr" aria-hidden="true"></span>
+        <span class="cnr bl" aria-hidden="true"></span><span class="cnr br" aria-hidden="true"></span>
+        <span class="eyebrow">AI Video Lab</span>
+        <h1>AI film,<br>directed by&nbsp;<em>two</em>.</h1>
+        <p class="lead">A.I Duo is a two-person studio that turns a brief into cinematic AI video — concept, frames, motion, and sound, start to finish.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary btn-lg" href="#work">See the work</a>
+          <a class="btn btn-ghost btn-lg" data-wa href="#contact">Start on WhatsApp</a>
+        </div>
+        <div class="hero-meta"><span class="dot" aria-hidden="true"></span> Replies within a day &nbsp;·&nbsp; Remote, worldwide &nbsp;·&nbsp; Concept → final cut</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── work ───────────────────────────────────────── -->
+  <section class="section" id="work">
+    <div class="wrap">
+      <div class="head reveal">
+        <span class="eyebrow">Selected Work</span>
+        <h2>A few frames from recent projects.</h2>
+        <p>Brand films, concept spots, and motion pieces — every one made with AI, finished like film.</p>
+      </div>
+      <div class="work-grid" id="workGrid">
+        <!-- featured -->
+        <article class="card feature reveal">
+          <div class="poster a"></div>
+          <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+          <div class="card-meta"><div><h3>Bubble Express</h3><div class="tag">Concept spot</div></div><span class="chip">1:12</span></div>
+        </article>
+        <article class="card reveal">
+          <div class="poster b"></div>
+          <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+          <div class="card-meta"><div><h3>Golden Hour</h3><div class="tag">Brand film</div></div><span class="chip">0:45</span></div>
+        </article>
+        <article class="card reveal">
+          <div class="poster c"></div>
+          <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+          <div class="card-meta"><div><h3>Night Signal</h3><div class="tag">Music video</div></div><span class="chip">0:30</span></div>
+        </article>
+        <article class="card reveal">
+          <div class="poster d"></div>
+          <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+          <div class="card-meta"><div><h3>Paper Cities</h3><div class="tag">Title sequence</div></div><span class="chip">0:22</span></div>
+        </article>
+        <article class="card reveal">
+          <div class="poster e"></div>
+          <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+          <div class="card-meta"><div><h3>Bloom</h3><div class="tag">Product</div></div><span class="chip">0:18</span></div>
+        </article>
+        <article class="card reveal">
+          <div class="poster f"></div>
+          <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+          <div class="card-meta"><div><h3>Drift</h3><div class="tag">Social</div></div><span class="chip">0:15</span></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── clients ────────────────────────────────────── -->
+  <section class="section" id="clients">
+    <div class="wrap">
+      <div class="head reveal" style="margin-bottom:34px">
+        <span class="eyebrow">Trusted by</span>
+        <h2>Brands we've made motion for.</h2>
+      </div>
+      <div class="clients-row reveal">
+        <!-- TODO: replace wordmarks with client logo <img>s -->
+        <span class="logo">LUMEN</span>
+        <span class="logo">KAVA</span>
+        <span class="logo">ORBIT</span>
+        <span class="logo">HÄLO</span>
+        <span class="logo">MERIDIAN</span>
+        <span class="logo">NOVA&nbsp;&amp;&nbsp;CO</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap"><div class="rule"></div></div>
+
+  <!-- ── testimonials ───────────────────────────────── -->
+  <section class="section" id="words">
+    <div class="wrap">
+      <div class="head reveal">
+        <span class="eyebrow">In their words</span>
+        <h2>Kind words from the cutting room.</h2>
+      </div>
+      <div class="quotes">
+        <!-- TODO: replace with real testimonials -->
+        <figure class="quote reveal">
+          <span class="qmark" aria-hidden="true">"</span>
+          <p>They turned a one-line brief into a film we'd have needed a full crew for. Fast, and genuinely cinematic.</p>
+          <figcaption class="who"><span class="ava" aria-hidden="true">ML</span><span><b>Maya Levi</b><span>Brand Lead, Lumen</span></span></figcaption>
+        </figure>
+        <figure class="quote reveal">
+          <span class="qmark" aria-hidden="true">"</span>
+          <p>The duo gets visual language. Every frame looked intentional — nothing felt auto-generated.</p>
+          <figcaption class="who"><span class="ava" aria-hidden="true">DC</span><span><b>Daniel Cohen</b><span>Founder, Orbit</span></span></figcaption>
+        </figure>
+        <figure class="quote reveal">
+          <span class="qmark" aria-hidden="true">"</span>
+          <p>Quick, collaborative, and the AI work is invisible — it just looks like great film.</p>
+          <figcaption class="who"><span class="ava" aria-hidden="true">NB</span><span><b>Noa Bar</b><span>Creative Director, Kava</span></span></figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── contact ────────────────────────────────────── -->
+  <section class="section contact" id="contact">
+    <div class="wrap">
+      <div class="hero-frame reveal">
+        <span class="cnr tl" aria-hidden="true"></span><span class="cnr tr" aria-hidden="true"></span>
+        <span class="cnr bl" aria-hidden="true"></span><span class="cnr br" aria-hidden="true"></span>
+        <span class="eyebrow" style="justify-content:center">Start a project</span>
+        <h2>Let's make something<br>that <em>moves</em>.</h2>
+        <p>Tell us the idea. We'll reply with how we'd shoot it.</p>
+        <div class="contact-cta">
+          <a class="btn btn-primary btn-lg wa-glow" data-wa href="#">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M.06 24l1.69-6.16A11.87 11.87 0 010 11.9C0 5.33 5.36 0 11.95 0a11.9 11.9 0 018.46 3.5 11.74 11.74 0 013.5 8.4c0 6.57-5.36 11.9-11.96 11.9a12 12 0 01-5.72-1.45L.06 24zM6.6 20.2l.36.22a9.9 9.9 0 005.04 1.38c5.48 0 9.95-4.43 9.95-9.9a9.8 9.8 0 00-2.9-7A9.85 9.85 0 0011.95 2C6.47 2 2 6.43 2 11.9c0 1.88.53 3.7 1.52 5.28l.24.38-1 3.64 3.84-1zm11.43-5.55c-.07-.12-.27-.2-.57-.35-.3-.15-1.76-.86-2.03-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.26-.46-2.4-1.47-.88-.78-1.48-1.76-1.65-2.05-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.53.15-.18.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.67-1.6-.92-2.2-.24-.58-.49-.5-.67-.5l-.57-.01c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.22 3.08.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.69.63.71.22 1.36.2 1.87.12.57-.08 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41z"/></svg>
+            Message us on WhatsApp
+          </a>
+          <a class="btn btn-ghost btn-lg" href="mailto:hello@aiduo.studio">Email instead</a>
+        </div>
+        <small>Usually replies the same day.</small>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <a class="brand" href="#top"><span class="mark" aria-hidden="true">◐</span> A.I&nbsp;<b>Duo</b></a>
+    <div class="foot-links">
+      <a href="#work">Work</a><a href="#clients">Clients</a><a href="#words">Words</a><a data-wa href="#contact">WhatsApp</a>
+    </div>
+    <div class="cr">© 2026 A.I Duo — AI Video Lab</div>
+  </div>
+</footer>
+
+<script>
+  // ── ONE place to set your WhatsApp number (international format, digits only, no +) ──
+  const WA_NUMBER = "972500000000";          // TODO: replace with the real number
+  const WA_TEXT = "Hi A.I Duo — I'd like to talk about a video project.";
+  const waHref = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(WA_TEXT)}`;
+  document.querySelectorAll('[data-wa]').forEach(a => { a.href = waHref; a.target = "_blank"; a.rel = "noopener"; });
+
+  // ── sticky-nav solid state ──
+  const hdr = document.getElementById('hdr');
+  const onScroll = () => hdr.classList.toggle('scrolled', window.scrollY > 8);
+  onScroll(); addEventListener('scroll', onScroll, { passive: true });
+
+  // ── mobile menu ──
+  const menuBtn = document.getElementById('menuBtn');
+  const navlinks = document.getElementById('navlinks');
+  menuBtn.addEventListener('click', () => {
+    const open = navlinks.classList.toggle('open');
+    menuBtn.setAttribute('aria-expanded', open);
+  });
+  navlinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+    navlinks.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false');
+  }));
+
+  // ── reveal on scroll ──
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.14 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // ── live showcase: pull real videos from the studio backend ──
+  // Replaces the placeholder cards once videos have been uploaded in the app's Showcase tab.
+  // (If none are up yet, the designed placeholders stay, so the page never looks empty.)
+  (async () => {
+    let items = [];
+    try { items = await (await fetch('/api/showcase')).json(); } catch { return; }
+    if (!Array.isArray(items) || !items.length) return;
+    const grid = document.getElementById('workGrid');
+    grid.innerHTML = '';
+    items.forEach((it, i) => {
+      const card = document.createElement('article');
+      card.className = 'card reveal in' + (i === 0 ? ' feature' : '');
+      const v = document.createElement('video');
+      v.className = 'poster';
+      Object.assign(v, { src: it.url, muted: true, loop: true, playsInline: true, preload: 'metadata' });
+      Object.assign(v.style, { objectFit: 'cover', width: '100%', height: '100%' });
+      const play = document.createElement('span');
+      play.className = 'play';
+      play.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+      const meta = document.createElement('div');
+      meta.className = 'card-meta';
+      meta.innerHTML = '<div><h3></h3><div class="tag"></div></div>';
+      meta.querySelector('h3').textContent = it.title || 'Untitled';
+      meta.querySelector('.tag').textContent = it.caption || '';
+      card.append(v, play, meta);
+      card.addEventListener('mouseenter', () => v.play().catch(() => {}));
+      card.addEventListener('mouseleave', () => { v.pause(); v.currentTime = 0; });
+      card.addEventListener('click', () => {
+        v.muted = false;
+        (v.requestFullscreen || v.webkitRequestFullscreen || (() => {})).call(v);
+        v.play().catch(() => {});
+      });
+      grid.appendChild(card);
+    });
+  })();
+</script>
+</body>
+</html>

@@ -69,6 +69,7 @@ STRICT DRAFTING RULES
 Word count: ~40-70 words for a single shot (Mode A); ~30-55 words per shot in a sequence (Mode B), one action each.
 Each prompt in its own Markdown code block.
 Physics detail: replace generic verbs. Not "he runs" but "he sprints with heavy footfalls, his muscles tensing under the strain."
+Concrete, never labels: spell out the actual camera move, motion physics, lighting (quality, direction, colour temperature), and atmosphere in specific terms — never a bare style label or a reference to "the project" / "the project's look" (the model can't render those). Translate any look or vibe shorthand into what the shot literally looks and moves like. Always be detailed and cinematic.
 Identity consistency: refer to the subject with the SAME concrete descriptor throughout — and, across a Mode B sequence, reuse that exact descriptor verbatim in every shot ("the woman in the red sari," not "she").
 Negative prompts: when instability is likely (faces, hands, fast motion), add one short line for Kling's separate Negative Prompt field — stability-focused, e.g. "Negative prompt: distorted face, warped hands, extra fingers, flicker, morphing." Keep it short and never contradict the positive prompt. In Mode B, one shared negative-prompt line for the sequence is enough.
 Mandatory suffix: every prompt (every shot) ends EXACTLY with: , 8k, raw footage, high fidelity, cinema grade.

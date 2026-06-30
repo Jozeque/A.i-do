@@ -2,9 +2,9 @@
 # Render reads this file and creates the service. You then set the secret env vars
 # (marked sync:false) in the dashboard.
 #
-# NOTE on storage: on the free plan the disk is EPHEMERAL — projects/images reset on
-# every redeploy or sleep. That's fine as a live preview. Persistent data comes when
-# we wire Google Drive + a database (next step), or by upgrading to a paid plan + disk.
+# Durable data: metadata lives in Firestore (DATA_BACKEND=firestore) and media in the
+# owner's Google Drive (STORAGE_BACKEND=drive) — both external, so Render's ephemeral
+# disk no longer matters. Set the backend + credential vars below.
 services:
   - type: web
     name: ai-video-studio
@@ -21,6 +21,34 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      # --- Google sign-in (Firebase). Set all of these to lock the app to 2 emails. ---
+      - key: ALLOWED_EMAILS          # comma-separated: "you@gmail.com,liran@gmail.com"
+        sync: false
+      - key: FIREBASE_API_KEY        # from the Firebase web config (public, but kept in env)
+        sync: false
+      - key: FIREBASE_PROJECT_ID     # from the Firebase web config
+        sync: false
+      - key: FIREBASE_AUTH_DOMAIN    # usually <project-id>.firebaseapp.com (optional)
+        sync: false
+      - key: FIREBASE_APP_ID         # from the Firebase web config (optional)
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT # the full service-account JSON, pasted as one line (SECRET) — also powers Firestore
+        sync: false
+      # --- backends: cloud metadata + media (durable, survive redeploys) ---
+      - key: DATA_BACKEND            # "firestore"
+        value: firestore
+      - key: STORAGE_BACKEND         # "drive"
+        value: drive
+      # --- Google Drive OAuth (media on the owner's 2 TB). Desktop-app client + consent token. ---
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REFRESH_TOKEN
+        sync: false
+      - key: DRIVE_ROOT_FOLDER       # the Drive folder media lives under
+        value: AI Video Studio
+      # --- interim fallback gate, only used if the Firebase vars above are NOT set ---
       - key: APP_USER         # username for the password gate (e.g. "studio")
         sync: false
       - key: APP_PASSWORD     # a long random password — locks the public URL
