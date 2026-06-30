@@ -220,6 +220,18 @@ app.get('/api/health', (req, res) => {
     hasAnthropic: !!anthropic,
     hasGemini: !!genai,
     authEnabled: authEnabled(),
+    // Diagnostic: which backends are active + which env vars are present (booleans only,
+    // never values) — so a misconfigured deploy can be pinpointed without guessing.
+    storage: storage.backend,
+    data: data.backend,
+    env: {
+      STORAGE_BACKEND: process.env.STORAGE_BACKEND || '(unset)',
+      DATA_BACKEND: process.env.DATA_BACKEND || '(unset)',
+      GOOGLE_OAUTH_CLIENT_ID: !!process.env.GOOGLE_OAUTH_CLIENT_ID,
+      GOOGLE_OAUTH_CLIENT_SECRET: !!process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+      GOOGLE_OAUTH_REFRESH_TOKEN: !!process.env.GOOGLE_OAUTH_REFRESH_TOKEN,
+      FIREBASE_SERVICE_ACCOUNT_or_FILE: !!(process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_APPLICATION_CREDENTIALS),
+    },
   });
 });
 
