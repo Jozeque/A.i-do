@@ -165,11 +165,13 @@
   .card:hover .play svg { color: #1a1206; }
 
   /* ── clients ───────────────────────────────────────── */
-  .clients-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 36px; }
-  /* replace each wordmark with a logo <img> (keep height ~26px, opacity styling) */
-  .logo { font-weight: 700; font-size: 1.18rem; letter-spacing: .04em; color: var(--ink-faint);
-          opacity: .82; transition: color .2s ease, opacity .2s ease; }
-  .logo:hover { color: var(--ink); opacity: 1; }
+  .clients-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 18px; }
+  /* real logos on clean light chips so any logo (transparent or white-bg) reads on the dark page */
+  .logo { display: inline-flex; align-items: center; justify-content: center; height: 62px; min-width: 132px;
+          padding: 0 26px; background: var(--ink); border-radius: 12px; opacity: .95;
+          transition: opacity .2s ease, transform .2s ease; }
+  .logo:hover { opacity: 1; transform: translateY(-2px); }
+  .logo img { max-height: 34px; max-width: 150px; width: auto; height: auto; object-fit: contain; display: block; }
 
   /* ── testimonials ──────────────────────────────────── */
   .quotes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
@@ -334,13 +336,10 @@
         <h2>Brands we've created for.</h2>
       </div>
       <div class="clients-row reveal">
-        <!-- TODO: replace wordmarks with client logo <img>s -->
-        <span class="logo">LUMEN</span>
-        <span class="logo">KAVA</span>
-        <span class="logo">ORBIT</span>
-        <span class="logo">HÄLO</span>
-        <span class="logo">MERIDIAN</span>
-        <span class="logo">NOVA&nbsp;&amp;&nbsp;CO</span>
+        <span class="logo"><img src="/landing/logos/clalit.png" alt="Clalit" loading="lazy" /></span>
+        <span class="logo"><img src="/landing/logos/client-2.png" alt="Client logo" loading="lazy" /></span>
+        <span class="logo"><img src="/landing/logos/client-3.png" alt="Client logo" loading="lazy" /></span>
+        <span class="logo"><img src="/landing/logos/client-4.png" alt="Client logo" loading="lazy" /></span>
       </div>
     </div>
   </section>
@@ -409,7 +408,7 @@
 
 <script>
   // ── ONE place to set your WhatsApp number (international format, digits only, no +) ──
-  const WA_NUMBER = "972500000000";          // TODO: replace with the real number
+  const WA_NUMBER = "972523993994";          // Sheyo — +972 52-399-3994
   const WA_TEXT = "Hi Sheyo — I'd like to talk about a video project.";
   const waHref = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(WA_TEXT)}`;
   document.querySelectorAll('[data-wa]').forEach(a => { a.href = waHref; a.target = "_blank"; a.rel = "noopener"; });
