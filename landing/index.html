@@ -171,6 +171,8 @@
   .logo-img { height: 30px; width: auto; max-width: 150px; object-fit: contain; flex: 0 0 auto;
               filter: brightness(0) invert(1); opacity: .42; transition: opacity .25s ease; }
   .logo-img:hover { opacity: .85; }
+  /* Opel + Tomix are square marks — scale them up so they don't look tiny beside the wordmark */
+  .logo-img[src*="client-2"], .logo-img[src*="client-3"] { height: 50px; opacity: .5; }
   @keyframes logo-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
   @media (prefers-reduced-motion: reduce) { .clients-lane { animation: none; flex-wrap: wrap; justify-content: center; } }
 
