@@ -193,11 +193,46 @@ app.use('/landing', express.static(LANDING_DIR));
 // serve saved media. Local backend: static from disk. Drive backend: proxy the file's
 // bytes from Drive by id (so <img>/<video src> just works, no token needed in the URL).
 if (storage.backend === 'drive') {
+  // Bounded in-memory cache for SMALL media (images) so repeat loads skip the Drive
+  // round-trip. Files over CACHE_ITEM_MAX (e.g. videos) always stream and are never
+  // buffered, so RAM stays safe; total is capped with simple LRU eviction.
+  const mediaCache = new Map(); // fileId -> { buf, mimeType }
+  let cacheBytes = 0;
+  const CACHE_ITEM_MAX = 2.5 * 1024 * 1024;  // 2.5 MB per file
+  const CACHE_TOTAL_MAX = 64 * 1024 * 1024;  // 64 MB total
+
   app.get('/media/:pid/:bucket/:file', async (req, res) => {
+    const id = req.params.file;
+    const hit = mediaCache.get(id);
+    if (hit) {
+      mediaCache.delete(id); mediaCache.set(id, hit); // bump LRU
+      res.setHeader('Content-Type', hit.mimeType);
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      return res.end(hit.buf);
+    }
     try {
-      const { stream, mimeType } = await storage.readFile(req.params.file);
+      const { stream, mimeType } = await storage.readFile(id);
       res.setHeader('Content-Type', mimeType);
       res.setHeader('Cache-Control', 'private, max-age=86400');
+      // Buffer alongside streaming so a small file can be cached without a 2nd fetch;
+      // once it exceeds the per-item limit, drop the buffer and just keep streaming.
+      let chunks = [], size = 0, cacheable = true;
+      stream.on('data', (c) => {
+        if (!cacheable) return;
+        size += c.length;
+        if (size > CACHE_ITEM_MAX) { cacheable = false; chunks = null; }
+        else chunks.push(c);
+      });
+      stream.on('end', () => {
+        if (cacheable && chunks) {
+          const buf = Buffer.concat(chunks);
+          mediaCache.set(id, { buf, mimeType }); cacheBytes += buf.length;
+          while (cacheBytes > CACHE_TOTAL_MAX && mediaCache.size) {
+            const [k, v] = mediaCache.entries().next().value;
+            mediaCache.delete(k); cacheBytes -= v.buf.length;
+          }
+        }
+      });
       stream.on('error', () => { if (!res.headersSent) res.status(404).end(); });
       stream.pipe(res);
     } catch { res.status(404).end(); }
@@ -220,18 +255,8 @@ app.get('/api/health', (req, res) => {
     hasAnthropic: !!anthropic,
     hasGemini: !!genai,
     authEnabled: authEnabled(),
-    // Diagnostic: which backends are active + which env vars are present (booleans only,
-    // never values) — so a misconfigured deploy can be pinpointed without guessing.
     storage: storage.backend,
     data: data.backend,
-    env: {
-      STORAGE_BACKEND: process.env.STORAGE_BACKEND || '(unset)',
-      DATA_BACKEND: process.env.DATA_BACKEND || '(unset)',
-      GOOGLE_OAUTH_CLIENT_ID: !!process.env.GOOGLE_OAUTH_CLIENT_ID,
-      GOOGLE_OAUTH_CLIENT_SECRET: !!process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-      GOOGLE_OAUTH_REFRESH_TOKEN: !!process.env.GOOGLE_OAUTH_REFRESH_TOKEN,
-      FIREBASE_SERVICE_ACCOUNT_or_FILE: !!(process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_APPLICATION_CREDENTIALS),
-    },
   });
 });
 
@@ -623,4 +648,5 @@ app.listen(PORT, () => {
   if (!genai) console.log('  ⚠  GEMINI_API_KEY missing — Nano Banana 2 disabled until set in .env');
   console.log(`  Claude model: ${CLAUDE_MODEL}   |   NB2 model: ${NB2_MODEL} @ ${NB2_IMAGE_SIZE}`);
   console.log(`  Data: ${data.backend}   |   Media storage: ${storage.backend}\n`);
+  storage.warmUp?.(); // pre-warm the Drive client so the first media request isn't cold
 });

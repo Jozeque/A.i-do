@@ -155,6 +155,11 @@ function createDriveStorage() {
       const res = await d.files.get({ fileId, alt: 'media' }, { responseType: 'stream' });
       return { stream: res.data, mimeType: res.headers?.['content-type'] || 'application/octet-stream' };
     },
+    // Pre-load the Drive client (googleapis import + first OAuth token exchange) at boot,
+    // so the first real media request isn't hit with the cold-start latency (~seconds).
+    async warmUp() {
+      try { const d = await drive(); await d.files.list({ pageSize: 1, fields: 'files(id)' }); } catch { /* best-effort */ }
+    },
   };
 }
 
