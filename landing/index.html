@@ -164,14 +164,15 @@
   .play svg { width: 14px; height: 14px; color: var(--ink); transition: color .2s; margin-left: 2px; }
   .card:hover .play svg { color: #1a1206; }
 
-  /* ── clients ───────────────────────────────────────── */
-  .clients-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 18px; }
-  /* real logos on clean light chips so any logo (transparent or white-bg) reads on the dark page */
-  .logo { display: inline-flex; align-items: center; justify-content: center; height: 62px; min-width: 132px;
-          padding: 0 26px; background: var(--ink); border-radius: 12px; opacity: .95;
-          transition: opacity .2s ease, transform .2s ease; }
-  .logo:hover { opacity: 1; transform: translateY(-2px); }
-  .logo img { max-height: 34px; max-width: 150px; width: auto; height: auto; object-fit: contain; display: block; }
+  /* ── clients (auto-scrolling logo slider) ─────────────── */
+  .clients-slider { overflow: hidden; }
+  .clients-lane { display: flex; align-items: center; gap: 60px; width: max-content; animation: logo-marquee 32s linear infinite; }
+  .clients-slider:hover .clients-lane { animation-play-state: paused; }
+  .logo-img { height: 30px; width: auto; max-width: 150px; object-fit: contain; flex: 0 0 auto;
+              filter: brightness(0) invert(1); opacity: .42; transition: opacity .25s ease; }
+  .logo-img:hover { opacity: .85; }
+  @keyframes logo-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) { .clients-lane { animation: none; flex-wrap: wrap; justify-content: center; } }
 
   /* ── testimonials ──────────────────────────────────── */
   .quotes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
@@ -335,11 +336,22 @@
         <span class="eyebrow">Trusted by</span>
         <h2>Brands we've created for.</h2>
       </div>
-      <div class="clients-row reveal">
-        <span class="logo"><img src="/landing/logos/clalit.png" alt="Clalit" loading="lazy" /></span>
-        <span class="logo"><img src="/landing/logos/client-2.png" alt="Client logo" loading="lazy" /></span>
-        <span class="logo"><img src="/landing/logos/client-3.png" alt="Client logo" loading="lazy" /></span>
-        <span class="logo"><img src="/landing/logos/client-4.png" alt="Client logo" loading="lazy" /></span>
+      <div class="clients-slider reveal">
+        <div class="clients-lane">
+          <img class="logo-img" src="/landing/logos/clalit.png" alt="Clalit" />
+          <img class="logo-img" src="/landing/logos/client-2.png" alt="Client" />
+          <img class="logo-img" src="/landing/logos/client-3.png" alt="Client" />
+          <img class="logo-img" src="/landing/logos/clalit.png" alt="Clalit" />
+          <img class="logo-img" src="/landing/logos/client-2.png" alt="Client" />
+          <img class="logo-img" src="/landing/logos/client-3.png" alt="Client" />
+          <!-- duplicate set for a seamless loop -->
+          <img class="logo-img" src="/landing/logos/clalit.png" alt="" aria-hidden="true" />
+          <img class="logo-img" src="/landing/logos/client-2.png" alt="" aria-hidden="true" />
+          <img class="logo-img" src="/landing/logos/client-3.png" alt="" aria-hidden="true" />
+          <img class="logo-img" src="/landing/logos/clalit.png" alt="" aria-hidden="true" />
+          <img class="logo-img" src="/landing/logos/client-2.png" alt="" aria-hidden="true" />
+          <img class="logo-img" src="/landing/logos/client-3.png" alt="" aria-hidden="true" />
+        </div>
       </div>
     </div>
   </section>
