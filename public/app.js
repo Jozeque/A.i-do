@@ -264,7 +264,7 @@ const state = {
   config: null,
   projects: [],
   current: null,        // full project object
-  activeTab: 'nb-frames',
+  activeTab: (['nb-frames','characters','kling','kling-advisor','nb-advisor','generate','library'].includes(localStorage.getItem('avs:lastTab')) ? localStorage.getItem('avs:lastTab') : 'nb-frames'),
   attachments: {},      // per-gem: array of {name, mimeType, data, url}
   refImages: [],        // for generate panel
   klingMode: localStorage.getItem('avs:klingMode') || 'single',  // 'single' (3 variations) | 'multi' (multi-shot)
@@ -453,6 +453,7 @@ async function uploadShowcase(e) {
 // ── tabs ──────────────────────────────────────────────────────────────────────
 function switchTab(tab) {
   state.activeTab = tab;
+  try { localStorage.setItem('avs:lastTab', tab); } catch {}
   $$('#wsTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   const body = $('#wsBody');
   body.innerHTML = '';
