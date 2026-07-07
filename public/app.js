@@ -359,6 +359,7 @@ async function openProject(pid) {
   state.current = await api(`/api/projects/${pid}`);
   try { localStorage.setItem('avs:lastProject', pid); } catch {}
   state.attachments = {};
+  state.drafts = {};
   state.refImages = [];
   $('#emptyState').classList.add('hidden');
   $('#showcaseView').classList.add('hidden');
@@ -452,6 +453,9 @@ async function uploadShowcase(e) {
 
 // ── tabs ──────────────────────────────────────────────────────────────────────
 function switchTab(tab) {
+  // Preserve the outgoing tab's unsent draft text before its composer is torn down.
+  const prevTa = document.getElementById('chatInput');
+  if (prevTa && state.activeTab) { state.drafts = state.drafts || {}; state.drafts[state.activeTab] = prevTa.value; }
   state.activeTab = tab;
   try { localStorage.setItem('avs:lastTab', tab); } catch {}
   $$('#wsTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
@@ -558,7 +562,9 @@ function renderChat(body, gemId) {
 
   // textarea autosize + enter to send
   const ta = $('#chatInput');
+  ta.value = (state.drafts && state.drafts[gemId]) || '';   // restore this tab's unsent draft text
   ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; };
+  ta.oninput();                                             // size the box to the restored text
   ta.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(gemId); } };
   ta.addEventListener('paste', async (e) => {
     const files = filesFromPaste(e);
@@ -812,6 +818,7 @@ async function sendChat(gemId) {
   state.current.chats[gemId].push(userMsg);
   renderMessages(gemId);
   ta.value = ''; ta.style.height = 'auto';
+  if (state.drafts) state.drafts[gemId] = '';   // sent → clear this tab's draft
 
   // Build history, scoped to the CURRENT scene so old references/prompts don't bleed in.
   // - Attaching new image(s) starts a fresh scene → send no prior history.
