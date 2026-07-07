@@ -1168,9 +1168,16 @@ async function doGenerate() {
   const btn = $('#genBtn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Generating…';
 
-  // Accumulate: prepend skeletons to the existing results grid — never wipe prior renders.
+  // Accumulate: prepend a live "generating" spot per image — never wipe prior renders.
   const grid = ensureGenGrid();
-  grid.insertAdjacentHTML('afterbegin', Array.from({ length: count }, () => '<div class="skeleton gen-skel"></div>').join(''));
+  const t0 = Date.now();
+  grid.insertAdjacentHTML('afterbegin', Array.from({ length: count }, () =>
+    '<div class="skeleton gen-skel"><div class="gen-load"><span class="spinner-lg"></span><span class="gen-load-label">Generating…</span><span class="gen-load-time">0s</span></div></div>'
+  ).join(''));
+  const genTimer = setInterval(() => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    $$('.gen-skel .gen-load-time', grid).forEach(el => el.textContent = s + 's');
+  }, 1000);
 
   try {
     const { images, errors } = await api(`/api/projects/${state.current.id}/generate`, {
@@ -1179,6 +1186,7 @@ async function doGenerate() {
     state.current.images = [...images.map(stripUrl), ...state.current.images];
     $$('.gen-skel', grid).forEach(s => s.remove());
     grid.insertAdjacentHTML('afterbegin', images.map(imgCard).join(''));   // newest on top, older kept below
+    $$('.img-card', grid).slice(0, images.length).forEach(c => c.classList.add('gen-reveal'));   // reveal the fresh renders
     wireImageCards(grid);
     if (errors && errors.length) toast(`${images.length} generated · ${errors.length} failed`, true);
     else toast(`${images.length} image${images.length > 1 ? 's' : ''} generated`);
@@ -1186,6 +1194,7 @@ async function doGenerate() {
     $$('.gen-skel', grid).forEach(s => s.remove());
     toast(e.message, true);
   } finally {
+    clearInterval(genTimer);
     btn.disabled = false; btn.textContent = 'Generate';
   }
 }
