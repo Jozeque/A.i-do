@@ -453,9 +453,7 @@ async function uploadShowcase(e) {
 
 // ── tabs ──────────────────────────────────────────────────────────────────────
 function switchTab(tab) {
-  // Preserve the outgoing tab's unsent draft text before its composer is torn down.
-  const prevTa = document.getElementById('chatInput');
-  if (prevTa && state.activeTab) { state.drafts = state.drafts || {}; state.drafts[state.activeTab] = prevTa.value; }
+  saveDrafts();                                  // keep the outgoing tab's unsent text inputs
   state.activeTab = tab;
   try { localStorage.setItem('avs:lastTab', tab); } catch {}
   $$('#wsTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
@@ -465,6 +463,22 @@ function switchTab(tab) {
   else if (tab === 'characters') renderCharacters(body);
   else if (tab === 'library') renderLibrary(body);
   else renderChat(body, tab);
+  restoreDrafts();                               // restore the incoming tab's text inputs
+}
+
+// Per-tab draft persistence: any composer/prompt input marked [data-draft] is remembered
+// across tab switches (keyed by tab + input id), so typed-but-unsent text is never lost —
+// covers the chat composer, the Nano Banana 2 prompt, and the Characters form.
+function saveDrafts() {
+  state.drafts = state.drafts || {};
+  document.querySelectorAll('#wsBody [data-draft]').forEach(el => { state.drafts[`${state.activeTab}:${el.id}`] = el.value; });
+}
+function restoreDrafts() {
+  if (!state.drafts) return;
+  document.querySelectorAll('#wsBody [data-draft]').forEach(el => {
+    const v = state.drafts[`${state.activeTab}:${el.id}`];
+    if (v) { el.value = v; el.dispatchEvent(new Event('input')); }
+  });
 }
 
 // ── CHAT panels (gems) ─────────────────────────────────────────────────────────
@@ -498,7 +512,7 @@ function renderChat(body, gemId) {
         <button class="attach-btn" id="attachBtn" title="Attach or paste an image">📎</button>
         <button class="attach-btn fav-open" id="favBtn" title="Add from this project's favorites">★</button>
         <input type="file" id="fileInput" accept="image/*" multiple hidden />
-        <textarea id="chatInput" rows="1" placeholder="${chatPlaceholder(gemId)}"></textarea>
+        <textarea id="chatInput" data-draft rows="1" placeholder="${chatPlaceholder(gemId)}"></textarea>
         <button class="send-btn" id="sendBtn">Send</button>
       </div>
     </div>`;
@@ -562,9 +576,7 @@ function renderChat(body, gemId) {
 
   // textarea autosize + enter to send
   const ta = $('#chatInput');
-  ta.value = (state.drafts && state.drafts[gemId]) || '';   // restore this tab's unsent draft text
   ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; };
-  ta.oninput();                                             // size the box to the restored text
   ta.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(gemId); } };
   ta.addEventListener('paste', async (e) => {
     const files = filesFromPaste(e);
@@ -818,7 +830,7 @@ async function sendChat(gemId) {
   state.current.chats[gemId].push(userMsg);
   renderMessages(gemId);
   ta.value = ''; ta.style.height = 'auto';
-  if (state.drafts) state.drafts[gemId] = '';   // sent → clear this tab's draft
+  if (state.drafts) delete state.drafts[`${gemId}:chatInput`];   // sent → clear this tab's draft
 
   // Build history, scoped to the CURRENT scene so old references/prompts don't bleed in.
   // - Attaching new image(s) starts a fresh scene → send no prior history.
@@ -872,7 +884,7 @@ function renderGenerate(body) {
       </div>
       <div>
         <span class="field-label">Prompt — paste from NB Frames or write your own</span>
-        <textarea id="genPrompt" placeholder="Paste a prompt here…"></textarea>
+        <textarea id="genPrompt" data-draft placeholder="Paste a prompt here…"></textarea>
       </div>
       <div>
         <span class="field-label">Reference image(s) — optional · attach, paste, or pull from favorites (identity / product / scene)</span>
@@ -988,8 +1000,8 @@ function renderCharacters(body) {
     <div class="chars-new">
       <div class="section-head"><h3>New character</h3></div>
       <p class="chars-hint">Upload a few clear photos of the person. We generate one clean multi-view reference sheet — a close-up plus front, three-quarter, and profile views — so NB&nbsp;Frames can place them in any scene with the same face. <b>A single close-up drifts; the sheet holds.</b></p>
-      <input class="char-text" id="charName" placeholder="Name (e.g. Maya, Detective Cole)" />
-      <textarea class="char-text" id="charNotes" rows="2" placeholder="Optional — wardrobe in words, age, a beard, glasses… (blank = keep them exactly as the photos)"></textarea>
+      <input class="char-text" id="charName" data-draft placeholder="Name (e.g. Maya, Detective Cole)" />
+      <textarea class="char-text" id="charNotes" data-draft rows="2" placeholder="Optional — wardrobe in words, age, a beard, glasses… (blank = keep them exactly as the photos)"></textarea>
       <span class="field-label">Photos of the person — identity · a few angles / expressions work best</span>
       <div class="ref-row" id="charRefRow">
         <button class="ref-add" id="charAdd" title="Add photos of the person">＋</button>
