@@ -79,6 +79,7 @@ const BUILDER_OPTS = {
   lighting: ['Clamshell beauty (soft 5600K)', 'Soft window / natural', 'Golden-hour warmth', 'Hard chiaroscuro', 'High-key bright & even', 'Overcast soft'],
   lens: ['ARRI Alexa Mini LF + Cooke S4/i primes, short-tele ~70–135mm, creamy bokeh', 'ARRI Alexa 35 + Zeiss Supreme primes, normal ~40–60mm, natural', 'Sony Venice 2 + Zeiss Supreme primes, wide ~24–35mm, environmental depth', 'ARRI + Cooke Anamorphic/i, oval bokeh & horizontal flares, ~40–75mm', 'RED V-Raptor + Zeiss Master Prime, clinical & sharp, ~50–100mm'],
   palette: ['Vibrant high-key', 'Muted pastel', 'Teal & orange', 'Warm earthy', 'Desaturated editorial', 'Clean clinical whites'],
+  grain: ['Match the reference exactly', 'Clean, near-grainless digital', 'Fine natural 35mm film grain', 'Subtle grain with gentle halation', 'Heavier organic film grain', '16mm — coarser, textured'],
   wardrobe: ['Describe wardrobe richly in prose', 'Keep wardrobe as in the reference', 'Minimal styling direction'],
 };
 
@@ -113,6 +114,7 @@ function gemEditorBody(gemId, meta) {
         <label class="bf">Lighting style<input id="bf_lighting" list="dl_lighting" placeholder="e.g. High-key bright &amp; even" /></label>
         <label class="bf">Lens &amp; camera<input id="bf_lens" list="dl_lens" placeholder="e.g. ARRI Alexa Mini LF + Cooke S4/i primes, short-tele ~70–135mm (name the rig; focal length is a range)" /></label>
         <label class="bf">Color &amp; palette<input id="bf_palette" list="dl_palette" placeholder="e.g. Clean clinical whites" /></label>
+        <label class="bf">Grain &amp; finish<input id="bf_grain" list="dl_grain" placeholder="e.g. fine natural 35mm grain — read from the reference" /></label>
         <label class="bf">Environment bias<input id="bf_environment" placeholder="e.g. bright airy modern clinics" /></label>
         <label class="bf">Default aspect ratio
           <select id="bf_aspectRatio">
@@ -134,7 +136,7 @@ function gemEditorBody(gemId, meta) {
         <pre id="gemCompiled" class="compiled">—</pre>
       </details>
       ${baseView}
-      ${dl('dl_look', BUILDER_OPTS.look)}${dl('dl_lighting', BUILDER_OPTS.lighting)}${dl('dl_lens', BUILDER_OPTS.lens)}${dl('dl_palette', BUILDER_OPTS.palette)}${dl('dl_wardrobe', BUILDER_OPTS.wardrobe)}`;
+      ${dl('dl_look', BUILDER_OPTS.look)}${dl('dl_lighting', BUILDER_OPTS.lighting)}${dl('dl_lens', BUILDER_OPTS.lens)}${dl('dl_palette', BUILDER_OPTS.palette)}${dl('dl_grain', BUILDER_OPTS.grain)}${dl('dl_wardrobe', BUILDER_OPTS.wardrobe)}`;
   }
 
   return `
@@ -151,8 +153,8 @@ async function loadGemEditor(gemId) {
 
   if (gemId === 'nb-frames') {
     const b = builder || {};
-    const fieldIds = ['campaign', 'look', 'lighting', 'lens', 'palette', 'environment', 'aspectRatio', 'wardrobe', 'extra'];
-    const styleIds = ['look', 'lighting', 'lens', 'palette', 'environment', 'aspectRatio', 'wardrobe', 'extra'];
+    const fieldIds = ['campaign', 'look', 'lighting', 'lens', 'palette', 'grain', 'environment', 'aspectRatio', 'wardrobe', 'extra'];
+    const styleIds = ['look', 'lighting', 'lens', 'palette', 'grain', 'environment', 'aspectRatio', 'wardrobe', 'extra'];
     fieldIds.forEach(k => { const el = $('#bf_' + k); if (el) el.value = b[k] || ''; });
     const cp = $('#gemCompiled'); if (cp) cp.textContent = override || '— (analyze a reference or fill the fields, then Save) —';
 
