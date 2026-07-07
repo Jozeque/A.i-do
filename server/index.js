@@ -657,7 +657,7 @@ app.post('/api/projects/:pid/characters', async (req, res) => {
     try {
       result = await genai.models.generateContent({
         model: NB_MODELS.pro, contents,
-        config: { responseModalities: ['IMAGE'], imageConfig: { imageSize: '2K', aspectRatio: AR } },
+        config: { responseModalities: ['IMAGE'], imageConfig: { imageSize: '1K', aspectRatio: AR } },
       });
     } catch (e) { return res.status(502).json({ error: `Nano Banana failed: ${e?.message || String(e)}` }); }
     const cand = result?.candidates?.[0];
