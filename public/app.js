@@ -76,7 +76,7 @@ const GEM_META = {
 const BUILDER_OPTS = {
   look: ['High-gloss beauty', 'Clinical-luxe', 'Editorial documentary', 'Moody cinematic', 'Product hero', 'Warm lifestyle', 'Cultural editorial'],
   lighting: ['Clamshell beauty (soft 5600K)', 'Soft window / natural', 'Golden-hour warmth', 'Hard chiaroscuro', 'High-key bright & even', 'Overcast soft'],
-  lens: ['ARRI Alexa Mini LF + Cooke S4/i primes, short-tele ~70–135mm, creamy bokeh', 'ARRI Alexa 35 + Zeiss Supreme primes, normal ~40–60mm, natural', 'Sony Venice 2 + Cooke S4/i, wide ~24–35mm, environmental depth', 'ARRI + Cooke Anamorphic/i, oval bokeh & horizontal flares, ~40–75mm', 'RED V-Raptor + Zeiss Master Prime, clinical & sharp, ~50–100mm'],
+  lens: ['ARRI Alexa Mini LF + Cooke S4/i primes, short-tele ~70–135mm, creamy bokeh', 'ARRI Alexa 35 + Zeiss Supreme primes, normal ~40–60mm, natural', 'Sony Venice 2 + Zeiss Supreme primes, wide ~24–35mm, environmental depth', 'ARRI + Cooke Anamorphic/i, oval bokeh & horizontal flares, ~40–75mm', 'RED V-Raptor + Zeiss Master Prime, clinical & sharp, ~50–100mm'],
   palette: ['Vibrant high-key', 'Muted pastel', 'Teal & orange', 'Warm earthy', 'Desaturated editorial', 'Clean clinical whites'],
   wardrobe: ['Describe wardrobe richly in prose', 'Keep wardrobe as in the reference', 'Minimal styling direction'],
 };
