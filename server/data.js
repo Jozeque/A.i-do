@@ -111,7 +111,10 @@ function createFirestoreDataStore() {
     const images = (await ref.collection('images').get()).docs
       .map((d) => d.data())
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    return { ...meta, chats, images };
+    const characters = (await ref.collection('characters').get()).docs
+      .map((d) => d.data())
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return { ...meta, chats, images, characters };
   }
 
   // Persist the blob: meta + per-tab chat docs in one batch, then image docs DIFFED
@@ -119,8 +122,9 @@ function createFirestoreDataStore() {
   async function saveProject(p) {
     await init();
     const ref = _col.doc(p.id);
-    const { chats = {}, images = [], ...meta } = p;
+    const { chats = {}, images = [], characters = [], ...meta } = p;
     meta.imageCount = images.length;
+    meta.characterCount = characters.length;
     meta.chatCount = Object.values(chats).reduce((n, a) => n + (a?.length || 0), 0);
 
     const head = _db.batch();
@@ -128,17 +132,21 @@ function createFirestoreDataStore() {
     for (const [gemId, msgs] of Object.entries(chats)) head.set(ref.collection('chats').doc(gemId), { messages: msgs || [] });
     await head.commit();
 
-    const existing = await ref.collection('images').get();
-    const prevById = new Map(existing.docs.map((d) => [d.id, d.data()]));
-    const ops = [];
-    const keep = new Set();
-    for (const img of images) {
-      const id = String(img.id);
-      keep.add(id);
-      const prev = prevById.get(id);
-      if (!prev || JSON.stringify(prev) !== JSON.stringify(img)) ops.push(['set', ref.collection('images').doc(id), img]);
+    // Diff a per-doc subcollection (images, characters): write only new/changed, delete removed.
+    async function diffSub(sub, items) {
+      const prevById = new Map((await ref.collection(sub).get()).docs.map((d) => [d.id, d.data()]));
+      const ops = [];
+      const keep = new Set();
+      for (const it of items) {
+        const docId = String(it.id);
+        keep.add(docId);
+        const prev = prevById.get(docId);
+        if (!prev || JSON.stringify(prev) !== JSON.stringify(it)) ops.push(['set', ref.collection(sub).doc(docId), it]);
+      }
+      for (const docId of prevById.keys()) if (!keep.has(docId)) ops.push(['del', ref.collection(sub).doc(docId)]);
+      return ops;
     }
-    for (const id of prevById.keys()) if (!keep.has(id)) ops.push(['del', ref.collection('images').doc(id)]);
+    const ops = [...(await diffSub('images', images)), ...(await diffSub('characters', characters))];
     for (let i = 0; i < ops.length; i += 450) {
       const batch = _db.batch();
       for (const [kind, docRef, data] of ops.slice(i, i + 450)) kind === 'set' ? batch.set(docRef, data) : batch.delete(docRef);
@@ -181,7 +189,7 @@ function createFirestoreDataStore() {
   async function deleteProject(pid) {
     await init();
     const ref = _col.doc(pid);
-    for (const sub of ['chats', 'images']) {
+    for (const sub of ['chats', 'images', 'characters']) {
       const docs = (await ref.collection(sub).get()).docs;
       for (let i = 0; i < docs.length; i += 450) {
         const batch = _db.batch();

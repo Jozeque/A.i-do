@@ -76,7 +76,7 @@ const GEM_META = {
 const BUILDER_OPTS = {
   look: ['High-gloss beauty', 'Clinical-luxe', 'Editorial documentary', 'Moody cinematic', 'Product hero', 'Warm lifestyle', 'Cultural editorial'],
   lighting: ['Clamshell beauty (soft 5600K)', 'Soft window / natural', 'Golden-hour warmth', 'Hard chiaroscuro', 'High-key bright & even', 'Overcast soft'],
-  lens: ['Short telephoto ~70–135mm, shallow DOF, creamy bokeh', 'Normal ~40–60mm, natural perspective', 'Wide ~24–35mm, environmental depth', 'Macro register for detail', 'Cinema look (e.g. Alexa + fast primes), modular focal range'],
+  lens: ['ARRI Alexa Mini LF + Cooke S4/i primes, short-tele ~70–135mm, creamy bokeh', 'ARRI Alexa 35 + Zeiss Supreme primes, normal ~40–60mm, natural', 'Sony Venice 2 + Cooke S4/i, wide ~24–35mm, environmental depth', 'ARRI + Cooke Anamorphic/i, oval bokeh & horizontal flares, ~40–75mm', 'RED V-Raptor + Zeiss Master Prime, clinical & sharp, ~50–100mm'],
   palette: ['Vibrant high-key', 'Muted pastel', 'Teal & orange', 'Warm earthy', 'Desaturated editorial', 'Clean clinical whites'],
   wardrobe: ['Describe wardrobe richly in prose', 'Keep wardrobe as in the reference', 'Minimal styling direction'],
 };
@@ -105,12 +105,12 @@ function gemEditorBody(gemId, meta) {
           <button class="mini-btn primary" id="bfAnalyze" type="button">✨ Analyze &amp; build</button>
         </div>
       </div>
-      <span class="field-label">Cinematography fields — these compile into the direction layered on the base NB Frames gem (for this project only). Analyze fills them; edit any by hand. Describe each as an adaptable range or family (e.g. a focal-length range, not one exact lens) so the look stays modular across different shots and frame sizes.</span>
+      <span class="field-label">Cinematography fields — these compile into the direction layered on the base NB Frames gem (for this project only). Analyze fills them; edit any by hand. Describe each as an adaptable range or family (e.g. a focal-length range, not one locked focal length) so the look stays modular across different shots and frame sizes — EXCEPT the camera body and lens series, which are named specifically (e.g. ARRI Alexa Mini LF + Cooke S4/i primes) and stay constant.</span>
       <div class="builder-grid">
         <label class="bf">Campaign / subject<input id="bf_campaign" placeholder="e.g. Clalit Smile dental campaign" /></label>
         <label class="bf">Look &amp; vibe<input id="bf_look" list="dl_look" placeholder="e.g. Clinical-luxe" /></label>
         <label class="bf">Lighting style<input id="bf_lighting" list="dl_lighting" placeholder="e.g. High-key bright &amp; even" /></label>
-        <label class="bf">Lens &amp; camera<input id="bf_lens" list="dl_lens" placeholder="e.g. short-telephoto ~70–135mm, shallow DOF (a range, not one lens)" /></label>
+        <label class="bf">Lens &amp; camera<input id="bf_lens" list="dl_lens" placeholder="e.g. ARRI Alexa Mini LF + Cooke S4/i primes, short-tele ~70–135mm (name the rig; focal length is a range)" /></label>
         <label class="bf">Color &amp; palette<input id="bf_palette" list="dl_palette" placeholder="e.g. Clean clinical whites" /></label>
         <label class="bf">Environment bias<input id="bf_environment" placeholder="e.g. bright airy modern clinics" /></label>
         <label class="bf">Default aspect ratio
@@ -457,6 +457,7 @@ function switchTab(tab) {
   const body = $('#wsBody');
   body.innerHTML = '';
   if (tab === 'generate') renderGenerate(body);
+  else if (tab === 'characters') renderCharacters(body);
   else if (tab === 'library') renderLibrary(body);
   else renderChat(body, tab);
 }
@@ -965,6 +966,144 @@ function renderRefImages() {
     t.querySelector('.rm').onclick = () => { state.refImages.splice(i, 1); renderRefImages(); };
     row.insertBefore(t, add);
   });
+}
+
+// ── CHARACTERS tab ─────────────────────────────────────────────────────────────
+// Build a reusable, identity-locked reference sheet from a few actor photos, then attach
+// it to NB Frames. Kept in its own `characters` collection — never in the Library.
+function renderCharacters(body) {
+  state.charUploads = state.charUploads || [];
+  const panel = document.createElement('div');
+  panel.className = 'chars-panel';
+  panel.innerHTML = `
+    <div class="chars-new">
+      <div class="section-head"><h3>New character</h3></div>
+      <p class="chars-hint">Upload a few clear photos of the person. We generate one clean multi-view reference sheet — a close-up plus front, three-quarter, and profile views — so NB&nbsp;Frames can place them in any scene with the same face. <b>A single close-up drifts; the sheet holds.</b></p>
+      <input class="char-text" id="charName" placeholder="Name (e.g. Maya, Detective Cole)" />
+      <textarea class="char-text" id="charNotes" rows="2" placeholder="Optional — wardrobe, age, a beard, glasses… (blank = keep them exactly as the photos)"></textarea>
+      <span class="field-label">Photos of the person — a few angles / expressions work best</span>
+      <div class="ref-row" id="charRefRow">
+        <button class="ref-add" id="charAdd" title="Add photos">＋</button>
+        <input type="file" id="charInput" accept="image/*" multiple hidden />
+      </div>
+      <button class="generate-btn" id="charGenBtn">Generate reference sheet</button>
+      <div class="gen-hint">Rendered on Nano Banana Pro at 2K. Stored with this project — separate from your Library and Nano Banana outputs.</div>
+    </div>
+    <div class="chars-gallery" id="charsGallery"></div>`;
+  body.appendChild(panel);
+  $('#charAdd').onclick = () => $('#charInput').click();
+  $('#charInput').onchange = async (e) => {
+    for (const f of e.target.files) {
+      try { const data = await fileToB64(f); state.charUploads.push({ name: f.name, mimeType: f.type, data, url: URL.createObjectURL(f) }); } catch {}
+    }
+    renderCharUploads(); e.target.value = '';
+  };
+  $('#charGenBtn').onclick = doCreateCharacter;
+  renderCharUploads();
+  renderCharsGallery();
+}
+
+function renderCharUploads() {
+  const row = $('#charRefRow');
+  if (!row) return;
+  $$('.thumb', row).forEach(t => t.remove());
+  const add = $('#charAdd');
+  (state.charUploads || []).forEach((a, i) => {
+    const t = document.createElement('div');
+    t.className = 'thumb';
+    t.innerHTML = `<img src="${a.url}" /><button class="rm" data-i="${i}">✕</button>`;
+    t.querySelector('.rm').onclick = () => { state.charUploads.splice(i, 1); renderCharUploads(); };
+    row.insertBefore(t, add);
+  });
+}
+
+function renderCharsGallery() {
+  const gallery = $('#charsGallery');
+  if (!gallery) return;
+  const chars = state.current.characters || [];
+  if (!chars.length) {
+    gallery.innerHTML = `<div class="gen-empty">No characters yet. Build one above, then attach it to NB Frames to keep the same face across every scene.</div>`;
+    return;
+  }
+  gallery.innerHTML = chars.map(c => {
+    const refUrl = `/media/${state.current.id}/images/${c.reference.file}`;
+    const srcs = (c.sourceImages || []).map(s => `<img class="char-src" src="/media/${state.current.id}/uploads/${s.file}" loading="lazy" />`).join('');
+    return `<div class="char-card" data-id="${c.id}">
+      <a class="char-ref" href="${refUrl}" target="_blank" rel="noopener"><img src="${refUrl}" loading="lazy" /></a>
+      <div class="char-meta">
+        <div class="char-name">${escapeHtml(c.name)}</div>
+        ${c.notes ? `<div class="char-notes">${escapeHtml(c.notes)}</div>` : ''}
+        ${srcs ? `<div class="char-srcs" title="Source photos">${srcs}</div>` : ''}
+        <div class="char-actions">
+          <button class="mini-btn char-use" data-id="${c.id}">＋ Use in NB Frames</button>
+          <a class="mini-btn" href="${refUrl}" download="${escapeHtml(c.name)}-reference.png">⬇</a>
+          <button class="mini-btn char-del" data-id="${c.id}">Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  $$('.char-use', gallery).forEach(b => b.onclick = () => useCharacterInFrames(chars.find(c => c.id === b.dataset.id)));
+  $$('.char-del', gallery).forEach(b => b.onclick = () => deleteCharacter(b.dataset.id));
+}
+
+async function doCreateCharacter() {
+  const name = ($('#charName')?.value || '').trim();
+  const notes = ($('#charNotes')?.value || '').trim();
+  if (!name) { toast('Give the character a name first.', true); return; }
+  if (!(state.charUploads || []).length) { toast('Add at least one photo of the person.', true); return; }
+  const btn = $('#charGenBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Building reference…'; }
+  const gallery = $('#charsGallery');
+  if (gallery && !gallery.querySelector('.char-card')) gallery.innerHTML = '';
+  if (gallery) gallery.insertAdjacentHTML('afterbegin', '<div class="char-card char-skel"><div class="skeleton"></div></div>');
+  try {
+    const images = state.charUploads.map(u => ({ mimeType: u.mimeType, data: u.data }));
+    const { character } = await api(`/api/projects/${state.current.id}/characters`, {
+      method: 'POST', body: JSON.stringify({ name, notes, images }),
+    });
+    state.current.characters = state.current.characters || [];
+    state.current.characters.unshift(character);
+    state.charUploads = [];
+    if ($('#charName')) $('#charName').value = '';
+    if ($('#charNotes')) $('#charNotes').value = '';
+    renderCharUploads();
+    toast(`${character.name} is ready — attach the reference to NB Frames from the card.`);
+  } catch (e) {
+    toast(e.message || 'Could not build the character.', true);
+  } finally {
+    const b = $('#charGenBtn');
+    if (b) { b.disabled = false; b.innerHTML = 'Generate reference sheet'; }
+    renderCharsGallery();
+  }
+}
+
+async function useCharacterInFrames(char) {
+  if (!char) return;
+  try {
+    const url = `/media/${state.current.id}/images/${char.reference.file}`;
+    const blob = await (await mediaFetch(url)).blob();
+    const data = await fileToB64(blob);
+    switchTab('nb-frames');
+    $$('#wsTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'nb-frames'));
+    state.attachments = state.attachments || {};
+    state.attachments['nb-frames'] = state.attachments['nb-frames'] || [];
+    if (!state.attachments['nb-frames'].some(r => r.url === url))
+      state.attachments['nb-frames'].push({ name: `${char.name} (reference)`, mimeType: blob.type || 'image/png', data, url });
+    renderAttachments('nb-frames');
+    toast(`${char.name}'s reference is attached to NB Frames — describe the scene and send.`);
+  } catch { toast('Could not attach the reference.', true); }
+}
+
+async function deleteCharacter(cid) {
+  const c = (state.current.characters || []).find(x => x.id === cid);
+  if (!c) return;
+  if (!confirm(`Delete "${c.name}"? This removes its reference sheet.`)) return;
+  try {
+    await api(`/api/projects/${state.current.id}/characters/${cid}`, { method: 'DELETE' });
+    state.current.characters = (state.current.characters || []).filter(x => x.id !== cid);
+    renderCharsGallery();
+    toast('Character deleted.');
+  } catch (e) { toast(e.message || 'Could not delete.', true); }
 }
 
 async function doGenerate() {

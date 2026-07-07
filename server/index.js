@@ -117,7 +117,7 @@ function compileNbFramesDirection(b) {
   if (campaign)    out.push(`Project / campaign: ${campaign}.`);
   if (look)        out.push(`Overall look & vibe: ${look}. Carry this feeling through composition, styling, grade, and mood across all three prompts.`);
   if (lighting)    out.push(`Lighting approach: ${lighting}. Motivate it from sources within the scene and keep it consistent across the set.`);
-  if (lens)        out.push(`Lens & camera character: work within ${lens}. Name one specific focal length per prompt that sits inside this range, matched to that shot's framing and depth.`);
+  if (lens)        out.push(`Camera & lens: ${lens}. Shoot every frame on this exact camera body and lens series and NAME them in the prompt — they are the constant look DNA and never change; only the focal length varies, so pick one specific focal length inside the stated range that fits each shot's framing and depth.`);
   if (palette)     out.push(`Color & palette: ${palette}. Hold this grade across every frame.`);
   if (environment) out.push(`Environment bias: ${environment}. Populate the surroundings with architecture, objects, textiles, light, and authentic atmosphere, and add people only when the brief calls for them.`);
   if (aspectRatio) out.push(`Default aspect ratio: render in ${aspectRatio} unless the brief specifies otherwise — the look itself does not depend on the frame shape.`);
@@ -375,14 +375,14 @@ app.post('/api/projects/:pid/gems/nb-frames/analyze', async (req, res) => {
     const kit = await readCineKit();
     const system = `${kit ? kit + '\n\n' : ''}You are a cinematography analyst. Examine the attached reference image(s) and extract their VISUAL STYLE as a REUSABLE LOOK — structured data an AI image generator can apply to MANY future images. Focus on style and craft, NOT the identity of any specific person.
 
-MOST IMPORTANT — capture the transferable CINEMATOGRAPHY, not this one frame's scene. The user reuses this look across many different shots, subjects, scenes, TIMES OF DAY, and aspect ratios. So extract what makes the image beautiful as CRAFT — its color science, contrast and grade, how light is shaped and sculpts the subject, lens character, texture, finish, and composition tendencies — and describe each as a FAMILY or RANGE (its DNA), never the single locked value of this one frame. CRITICALLY, do NOT bake in the reference's circumstantial facts — its time of day, its light SOURCE, its specific LOCATION, or the subject's exact OUTFIT. If the reference was shot in daylight, that does NOT make this a daylight project: describe the lighting's character so it can be re-created at night, golden hour, or indoors, adapting the source to whatever the user later briefs. For LENSES, give a lens CHARACTER and a focal-length RANGE (e.g. "short-telephoto family, ~70–135mm-equivalent"), never one fixed focal length. The look must stay modular to the user's brief while preserving the reference's overall cinematography.
+MOST IMPORTANT — capture the transferable CINEMATOGRAPHY, not this one frame's scene. The user reuses this look across many different shots, subjects, scenes, TIMES OF DAY, and aspect ratios. So extract what makes the image beautiful as CRAFT — its color science, contrast and grade, how light is shaped and sculpts the subject, lens character, texture, finish, and composition tendencies — and describe each as a FAMILY or RANGE (its DNA), never the single locked value of this one frame. CRITICALLY, do NOT bake in the reference's circumstantial facts — its time of day, its light SOURCE, its specific LOCATION, or the subject's exact OUTFIT. If the reference was shot in daylight, that does NOT make this a daylight project: describe the lighting's character so it can be re-created at night, golden hour, or indoors, adapting the source to whatever the user later briefs. For LENSES, you MUST name the specific real-world CAMERA BODY and LENS SERIES whose optical and colour character produce this look (e.g. "ARRI Alexa Mini LF with Cooke S4/i primes") — infer the best-matching professional rig from how the image renders; this named rig is the CONSTANT look DNA — and pair it with a focal-length RANGE (e.g. "~70–135mm-equivalent"), never one fixed focal length. The rig is the constant; the focal length is the per-shot variable. The look must stay modular to the user's brief while preserving the reference's overall cinematography.
 
 Return STRICT JSON only — no markdown, no commentary outside the JSON object — with exactly these string keys:
 {"look":"","lighting":"","lens":"","palette":"","environment":"","aspectRatio":"","wardrobe":"","extra":""}
 Guidance per key (describe the RANGE / FAMILY, not a single locked value):
 - look: 2-6 word overall look/vibe (e.g. "High-gloss beauty", "Moody cinematic noir").
 - lighting: the lighting CRAFT as a SCENE-ADAPTIVE approach — its quality (soft↔hard), contrast character, color saturation, how it shapes and separates the subject, and catchlight character — described so it can be re-created under ANY scene or time of day (the model adapts the actual source: sun, golden hour, window, night practicals, motivated "magic" light). Capture what makes the light beautiful, NOT the reference's time of day or source — do not weld in "daylight"/"sunlight"/"night" or a daylight-only Kelvin (e.g. "Bold, luminous key with strong directional shaping, punchy contrast holding clean rich shadows, bright catchlights — adaptable to any scene's light sources").
-- lens: lens CHARACTER plus a focal-length RANGE, the depth-of-field/bokeh feel, and any distortion — NEVER a single focal length (e.g. "Short-telephoto family, ~70–135mm-equivalent, shallow-to-moderate depth of field, creamy background bokeh, no distortion").
+- lens: you MUST commit to a specific real-world CAMERA BODY and LENS SERIES that best matches this look, then give the focal-length RANGE, the depth-of-field/bokeh feel, and any distortion/anamorphic character. NEVER a single focal length, and NEVER omit the camera+lens — name actual professional gear (bodies e.g. ARRI Alexa Mini LF / Alexa 35 / RED V-Raptor / Sony Venice 2; glass e.g. Cooke S4/i, Cooke Anamorphic/i, Zeiss Master Prime or Supreme, Panavision Primo, Leica Summilux-C). Infer the best-matching rig from how the image renders even though you cannot read it from metadata — pick the camera+glass a DP would choose to create exactly this look (e.g. "ARRI Alexa Mini LF with Cooke S4/i primes — warm, gentle Cooke roll-off; short-telephoto range ~70–135mm-equivalent; shallow-to-moderate depth of field, creamy round bokeh, no distortion").
 - palette: the GRADE and colour science as a transferable family — the colour RELATIONSHIPS (warm/cool balance, complementary or analogous scheme), saturation level, contrast, and film-like treatment (separation, highlight roll-off) — NOT the specific objects' colours in this one frame (avoid "green grapes, magenta labels"; instead "high-saturation jewel-tone scheme, warm subject against cooler surroundings, filmic roll-off").
 - environment: by DEFAULT say the environment follows the brief, and capture only the transferable rendering approach — how backgrounds are graded, shaped, and handled for depth (bokeh / depth of field) — NOT the reference's specific location or time of day. Only record a concrete setting if the project is genuinely tied to one place. Don't lock the reference's exact scene (NOT "suburban garden with picket fence"; instead "environment follows the brief, backgrounds rendered in the look's palette as a soft shallow-DOF bokeh wash").
 - aspectRatio: ALWAYS return "". Do NOT infer an aspect ratio from the reference's crop — the reference's frame shape is circumstantial, and aspect ratio is a per-shot choice the user sets at generation time. The look must never carry a frame shape.
@@ -598,6 +598,96 @@ app.post('/api/projects/:pid/generate', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });
   }
+});
+
+// ── CHARACTERS — build a reusable, identity-locked reference sheet from actor photos ──
+// The character-builder gem (Claude, vision) writes ONE Nano Banana prompt; Nano Banana Pro
+// renders a single clean multi-view reference sheet (2K, landscape) with the uploaded photos
+// as the identity source. Stored in its OWN `characters` collection — never mixed into the
+// Library / Nano Banana outputs. body: { name, notes?, images:[{mimeType, data(base64)}] }
+app.post('/api/projects/:pid/characters', async (req, res) => {
+  if (!anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
+  if (!genai) return res.status(400).json({ error: 'GEMINI_API_KEY is not set. Add it to your .env file.' });
+  try {
+    const { name, notes = '', images = [] } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Give the character a name.' });
+    if (!images.length) return res.status(400).json({ error: 'Attach at least one clear photo of the person.' });
+    const p = await loadProject(req.params.pid);
+
+    // 1) The character-builder gem (Claude, vision) writes ONE Nano Banana prompt for the sheet.
+    const gem = await fsp.readFile(path.join(GEMS_DIR, 'character-builder.txt'), 'utf8');
+    const brief = await anthropic.messages.create({
+      model: CLAUDE_MODEL, max_tokens: 1024, system: gem,
+      messages: [{ role: 'user', content: [
+        ...images.map(img => ({ type: 'image', source: { type: 'base64', media_type: img.mimeType || 'image/jpeg', data: img.data } })),
+        { type: 'text', text: `Build a character reference sheet for "${name.trim()}".` + (notes.trim() ? `\nNotes / adjustments: ${notes.trim()}` : '') },
+      ] }],
+    });
+    const nbPrompt = brief.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    if (!nbPrompt) return res.status(502).json({ error: 'The character builder returned no prompt — try clearer photos.' });
+
+    // 2) Nano Banana Pro renders the reference sheet (single image, 2K, landscape),
+    //    with the source photos as the identity reference.
+    const AR = '16:9';
+    const contents = images.map(img => ({ inlineData: { mimeType: img.mimeType || 'image/jpeg', data: img.data } }));
+    contents.push({ text: `${nbPrompt}\n\nCompose the sheet as a ${AR_WORDS[AR]} (${AR}) landscape image; recompose to fill the full frame rather than copying any reference photo's shape.` });
+    let result;
+    try {
+      result = await genai.models.generateContent({
+        model: NB_MODELS.pro, contents,
+        config: { responseModalities: ['IMAGE'], imageConfig: { imageSize: '2K', aspectRatio: AR } },
+      });
+    } catch (e) { return res.status(502).json({ error: `Nano Banana failed: ${e?.message || String(e)}` }); }
+    const cand = result?.candidates?.[0];
+    const parts = cand?.content?.parts || [];
+    const imgPart = parts.find(pt => pt.inlineData);
+    if (!imgPart) {
+      const block = result?.promptFeedback?.blockReason;
+      const finish = cand?.finishReason;
+      const textPart = parts.find(pt => pt.text)?.text;
+      const why = block ? `blocked by Gemini safety filter (${block})`
+        : (finish && !['STOP', 'MAX_TOKENS'].includes(finish)) ? `no image (finishReason: ${finish})`
+        : textPart ? `model returned text instead of an image: "${textPart.slice(0, 160)}"`
+        : 'no image returned (empty response)';
+      return res.status(502).json({ error: `No reference generated — ${why}` });
+    }
+
+    // 3) Persist the reference sheet (images bucket) + the source photos (kept with the character).
+    const charId = id(), refId = id();
+    const { file: refFile } = await storage.saveImage(p.id, refId, Buffer.from(imgPart.inlineData.data, 'base64'), imgPart.inlineData.mimeType);
+    const sourceImages = [];
+    for (const img of images) { const s = await storage.saveUpload(p.id, img.data, img.mimeType); sourceImages.push({ file: s.file, mimeType: s.mimeType }); }
+    const character = {
+      id: charId, name: name.trim(), notes: notes.trim(), prompt: nbPrompt,
+      reference: { id: refId, file: refFile, mimeType: imgPart.inlineData.mimeType || 'image/png', aspectRatio: AR },
+      sourceImages, createdAt: Date.now(),
+    };
+    await updateProject(req.params.pid, (proj) => {
+      proj.characters = proj.characters || [];
+      proj.characters.unshift(character);
+      proj.updatedAt = Date.now();
+    });
+    res.json({ character });
+  } catch (e) {
+    res.status(500).json({ error: e?.message || String(e) });
+  }
+});
+
+// Delete a character + best-effort remove its reference + source files.
+app.delete('/api/projects/:pid/characters/:charId', async (req, res) => {
+  try {
+    let removed = null;
+    await updateProject(req.params.pid, (proj) => {
+      const list = proj.characters || [];
+      const i = list.findIndex(c => c.id === req.params.charId);
+      if (i >= 0) { removed = list[i]; list.splice(i, 1); proj.updatedAt = Date.now(); }
+    });
+    if (removed) {
+      const files = [removed.reference?.file, ...(removed.sourceImages || []).map(s => s.file)].filter(Boolean);
+      for (const f of files) { try { await storage.deleteImage(req.params.pid, f); } catch { /* best-effort */ } }
+    }
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
 });
 
 // ── image library management ───────────────────────────────────────────────────

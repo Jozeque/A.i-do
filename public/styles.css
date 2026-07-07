@@ -432,3 +432,27 @@ select:focus { border-color: var(--accent); }
 
 .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(26,18,6,.3); border-top-color: #1a1206; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Characters tab ─────────────────────────────────────────────── */
+.chars-panel { flex: 1; height: 100%; overflow-y: auto; padding: 24px 30px 60px; }
+.chars-new { max-width: 640px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 26px; margin-bottom: 24px; border-bottom: 1px solid var(--line-soft); }
+.chars-new .section-head h3 { font-family: var(--display); font-weight: 500; font-size: 22px; letter-spacing: -.01em; }
+.chars-hint { font-size: 13px; color: var(--ink-dim); line-height: 1.55; margin: -2px 0 4px; }
+.chars-hint b { color: var(--ink); font-weight: 600; }
+.char-text { width: 100%; font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; }
+.char-text::placeholder { color: var(--ink-faint); }
+.char-text:focus { border-color: var(--accent); outline: none; }
+textarea.char-text { resize: vertical; min-height: 46px; line-height: 1.5; }
+.chars-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; }
+.char-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+.char-ref { display: block; background: #000; line-height: 0; }
+.char-ref img { width: 100%; height: auto; display: block; }
+.char-meta { padding: 13px 15px 15px; display: flex; flex-direction: column; gap: 9px; }
+.char-name { font-family: var(--display); font-weight: 500; font-size: 18px; color: var(--ink); letter-spacing: -.01em; }
+.char-notes { font-size: 12.5px; color: var(--ink-dim); line-height: 1.45; }
+.char-srcs { display: flex; gap: 6px; flex-wrap: wrap; }
+.char-src { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); opacity: .75; }
+.char-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 3px; align-items: center; }
+.char-actions .char-use { color: var(--accent); border-color: var(--accent); }
+.char-skel { border: 1px solid var(--line); }
+.char-skel .skeleton { width: 100%; aspect-ratio: 16 / 9; border: none; border-radius: 0; }
