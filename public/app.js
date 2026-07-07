@@ -6,6 +6,7 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 // ID token. _firebaseAuth is set by initAuth(); it stays null in open (local) mode,
 // so authHeader() is a no-op and nothing changes for local development.
 let _firebaseAuth = null;
+let _fs = null, _fsApi = null;   // Firestore + { collection, doc, onSnapshot } — set in initAuth, used for live sync
 async function authHeader() {
   const u = _firebaseAuth?.currentUser;
   if (!u) return {};
@@ -287,6 +288,7 @@ async function boot() {
     const withContent = state.projects.find(p => ((p.imageCount || 0) + (p.chatCount || 0)) > 0);
     pick = (withContent || state.projects[0])?.id;
   }
+  startProjectListSync();          // live sidebar (projects added/renamed/deleted by either user)
   if (pick) openProject(pick);
 }
 function renderKeyStatus() {
@@ -327,9 +329,13 @@ function wireGlobal() {
 // ── projects ────────────────────────────────────────────────────────────────
 async function loadProjects() {
   state.projects = await api('/api/projects');
+  renderProjectList();
+}
+function renderProjectList() {
   const list = $('#projectList');
+  if (!list) return;
   list.innerHTML = '';
-  state.projects.forEach(p => {
+  (state.projects || []).forEach(p => {
     const el = document.createElement('div');
     el.className = 'project-item' + (state.current?.id === p.id ? ' active' : '');
     el.innerHTML = `<span class="pname">${escapeHtml(p.name)}</span><span class="pdel" title="Delete">🗑</span>`;
@@ -345,6 +351,78 @@ async function loadProjects() {
     };
     list.appendChild(el);
   });
+}
+
+// ── Live sync (Firestore real-time listeners) ─────────────────────────────────
+// Both users watch the same project live. The browsers subscribe DIRECTLY to Firestore
+// (Google's infra), so live updates never touch our server — sync adds ~zero server load.
+// Needs Firestore rules allowing the allowlisted emails to READ (writes stay server-side
+// via the admin SDK). No-ops in local/open mode (no _fs).
+let _projListUnsub = null;
+let _projUnsubs = [];
+
+function startProjectListSync() {
+  if (!_fs || _projListUnsub) return;
+  const { collection, onSnapshot } = _fsApi;
+  _projListUnsub = onSnapshot(collection(_fs, 'projects'), (snap) => {
+    const projects = [];
+    snap.forEach(d => { const p = d.data(); if (p && p.id) projects.push({ id: p.id, name: p.name, createdAt: p.createdAt, updatedAt: p.updatedAt, imageCount: p.imageCount || 0, chatCount: p.chatCount || 0 }); });
+    projects.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    state.projects = projects;
+    renderProjectList();
+  }, (err) => console.warn('[sync] project list:', err?.message || err));
+}
+
+function stopProjectSync() {
+  _projUnsubs.forEach(u => { try { u(); } catch {} });
+  _projUnsubs = [];
+}
+
+function syncProject(pid) {
+  stopProjectSync();
+  if (!_fs) return;
+  const { collection, doc, onSnapshot } = _fsApi;
+  const mine = () => state.current && state.current.id === pid;
+
+  // project meta (live rename)
+  _projUnsubs.push(onSnapshot(doc(_fs, 'projects', pid), (d) => {
+    if (!mine() || !d.exists()) return;
+    const m = d.data();
+    if (m.name && m.name !== state.current.name) {
+      state.current.name = m.name;
+      const el = $('#projectNameInput');
+      if (el && el !== document.activeElement) el.value = m.name;
+    }
+  }, (e) => console.warn('[sync] meta:', e?.message || e)));
+
+  // chat messages per gem — the "see each other's prompts" bit
+  _projUnsubs.push(onSnapshot(collection(_fs, 'projects', pid, 'chats'), (snap) => {
+    if (!mine()) return;
+    snap.docChanges().forEach(ch => {
+      const gemId = ch.doc.id;
+      state.current.chats[gemId] = ch.doc.data().messages || [];
+      if (state.activeTab === gemId && $('#chatScroll')) renderMessages(gemId);
+    });
+  }, (e) => console.warn('[sync] chats:', e?.message || e)));
+
+  // generated images (Nano Banana 2 + Library) — redraw from state, never re-fetch
+  _projUnsubs.push(onSnapshot(collection(_fs, 'projects', pid, 'images'), (snap) => {
+    if (!mine()) return;
+    state.current.images = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    if (state.activeTab === 'generate' && !state.generating) paintGenResults();
+    else if (state.activeTab === 'library' && $('#libGrid')) {
+      const imgs = state.current.images.map(im => ({ ...im, url: `/media/${state.current.id}/images/${im.file}` }));
+      const c = $('.lib-head h3 span'); if (c) c.textContent = `${imgs.length} images`;
+      drawLibGrid(imgs);
+    }
+  }, (e) => console.warn('[sync] images:', e?.message || e)));
+
+  // characters
+  _projUnsubs.push(onSnapshot(collection(_fs, 'projects', pid, 'characters'), (snap) => {
+    if (!mine()) return;
+    state.current.characters = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    if (state.activeTab === 'characters') renderCharsGallery();
+  }, (e) => console.warn('[sync] characters:', e?.message || e)));
 }
 
 async function newProject() {
@@ -368,6 +446,7 @@ async function openProject(pid) {
   $('#wsMeta').textContent = `created ${new Date(state.current.createdAt).toLocaleDateString()}`;
   await loadProjects();
   switchTab(state.activeTab);
+  syncProject(pid);                // live-stream this project's chats / images / characters
 }
 function showEmpty() {
   $('#workspace').classList.add('hidden');
@@ -669,6 +748,8 @@ function renderGenFavPicker() {
 function renderMessages(gemId) {
   const scroll = $('#chatScroll');
   if (!scroll) return;
+  const nearBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 120;
+  const prevTop = scroll.scrollTop;
   const msgs = state.current.chats[gemId] || [];
   if (msgs.length === 0) {
     scroll.innerHTML = `<div class="gen-empty">No messages yet. ${GEM_META[gemId].name} is ready when you are.</div>`;
@@ -690,7 +771,7 @@ function renderMessages(gemId) {
   });
   $$('.gen-link', scroll).forEach(b => b.onclick = () => sendPromptToGenerator(b));
   $$('.reuse-prompt', scroll).forEach(b => b.onclick = () => reusePromptInComposer(b));
-  scroll.scrollTop = scroll.scrollHeight;
+  scroll.scrollTop = nearBottom ? scroll.scrollHeight : prevTop;
 }
 
 // Reuse a generated prompt in THIS gem's composer: drop the text into the input and
@@ -1167,6 +1248,7 @@ async function doGenerate() {
 
   const btn = $('#genBtn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Generating…';
+  state.generating = true;
 
   // Accumulate: prepend a live "generating" spot per image — never wipe prior renders.
   const grid = ensureGenGrid();
@@ -1195,6 +1277,7 @@ async function doGenerate() {
     toast(e.message, true);
   } finally {
     clearInterval(genTimer);
+    state.generating = false;
     btn.disabled = false; btn.textContent = 'Generate';
   }
 }
@@ -1337,7 +1420,12 @@ async function initAuth() {
   const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut,
           setPersistence, browserLocalPersistence } =
     await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js');
-  _firebaseAuth = getAuth(initializeApp(cfg.firebase));
+  const { getFirestore, collection, doc, onSnapshot } =
+    await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js');
+  const _app = initializeApp(cfg.firebase);
+  _firebaseAuth = getAuth(_app);
+  _fs = getFirestore(_app);
+  _fsApi = { collection, doc, onSnapshot };
   await setPersistence(_firebaseAuth, browserLocalPersistence).catch(() => {});
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });

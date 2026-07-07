@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Live sync: the two allowlisted users may READ everything — their browsers subscribe
+    // to project changes in real time (chats, images, characters, project list).
+    //
+    // All WRITES still go only through the app server, which uses the Firebase Admin SDK
+    // and BYPASSES these rules — so direct client writes stay fully closed.
+    match /{document=**} {
+      allow read: if request.auth != null
+        && request.auth.token.email in [
+          'yossi.bozo112@gmail.com',
+          'liran.segal@gmail.com'
+        ];
+      allow write: if false;
+    }
+  }
+}
