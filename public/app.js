@@ -973,6 +973,7 @@ function renderRefImages() {
 // it to NB Frames. Kept in its own `characters` collection — never in the Library.
 function renderCharacters(body) {
   state.charUploads = state.charUploads || [];
+  state.charWardrobe = state.charWardrobe || [];
   const panel = document.createElement('div');
   panel.className = 'chars-panel';
   panel.innerHTML = `
@@ -980,11 +981,16 @@ function renderCharacters(body) {
       <div class="section-head"><h3>New character</h3></div>
       <p class="chars-hint">Upload a few clear photos of the person. We generate one clean multi-view reference sheet — a close-up plus front, three-quarter, and profile views — so NB&nbsp;Frames can place them in any scene with the same face. <b>A single close-up drifts; the sheet holds.</b></p>
       <input class="char-text" id="charName" placeholder="Name (e.g. Maya, Detective Cole)" />
-      <textarea class="char-text" id="charNotes" rows="2" placeholder="Optional — wardrobe, age, a beard, glasses… (blank = keep them exactly as the photos)"></textarea>
-      <span class="field-label">Photos of the person — a few angles / expressions work best</span>
+      <textarea class="char-text" id="charNotes" rows="2" placeholder="Optional — wardrobe in words, age, a beard, glasses… (blank = keep them exactly as the photos)"></textarea>
+      <span class="field-label">Photos of the person — identity · a few angles / expressions work best</span>
       <div class="ref-row" id="charRefRow">
-        <button class="ref-add" id="charAdd" title="Add photos">＋</button>
+        <button class="ref-add" id="charAdd" title="Add photos of the person">＋</button>
         <input type="file" id="charInput" accept="image/*" multiple hidden />
+      </div>
+      <span class="field-label">Wardrobe / outfit references — optional · face &amp; look come from the photos above, only the clothes come from these</span>
+      <div class="ref-row" id="charWardrobeRow">
+        <button class="ref-add" id="charWardrobeAdd" title="Add wardrobe / outfit photos">＋</button>
+        <input type="file" id="charWardrobeInput" accept="image/*" multiple hidden />
       </div>
       <button class="generate-btn" id="charGenBtn">Generate reference sheet</button>
       <div class="gen-hint">Rendered on Nano Banana Pro at 2K. Stored with this project — separate from your Library and Nano Banana outputs.</div>
@@ -998,8 +1004,16 @@ function renderCharacters(body) {
     }
     renderCharUploads(); e.target.value = '';
   };
+  $('#charWardrobeAdd').onclick = () => $('#charWardrobeInput').click();
+  $('#charWardrobeInput').onchange = async (e) => {
+    for (const f of e.target.files) {
+      try { const data = await fileToB64(f); state.charWardrobe.push({ name: f.name, mimeType: f.type, data, url: URL.createObjectURL(f) }); } catch {}
+    }
+    renderCharWardrobe(); e.target.value = '';
+  };
   $('#charGenBtn').onclick = doCreateCharacter;
   renderCharUploads();
+  renderCharWardrobe();
   renderCharsGallery();
 }
 
@@ -1017,6 +1031,20 @@ function renderCharUploads() {
   });
 }
 
+function renderCharWardrobe() {
+  const row = $('#charWardrobeRow');
+  if (!row) return;
+  $$('.thumb', row).forEach(t => t.remove());
+  const add = $('#charWardrobeAdd');
+  (state.charWardrobe || []).forEach((a, i) => {
+    const t = document.createElement('div');
+    t.className = 'thumb';
+    t.innerHTML = `<img src="${a.url}" /><button class="rm" data-i="${i}">✕</button>`;
+    t.querySelector('.rm').onclick = () => { state.charWardrobe.splice(i, 1); renderCharWardrobe(); };
+    row.insertBefore(t, add);
+  });
+}
+
 function renderCharsGallery() {
   const gallery = $('#charsGallery');
   if (!gallery) return;
@@ -1027,7 +1055,7 @@ function renderCharsGallery() {
   }
   gallery.innerHTML = chars.map(c => {
     const refUrl = `/media/${state.current.id}/images/${c.reference.file}`;
-    const srcs = (c.sourceImages || []).map(s => `<img class="char-src" src="/media/${state.current.id}/uploads/${s.file}" loading="lazy" />`).join('');
+    const srcs = [...(c.sourceImages || []), ...(c.wardrobeImages || [])].map(s => `<img class="char-src" src="/media/${state.current.id}/uploads/${s.file}" loading="lazy" />`).join('');
     return `<div class="char-card" data-id="${c.id}">
       <a class="char-ref" href="${refUrl}" target="_blank" rel="noopener"><img src="${refUrl}" loading="lazy" /></a>
       <div class="char-meta">
@@ -1058,15 +1086,18 @@ async function doCreateCharacter() {
   if (gallery) gallery.insertAdjacentHTML('afterbegin', '<div class="char-card char-skel"><div class="skeleton"></div></div>');
   try {
     const images = state.charUploads.map(u => ({ mimeType: u.mimeType, data: u.data }));
+    const wardrobeImages = (state.charWardrobe || []).map(u => ({ mimeType: u.mimeType, data: u.data }));
     const { character } = await api(`/api/projects/${state.current.id}/characters`, {
-      method: 'POST', body: JSON.stringify({ name, notes, images }),
+      method: 'POST', body: JSON.stringify({ name, notes, images, wardrobeImages }),
     });
     state.current.characters = state.current.characters || [];
     state.current.characters.unshift(character);
     state.charUploads = [];
+    state.charWardrobe = [];
     if ($('#charName')) $('#charName').value = '';
     if ($('#charNotes')) $('#charNotes').value = '';
     renderCharUploads();
+    renderCharWardrobe();
     toast(`${character.name} is ready — attach the reference to NB Frames from the card.`);
   } catch (e) {
     toast(e.message || 'Could not build the character.', true);

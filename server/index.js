@@ -604,24 +604,31 @@ app.post('/api/projects/:pid/generate', async (req, res) => {
 // The character-builder gem (Claude, vision) writes ONE Nano Banana prompt; Nano Banana Pro
 // renders a single clean multi-view reference sheet (2K, landscape) with the uploaded photos
 // as the identity source. Stored in its OWN `characters` collection — never mixed into the
-// Library / Nano Banana outputs. body: { name, notes?, images:[{mimeType, data(base64)}] }
+// Library / Nano Banana outputs. Optional wardrobeImages are a CLOTHING-only role (face &
+// look from `images`, garments from these). body: { name, notes?, images:[…], wardrobeImages?:[…] }
 app.post('/api/projects/:pid/characters', async (req, res) => {
   if (!anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
   if (!genai) return res.status(400).json({ error: 'GEMINI_API_KEY is not set. Add it to your .env file.' });
   try {
-    const { name, notes = '', images = [] } = req.body;
+    const { name, notes = '', images = [], wardrobeImages = [] } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'Give the character a name.' });
     if (!images.length) return res.status(400).json({ error: 'Attach at least one clear photo of the person.' });
     const p = await loadProject(req.params.pid);
 
     // 1) The character-builder gem (Claude, vision) writes ONE Nano Banana prompt for the sheet.
     const gem = await fsp.readFile(path.join(GEMS_DIR, 'character-builder.txt'), 'utf8');
+    const toImg = (img) => ({ type: 'image', source: { type: 'base64', media_type: img.mimeType || 'image/jpeg', data: img.data } });
+    const content = [{ type: 'text', text: `Photos of the person "${name.trim()}" — the identity source:` }, ...images.map(toImg)];
+    if (wardrobeImages.length) {
+      content.push({ type: 'text', text: 'Wardrobe / outfit reference(s) — the CLOTHING source only; take only the garments from these, never their body, face, or pose:' });
+      content.push(...wardrobeImages.map(toImg));
+    }
+    content.push({ type: 'text', text: `Build a character reference sheet for "${name.trim()}".`
+      + (wardrobeImages.length ? ' Dress them in the wardrobe shown in the wardrobe reference(s).' : '')
+      + (notes.trim() ? `\nNotes / adjustments: ${notes.trim()}` : '') });
     const brief = await anthropic.messages.create({
       model: CLAUDE_MODEL, max_tokens: 1024, system: gem,
-      messages: [{ role: 'user', content: [
-        ...images.map(img => ({ type: 'image', source: { type: 'base64', media_type: img.mimeType || 'image/jpeg', data: img.data } })),
-        { type: 'text', text: `Build a character reference sheet for "${name.trim()}".` + (notes.trim() ? `\nNotes / adjustments: ${notes.trim()}` : '') },
-      ] }],
+      messages: [{ role: 'user', content }],
     });
     const nbPrompt = brief.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     if (!nbPrompt) return res.status(502).json({ error: 'The character builder returned no prompt — try clearer photos.' });
@@ -629,7 +636,8 @@ app.post('/api/projects/:pid/characters', async (req, res) => {
     // 2) Nano Banana Pro renders the reference sheet (single image, 2K, landscape),
     //    with the source photos as the identity reference.
     const AR = '16:9';
-    const contents = images.map(img => ({ inlineData: { mimeType: img.mimeType || 'image/jpeg', data: img.data } }));
+    const toInline = (img) => ({ inlineData: { mimeType: img.mimeType || 'image/jpeg', data: img.data } });
+    const contents = [...images.map(toInline), ...wardrobeImages.map(toInline)];
     contents.push({ text: `${nbPrompt}\n\nCompose the sheet as a ${AR_WORDS[AR]} (${AR}) landscape image; recompose to fill the full frame rather than copying any reference photo's shape.` });
     let result;
     try {
@@ -652,15 +660,16 @@ app.post('/api/projects/:pid/characters', async (req, res) => {
       return res.status(502).json({ error: `No reference generated — ${why}` });
     }
 
-    // 3) Persist the reference sheet (images bucket) + the source photos (kept with the character).
+    // 3) Persist the reference sheet (images bucket) + the source + wardrobe photos (kept with the character).
     const charId = id(), refId = id();
     const { file: refFile } = await storage.saveImage(p.id, refId, Buffer.from(imgPart.inlineData.data, 'base64'), imgPart.inlineData.mimeType);
-    const sourceImages = [];
-    for (const img of images) { const s = await storage.saveUpload(p.id, img.data, img.mimeType); sourceImages.push({ file: s.file, mimeType: s.mimeType }); }
+    const saveAll = async (arr) => { const out = []; for (const img of arr) { const s = await storage.saveUpload(p.id, img.data, img.mimeType); out.push({ file: s.file, mimeType: s.mimeType }); } return out; };
+    const sourceImages = await saveAll(images);
+    const wardrobeSaved = await saveAll(wardrobeImages);
     const character = {
       id: charId, name: name.trim(), notes: notes.trim(), prompt: nbPrompt,
       reference: { id: refId, file: refFile, mimeType: imgPart.inlineData.mimeType || 'image/png', aspectRatio: AR },
-      sourceImages, createdAt: Date.now(),
+      sourceImages, wardrobeImages: wardrobeSaved, createdAt: Date.now(),
     };
     await updateProject(req.params.pid, (proj) => {
       proj.characters = proj.characters || [];
