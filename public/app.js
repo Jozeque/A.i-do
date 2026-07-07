@@ -320,7 +320,23 @@ function wireGlobal() {
     state.current.name = e.target.value;
     await loadProjects();
   };
-  $$('#wsTabs .tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
+  $$('#wsTabs .tab').forEach(t => {
+    t.onclick = () => switchTab(t.dataset.tab);
+    // Drag an image (from NB2 results / Library) onto a tab to attach it there.
+    t.addEventListener('dragover', (e) => {
+      if (DROP_TABS.includes(t.dataset.tab) && Array.from(e.dataTransfer.types || []).includes('text/avs-image')) {
+        e.preventDefault(); t.classList.add('tab-drop');
+      }
+    });
+    t.addEventListener('dragleave', () => t.classList.remove('tab-drop'));
+    t.addEventListener('drop', (e) => {
+      t.classList.remove('tab-drop');
+      const url = e.dataTransfer.getData('text/avs-image');
+      if (!url) return;
+      e.preventDefault();
+      dropImageOnTab(t.dataset.tab, url);
+    });
+  });
   // close any open favorites popover when clicking outside it / its toggle button
   document.addEventListener('click', (e) => {
     if (e.target.closest('.fav-picker') || e.target.closest('.fav-open')) return;
@@ -721,6 +737,32 @@ async function favoriteToAttachment(im) {
   const blob = await (await mediaFetch(url)).blob();
   const data = await fileToB64(blob);
   return { name: im.file, mimeType: blob.type || 'image/jpeg', data, url };
+}
+
+// Drag an image card (from NB2 results / Library) onto a tab button to attach it there.
+const DROP_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor', 'generate'];
+async function urlToAttachment(url) {
+  const blob = await (await mediaFetch(url)).blob();
+  const data = await fileToB64(blob);
+  return { name: url.split('/').pop() || 'image', mimeType: blob.type || 'image/jpeg', data, url };
+}
+async function dropImageOnTab(tab, url) {
+  if (!DROP_TABS.includes(tab) || !state.current) return;
+  try {
+    const att = await urlToAttachment(url);
+    switchTab(tab);
+    if (tab === 'generate') {
+      if (!state.refImages.some(r => r.url === url)) state.refImages.push(att);
+      renderRefImages();
+    } else {
+      state.attachments = state.attachments || {};
+      state.attachments[tab] = state.attachments[tab] || [];
+      if (!state.attachments[tab].some(r => r.url === url)) state.attachments[tab].push(att);
+      renderAttachments(tab);
+    }
+    const label = tab === 'generate' ? 'Nano Banana 2' : (GEM_META[tab]?.name || tab);
+    toast(`Image sent to ${label}.`);
+  } catch { toast('Could not add that image.', true); }
 }
 
 // Chat composer: add a favorite as a message attachment.
@@ -1321,6 +1363,15 @@ function imgCard(im) {
 function wireImageCards(scope) {
   $$('.img-card', scope).forEach(card => {
     const imgId = card.dataset.id;
+    const imgEl = card.querySelector('img');
+    if (imgEl) {
+      imgEl.setAttribute('draggable', 'true');
+      imgEl.title = 'Drag onto a tab (NB Frames, Kling…) to use as a reference';
+      imgEl.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/avs-image', imgEl.src);
+        e.dataTransfer.effectAllowed = 'copy';
+      });
+    }
     card.querySelector('.imgwrap').onclick = () => {
       // build the navigable set from every card currently in this grid (live order)
       const container = card.closest('.results-grid') || scope;
