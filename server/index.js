@@ -649,8 +649,9 @@ app.post('/api/projects/:pid/characters', async (req, res) => {
     const nbPrompt = brief.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     if (!nbPrompt) return res.status(502).json({ error: 'The character builder returned no prompt — try clearer photos.' });
 
-    // 2) Nano Banana Pro renders the reference sheet (single image, 2K, landscape),
-    //    with the source photos as the identity reference.
+    // 2) Nano Banana Pro renders the reference sheet at 2K, landscape, with the source photos
+    //    as the identity reference. 2K matters — a multi-view sheet spreads resolution across
+    //    several figures, so 1K left each face too small to capture the likeness.
     const AR = '16:9';
     const toInline = (img) => ({ inlineData: { mimeType: sniffImageMime(img.data, img.mimeType), data: img.data } });
     const contents = [...images.map(toInline), ...wardrobeImages.map(toInline)];
@@ -659,7 +660,7 @@ app.post('/api/projects/:pid/characters', async (req, res) => {
     try {
       result = await genai.models.generateContent({
         model: NB_MODELS.pro, contents,
-        config: { responseModalities: ['IMAGE'], imageConfig: { imageSize: '1K', aspectRatio: AR } },
+        config: { responseModalities: ['IMAGE'], imageConfig: { imageSize: '2K', aspectRatio: AR } },
       });
     } catch (e) { return res.status(502).json({ error: `Nano Banana failed: ${e?.message || String(e)}` }); }
     const cand = result?.candidates?.[0];
