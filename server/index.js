@@ -467,12 +467,16 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
     // an earlier scene/reference must never bleed into prompts for a newly attached image.
     const messages = (images.length > 0 ? [] : history).map(m => ({ role: m.role, content: m.content }));
     const userContent = [];
-    for (const img of images) {
+    // Label each attached image ("Image 1:", "Image 2:", …) so the gem knows which one the
+    // user means by "image 1" / "image 2" — essential for swaps/composites where direction
+    // matters — instead of leaving it to infer from order.
+    images.forEach((img, i) => {
+      if (images.length > 1) userContent.push({ type: 'text', text: `Image ${i + 1}:` });
       userContent.push({
         type: 'image',
         source: { type: 'base64', media_type: sniffImageMime(img.data, img.mimeType), data: img.data },
       });
-    }
+    });
     // For Kling, append the toggle's mode tag to THIS turn's text (most salient place,
     // so it wins over any conflicting wording). Only userText is persisted, not the tag.
     let turnText = userText || '';
@@ -541,7 +545,12 @@ app.post('/api/projects/:pid/generate', async (req, res) => {
 
     const contents = [];
     const savedRefs = [];
-    for (const r of refImages) {
+    // Label each reference explicitly ("Image 1:", "Image 2:", …) so Nano Banana knows which
+    // is which — critical for edits/swaps where the prompt says "the face from image 2" and
+    // the direction matters (otherwise it has to guess the order).
+    for (let i = 0; i < refImages.length; i++) {
+      const r = refImages[i];
+      if (refImages.length > 1) contents.push({ text: `Image ${i + 1}:` });
       contents.push({ inlineData: { mimeType: sniffImageMime(r.data, r.mimeType), data: r.data } });
       savedRefs.push(await storage.saveUpload(p.id, r.data, r.mimeType));
     }
