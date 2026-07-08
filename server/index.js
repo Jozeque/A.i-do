@@ -489,7 +489,9 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
       // NB Frames returns 3 prompts × 4 dense DOP-grade paragraphs; 2048 truncated the
       // later prompts down to fewer paragraphs. Give it room for the full structure.
       max_tokens: 4096,
-      system,
+      // Cache the large (~8k-token) gem system prompt so it isn't re-processed and re-billed
+      // on every message in a session (5-min TTL) — cuts time-to-first-token and cost.
+      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       messages,
     });
     const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
