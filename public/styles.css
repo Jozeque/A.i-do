@@ -470,3 +470,7 @@ textarea.char-text { resize: vertical; min-height: 46px; line-height: 1.5; }
 .img-card img { cursor: grab; }
 .img-card img:active { cursor: grabbing; }
 #wsTabs .tab.tab-drop { color: #1a1206; background: var(--accent); border-bottom-color: var(--accent); border-radius: 6px 6px 0 0; }
+
+/* copy a sent message's whole block (text + reference images) back into the composer */
+.msg-copy { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-dim); border-radius: 6px; padding: 3px 9px; font-size: 11px; font-family: var(--mono); cursor: pointer; transition: color .15s, border-color .15s; }
+.msg-copy:hover { color: var(--accent); border-color: var(--accent); }

@@ -815,6 +815,7 @@ function renderMessages(gemId) {
   });
   $$('.gen-link', scroll).forEach(b => b.onclick = () => sendPromptToGenerator(b));
   $$('.reuse-prompt', scroll).forEach(b => b.onclick = () => reusePromptInComposer(b));
+  $$('.msg-copy', scroll).forEach(b => b.onclick = () => copyUserBlock(b));
   scroll.scrollTop = nearBottom ? scroll.scrollHeight : prevTop;
 }
 
@@ -843,6 +844,13 @@ async function reusePromptInComposer(btn) {
   toast(added
     ? `Prompt + ${added} reference image${added > 1 ? 's' : ''} loaded into the composer — ready to edit, copy, or resend.`
     : 'Prompt loaded into the composer — ready to edit, copy, or resend.');
+}
+
+// Copy a SENT (user) message's whole block: text to the clipboard, and the text + its
+// reference image(s) back into this tab's composer — ready to resend, tweak, or send on.
+async function copyUserBlock(btn) {
+  try { const t = decodeURIComponent(btn.dataset.text || ''); if (t) await navigator.clipboard.writeText(t); } catch {}
+  await reusePromptInComposer(btn);
 }
 
 // Send a prompt to the generator, carrying its relevant reference image(s) from the chat.
@@ -885,7 +893,10 @@ function renderMsg(m, refImgs = []) {
     } else if (m.hadImages) {
       strip = '<div class="chat-images-strip"><em style="font-size:11px;color:var(--ink-faint)">+ attached image(s)</em></div>';
     }
-    content = escapeHtml(m.content) + strip;
+    const copyBtn = (m.content || (m.images && m.images.length))
+      ? `<button class="msg-copy" data-text="${encodeURIComponent(m.content || '')}" data-imgs="${encodeURIComponent(JSON.stringify(m.images || []))}" title="Copy this message: text to clipboard + the whole block (text and reference images) back into the composer">⧉ copy</button>`
+      : '';
+    content = escapeHtml(m.content) + strip + copyBtn;
   }
   return `<div class="msg ${m.role}"><div class="role-tag">${tag}</div><div class="bubble">${content}</div></div>`;
 }
