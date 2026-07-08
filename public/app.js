@@ -304,6 +304,7 @@ function wireGlobal() {
   $('#newProjectBtn').onclick = newProject;
   $('#newProjectBtn2').onclick = newProject;
   $('#showcaseBtn').onclick = openShowcase;
+  $('#expensesBtn').onclick = openExpenses;
   $('#lightboxClose').onclick = () => $('#lightbox').classList.add('hidden');
   $('#lightbox').onclick = (e) => { if (e.target.id === 'lightbox') $('#lightbox').classList.add('hidden'); };
   $('#lightboxPrev').onclick = (e) => { e.stopPropagation(); lightboxNav(-1); };
@@ -459,6 +460,7 @@ async function openProject(pid) {
   state.refImages = [];
   $('#emptyState').classList.add('hidden');
   $('#showcaseView').classList.add('hidden');
+  $('#expensesView').classList.add('hidden');
   $('#workspace').classList.remove('hidden');
   $('#projectNameInput').value = state.current.name;
   $('#wsMeta').textContent = `created ${new Date(state.current.createdAt).toLocaleDateString()}`;
@@ -469,6 +471,7 @@ async function openProject(pid) {
 function showEmpty() {
   $('#workspace').classList.add('hidden');
   $('#showcaseView').classList.add('hidden');
+  $('#expensesView').classList.add('hidden');
   $('#emptyState').classList.remove('hidden');
 }
 
@@ -476,6 +479,7 @@ function showEmpty() {
 async function openShowcase() {
   $('#emptyState').classList.add('hidden');
   $('#workspace').classList.add('hidden');
+  $('#expensesView').classList.add('hidden');
   const view = $('#showcaseView');
   view.classList.remove('hidden');
   view.innerHTML = `
@@ -496,6 +500,54 @@ async function openShowcase() {
     $('#scFile').closest('.sc-file').querySelector('span').textContent = e.target.files[0]?.name || 'Choose video…';
   });
   await renderShowcaseList();
+}
+
+// ── Expenses (global): running Claude + Nano Banana spend, split by month & week ──
+async function openExpenses() {
+  $('#emptyState').classList.add('hidden');
+  $('#workspace').classList.add('hidden');
+  $('#showcaseView').classList.add('hidden');
+  const view = $('#expensesView');
+  view.classList.remove('hidden');
+  view.innerHTML = `<div class="exp-head"><h1>Expenses</h1><p>Loading…</p></div>`;
+  let u;
+  try { u = await api('/api/usage'); }
+  catch (e) { view.innerHTML = `<div class="exp-head"><h1>Expenses</h1><p>Couldn't load expenses: ${escapeHtml(e.message || String(e))}</p></div>`; return; }
+  renderExpenses(view, u);
+}
+
+function renderExpenses(view, u) {
+  const money = (n) => '$' + (n || 0).toFixed(2);
+  const nParts = state.expSplit || 2;
+  const row = (b) => `<tr>
+    <td>${escapeHtml(b.label)}</td>
+    <td class="exp-num">${money(b.nb)}<span class="exp-sub">${b.nbImages} img</span></td>
+    <td class="exp-num">${money(b.claude)}<span class="exp-sub">${b.claudeCalls} calls</span></td>
+    <td class="exp-num exp-tot">${money(b.total)}</td></tr>`;
+  const claudePct = u.total.total ? Math.round((u.total.claude / u.total.total) * 100) : 0;
+  view.innerHTML = `
+    <div class="exp-head">
+      <h1>Expenses</h1>
+      <p>Running API cost across all projects — Nano Banana renders + Claude prompts. Split by month for settling up with partners.</p>
+    </div>
+    <div class="exp-cards">
+      <div class="exp-card exp-hero">
+        <div class="exp-card-label">All-time total</div>
+        <div class="exp-card-num">${money(u.total.total)}</div>
+        <div class="exp-split">Split <select id="expSplit">${[2, 3, 4, 5].map(n => `<option value="${n}"${n === nParts ? ' selected' : ''}>${n}</option>`).join('')}</select> ways → <b>${money(u.total.total / nParts)}</b> each</div>
+      </div>
+      <div class="exp-card"><div class="exp-card-label">Nano Banana · Google</div><div class="exp-card-num">${money(u.total.nb)}</div><div class="exp-card-sub">${u.total.nbImages} images · exact</div></div>
+      <div class="exp-card"><div class="exp-card-label">Claude · Anthropic</div><div class="exp-card-num">${money(u.total.claude)}</div><div class="exp-card-sub">${u.total.claudeCalls} prompts · est.</div></div>
+    </div>
+    <h2 class="exp-h2">By month</h2>
+    <table class="exp-table"><thead><tr><th>Month</th><th>Nano Banana</th><th>Claude</th><th>Total</th></tr></thead>
+      <tbody>${u.months.map(row).join('') || '<tr><td colspan="4" class="exp-empty">No usage yet.</td></tr>'}</tbody></table>
+    <h2 class="exp-h2">Recent weeks</h2>
+    <table class="exp-table"><thead><tr><th>Week</th><th>Nano Banana</th><th>Claude</th><th>Total</th></tr></thead>
+      <tbody>${u.weeks.map(row).join('') || '<tr><td colspan="4" class="exp-empty">—</td></tr>'}</tbody></table>
+    <p class="exp-note"><b>Nano Banana is exact</b> — billed per image by model + resolution. <b>Claude is estimated</b> from message sizes (±~15%; only ~${claudePct}% of spend). Deleted images aren't counted, so the true total may be slightly higher. For invoices, check the Anthropic Console and Google AI Studio billing dashboards.${u.cached ? ' · cached' : ''}</p>`;
+  const sel = view.querySelector('#expSplit');
+  if (sel) sel.onchange = () => { state.expSplit = parseInt(sel.value, 10); renderExpenses(view, u); };
 }
 
 async function renderShowcaseList() {

@@ -474,3 +474,31 @@ textarea.char-text { resize: vertical; min-height: 46px; line-height: 1.5; }
 /* copy a sent message's whole block (text + reference images) back into the composer */
 .msg-copy { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-dim); border-radius: 6px; padding: 3px 9px; font-size: 11px; font-family: var(--mono); cursor: pointer; transition: color .15s, border-color .15s; }
 .msg-copy:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── Expenses view ─────────────────────────────────────────────────────────── */
+.exp-head { margin-bottom: 22px; }
+.exp-head h1 { font-family: var(--display); font-weight: 500; font-size: 30px; margin: 0 0 6px; color: var(--ink); }
+.exp-head p { color: var(--ink-dim); max-width: 640px; margin: 0; line-height: 1.5; }
+.exp-cards { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 14px; margin-bottom: 8px; }
+.exp-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+.exp-card.exp-hero { background: linear-gradient(150deg, rgba(232,176,75,.16), rgba(232,176,75,.03)); border-color: #6b5628; }
+.exp-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); }
+.exp-card-num { font-family: var(--mono); font-size: 30px; font-weight: 700; color: var(--ink); margin-top: 6px; line-height: 1.1; }
+.exp-hero .exp-card-num { color: var(--accent); font-size: 40px; }
+.exp-card-sub { font-size: 12px; color: var(--ink-dim); margin-top: 5px; }
+.exp-split { margin-top: 12px; font-size: 13px; color: var(--ink-dim); }
+.exp-split select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font-family: var(--mono); margin: 0 4px; cursor: pointer; }
+.exp-split b { color: var(--accent); font-family: var(--mono); }
+.exp-h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-faint); margin: 26px 0 8px; font-weight: 700; }
+.exp-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.exp-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 700; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.exp-table th:not(:first-child), .exp-table td:not(:first-child) { text-align: right; }
+.exp-table td { padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.045); color: var(--ink); }
+.exp-table tbody tr:hover { background: rgba(255,255,255,.02); }
+.exp-num { font-family: var(--mono); white-space: nowrap; }
+.exp-sub { display: block; font-size: 10px; color: var(--ink-faint); margin-top: 2px; }
+.exp-tot { color: var(--accent); font-weight: 700; }
+.exp-empty { color: var(--ink-faint); text-align: center !important; padding: 18px; }
+.exp-note { margin-top: 22px; font-size: 12px; line-height: 1.65; color: var(--ink-faint); max-width: 720px; }
+.exp-note b { color: var(--ink-dim); }
+@media (max-width: 720px) { .exp-cards { grid-template-columns: 1fr; } }

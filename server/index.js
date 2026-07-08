@@ -10,6 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenAI } from '@google/genai';
 import { createStorage } from './storage.js';
 import { createDataStore } from './data.js';
+import { computeUsage } from './usage.js';
 import { requireAuth, authEnabled, allowedEmails, webConfig } from './auth.js';
 import { createShowcase } from './showcase.js';
 
@@ -441,6 +442,20 @@ Describe only what you can actually see; do not invent. Keep values concise.`;
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });
   }
+});
+
+// ── Expenses (global): running Claude + Nano Banana cost, by month & week ──────
+// Computed on read from existing data (NB exact per image, Claude estimated), cached
+// briefly so opening the tab doesn't re-scan every project on each open.
+let _usageCache = { at: 0, data: null };
+app.get('/api/usage', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (!req.query.fresh && _usageCache.data && now - _usageCache.at < 5 * 60 * 1000) return res.json({ ..._usageCache.data, cached: true });
+    const out = await computeUsage(data, CLAUDE_MODEL);
+    _usageCache = { at: now, data: out };
+    res.json(out);
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
 });
 
 // ── CHAT with a gem (Claude) ───────────────────────────────────────────────────
