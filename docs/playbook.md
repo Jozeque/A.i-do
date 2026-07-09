@@ -47,4 +47,11 @@ Add to it whenever we discover something._
 - Before this, a storyboard illustration was analyzed as "Alexa Mini + Cooke lens." The tune panel now has a **Medium & style** field the analyzer fills; if it reads an illustrated medium, the frames come out illustrated, not photoreal.
 - To deliberately turn a drawn reference into a photograph, set the **Medium** field to "Photograph / cinematic film still" by hand.
 
+## Best model for a faithful character / face swap (NB is the wrong tool)
+- Nano Banana is **generative** — it re-renders the whole frame, so it can never keep image 1 pixel-identical when swapping a character. This is inherent, not a prompt problem. NB2 drifts hard; NB Pro takes "creative" liberties.
+- **Full character swap, keep the scene → Flux Kontext** (Black Forest Labs) — the leading in-context editor for "keep everything, change one thing"; preserves clothing/scene far better than NB. Via **fal.ai** (`fal-ai/flux-kontext`) or Replicate.
+- **Face only, keep everything else → a dedicated face-swap model** (InsightFace / `inswapper`, ReActor) — operates on the real pixels (detect → swap the face → leave the rest untouched), so it's the most faithful to image 1. Face-only; weaker on stylized/extreme angles. Via fal.ai face-swap models or ReActor locally.
+- **Full-body character swap → Higgsfield "Recast"** (higgsfield.ai). **Character consistency into new scenes → Ideogram Character** (the inverse need).
+- App path: integrate Flux Kontext and/or a face-swap model via **fal.ai** (same aggregator the roadmap plans for Kling), as a dedicated "Swap" action — don't keep fighting NB for this. Verified via web benchmarks 2026-07-09.
+
 _Add new learnings here as we find them._
