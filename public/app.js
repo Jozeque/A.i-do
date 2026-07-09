@@ -861,9 +861,10 @@ function renderMessages(gemId) {
     return renderMsg(m, refImgs);
   }).join('');
   // wire copy buttons + generate links
-  $$('.copy-block', scroll).forEach(b => b.onclick = () => {
-    navigator.clipboard.writeText(decodeURIComponent(b.dataset.text));
-    b.textContent = 'copied'; setTimeout(() => b.textContent = 'copy', 1400);
+  $$('.copy-block', scroll).forEach(b => b.onclick = async () => {
+    const ok = await copyTextToClipboard(decodeURIComponent(b.dataset.text));
+    b.textContent = ok ? 'copied' : 'copy failed';
+    setTimeout(() => b.textContent = 'copy', 1400);
   });
   $$('.gen-link', scroll).forEach(b => b.onclick = () => sendPromptToGenerator(b));
   $$('.reuse-prompt', scroll).forEach(b => b.onclick = () => reusePromptInComposer(b));
@@ -901,7 +902,7 @@ async function reusePromptInComposer(btn) {
 // Copy a SENT (user) message's whole block: text to the clipboard, and the text + its
 // reference image(s) back into this tab's composer — ready to resend, tweak, or send on.
 async function copyUserBlock(btn) {
-  try { const t = decodeURIComponent(btn.dataset.text || ''); if (t) await navigator.clipboard.writeText(t); } catch {}
+  const t = decodeURIComponent(btn.dataset.text || ''); if (t) await copyTextToClipboard(t);
   await reusePromptInComposer(btn);
 }
 
@@ -951,6 +952,31 @@ function renderMsg(m, refImgs = []) {
     content = escapeHtml(m.content) + strip + copyBtn;
   }
   return `<div class="msg ${m.role}"><div class="role-tag">${tag}</div><div class="bubble">${content}</div></div>`;
+}
+
+// Copy TEXT ONLY to the clipboard, reliably. writeText replaces the ENTIRE clipboard, so it
+// also clears any image left there from an earlier copy — otherwise a paste target like
+// OpenArt grabs that stale image and rejects it ("image size invalid"). Falls back to
+// execCommand when the async Clipboard API is blocked, so the copy never silently no-ops
+// and leaves the old image on the clipboard while the button falsely says "copied".
+async function copyTextToClipboard(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fall through to the execCommand path */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch { return false; }
 }
 
 // Render assistant text: turn ```code``` blocks and PROMPT n labels into rich cards.
