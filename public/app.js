@@ -554,12 +554,13 @@ function renderExpenses(view, u) {
     <td class="exp-num">${money(b.nb)}<span class="exp-sub">${b.nbImages} img</span></td>
     <td class="exp-num">${money(b.swap || 0)}<span class="exp-sub">${b.swapImages || 0} swap</span></td>
     <td class="exp-num">${money(b.claude)}<span class="exp-sub">${b.claudeCalls} calls</span></td>
+    <td class="exp-num">${b.sub ? money(b.sub) : '—'}</td>
     <td class="exp-num exp-tot">${money(b.total)}</td></tr>`;
   const claudePct = u.total.total ? Math.round((u.total.claude / u.total.total) * 100) : 0;
   view.innerHTML = `
     <div class="exp-head">
       <h1>Expenses</h1>
-      <p>Running API cost across all projects — Nano Banana renders, Swap/Edit renders (Flux + GPT Image), and Claude prompts. Split by month for settling up with partners.</p>
+      <p>Running cost across all projects — Nano Banana + Swap/Edit + Claude API usage, plus fixed subscriptions (ChatGPT Plus). Split by month for settling up with partners.</p>
     </div>
     <div class="exp-cards">
       <div class="exp-card exp-hero">
@@ -570,14 +571,15 @@ function renderExpenses(view, u) {
       <div class="exp-card"><div class="exp-card-label">Nano Banana · Google</div><div class="exp-card-num">${money(u.total.nb)}</div><div class="exp-card-sub">${u.total.nbImages} images · exact</div></div>
       <div class="exp-card"><div class="exp-card-label">Swap / Edit · fal + OpenAI</div><div class="exp-card-num">${money(u.total.swap || 0)}</div><div class="exp-card-sub">${u.total.swapImages || 0} renders · est.</div></div>
       <div class="exp-card"><div class="exp-card-label">Claude · Anthropic</div><div class="exp-card-num">${money(u.total.claude)}</div><div class="exp-card-sub">${u.total.claudeCalls} prompts · est.</div></div>
+      <div class="exp-card"><div class="exp-card-label">Subscriptions</div><div class="exp-card-num">${money(u.total.sub || 0)}</div><div class="exp-card-sub">ChatGPT Plus · $20/mo</div></div>
     </div>
     <h2 class="exp-h2">By month</h2>
-    <table class="exp-table"><thead><tr><th>Month</th><th>Nano Banana</th><th>Swap/Edit</th><th>Claude</th><th>Total</th></tr></thead>
-      <tbody>${u.months.map(row).join('') || '<tr><td colspan="5" class="exp-empty">No usage yet.</td></tr>'}</tbody></table>
+    <table class="exp-table"><thead><tr><th>Month</th><th>Nano Banana</th><th>Swap/Edit</th><th>Claude</th><th>Subs</th><th>Total</th></tr></thead>
+      <tbody>${u.months.map(row).join('') || '<tr><td colspan="6" class="exp-empty">No usage yet.</td></tr>'}</tbody></table>
     <h2 class="exp-h2">Recent weeks</h2>
-    <table class="exp-table"><thead><tr><th>Week</th><th>Nano Banana</th><th>Swap/Edit</th><th>Claude</th><th>Total</th></tr></thead>
-      <tbody>${u.weeks.map(row).join('') || '<tr><td colspan="5" class="exp-empty">—</td></tr>'}</tbody></table>
-    <p class="exp-note"><b>Nano Banana is exact</b> — billed per image by model + resolution. <b>Claude and Swap/Edit are estimated</b> (Claude from message sizes ±~15%; Swap ≈ $0.08 Flux / $0.06 GPT Image per render). Deleted images aren't counted, so the true total may be slightly higher. For invoices, check the Anthropic, Google AI Studio, fal.ai, and OpenAI billing dashboards.${u.cached ? ' · cached' : ''}</p>`;
+    <table class="exp-table"><thead><tr><th>Week</th><th>Nano Banana</th><th>Swap/Edit</th><th>Claude</th><th>Subs</th><th>Total</th></tr></thead>
+      <tbody>${u.weeks.map(row).join('') || '<tr><td colspan="6" class="exp-empty">—</td></tr>'}</tbody></table>
+    <p class="exp-note"><b>Nano Banana is exact</b> — billed per image by model + resolution. <b>Claude and Swap/Edit are estimated</b> (Claude from message sizes ±~15%; Swap ≈ $0.08 Flux / $0.21 GPT Image 2 per render). <b>Subscriptions</b> (ChatGPT Plus $20/mo) are fixed monthly costs added to each month since July 2026 — shown in months, not weeks. For invoices, check the Anthropic, Google AI Studio, fal.ai, and OpenAI dashboards.${u.cached ? ' · cached' : ''}</p>`;
   const sel = view.querySelector('#expSplit');
   if (sel) sel.onchange = () => { state.expSplit = parseInt(sel.value, 10); renderExpenses(view, u); };
 }

@@ -46,6 +46,9 @@ async function gemSysTokens() {
 // (gpt-image-2 high ≈ $0.21/edit + reference inputs); legacy gpt-image-1 ≈ $0.06. Estimates; keep
 // in sync with docs/pricing.md.
 const SWAP_PRICE = { flux: 0.08, gptimage: 0.06, gptimage2: 0.22 };
+// Fixed recurring subscriptions tracked in Expenses (NOT API usage). `since` = first month billed
+// (YYYY-MM). Added to every month from `since` to the current month so the monthly split includes them.
+const SUBSCRIPTIONS = [{ name: 'ChatGPT Plus', monthly: 20, since: '2026-07' }];
 const isSwapModel = (model) => /flux|gpt-image/.test(model || '');
 const imageCost = (model, size) => {
   const m = model || '';
@@ -68,7 +71,7 @@ export async function computeUsage(data, claudeModel) {
   const sysTok = await gemSysTokens();
   const rate = CLAUDE[claudeModel] || CLAUDE._default;
   const months = new Map(), weeks = new Map();
-  const mk = () => ({ claude: 0, nb: 0, swap: 0, claudeCalls: 0, nbImages: 0, swapImages: 0 });
+  const mk = () => ({ claude: 0, nb: 0, swap: 0, sub: 0, claudeCalls: 0, nbImages: 0, swapImages: 0 });
   const total = mk();
   const addM = (ts, f) => { const k = mKey(ts); let b = months.get(k); if (!b) { b = mk(); b.key = k; b.label = mLabel(k); b.sort = k; months.set(k, b); } f(b); };
   const addW = (ts, f) => { const w = weekStartTs(ts); let b = weeks.get(w); if (!b) { b = mk(); b.key = String(w); b.label = wLabel(w); b.sort = w; weeks.set(w, b); } f(b); };
@@ -102,7 +105,18 @@ export async function computeUsage(data, claudeModel) {
       spend(ch.createdAt || p.createdAt || Date.now(), { claude: (cIn * rate.in + 400 * rate.out) / 1e6, claudeCalls: 1, nb: imageCost('gemini-3-pro-image', ch.size || '2K'), nbImages: 1 });
     }
   }
-  const round = (b) => ({ key: b.key, label: b.label, claude: +b.claude.toFixed(4), nb: +b.nb.toFixed(4), swap: +b.swap.toFixed(4), total: +(b.claude + b.nb + b.swap).toFixed(4), claudeCalls: b.claudeCalls, nbImages: b.nbImages, swapImages: b.swapImages });
+  // Fixed monthly subscriptions — not API calls; add to each month from `since` to now.
+  const nowKey = mKey(Date.now());
+  for (const sb of SUBSCRIPTIONS) {
+    let [y, m] = sb.since.split('-').map(Number);
+    const [cy, cm] = nowKey.split('-').map(Number);
+    while (y < cy || (y === cy && m <= cm)) {
+      addM(new Date(y, m - 1, 15).getTime(), b => { b.sub += sb.monthly; });
+      total.sub += sb.monthly;
+      if (++m > 12) { m = 1; y++; }
+    }
+  }
+  const round = (b) => ({ key: b.key, label: b.label, claude: +b.claude.toFixed(4), nb: +b.nb.toFixed(4), swap: +b.swap.toFixed(4), sub: +b.sub.toFixed(4), total: +(b.claude + b.nb + b.swap + b.sub).toFixed(4), claudeCalls: b.claudeCalls, nbImages: b.nbImages, swapImages: b.swapImages });
   return {
     total: round({ ...total, key: 'all', label: 'All-time' }),
     months: [...months.values()].sort((a, b) => (a.sort < b.sort ? 1 : -1)).map(round),
