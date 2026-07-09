@@ -707,6 +707,33 @@ app.post('/api/projects/:pid/generate', async (req, res) => {
   }
 });
 
+// Upload finished images straight into a project's Library (e.g. a swap downloaded from ChatGPT).
+// Not a generation — model:'upload' so the Expenses tracker skips it (no API cost). Stored full-res, as-is.
+// body: { images:[{mimeType,data}], note? }
+app.post('/api/projects/:pid/images/upload', async (req, res) => {
+  try {
+    const { images = [], note = '' } = req.body;
+    if (!images.length) return res.status(400).json({ error: 'No image to upload.' });
+    const pid = req.params.pid;
+    const saved = [];
+    for (const im of images) {
+      if (!im?.data) continue;
+      const mime = sniffImageMime(im.data, im.mimeType);
+      const buf = Buffer.from(im.data, 'base64');
+      const dim = imageSize(buf);
+      const imgId = id();
+      const { file: fname } = await storage.saveImage(pid, imgId, buf, mime);
+      const rec = { id: imgId, prompt: note || 'Uploaded image', file: fname, createdAt: Date.now(), favorite: false, note: note || '', model: 'upload', size: dim ? `${dim.w}x${dim.h}` : null, refs: [] };
+      await data.addImage(pid, rec);
+      saved.push({ ...rec, url: `/media/${pid}/images/${fname}` });
+    }
+    if (!saved.length) return res.status(400).json({ error: 'No valid image data.' });
+    res.json({ images: saved });
+  } catch (e) {
+    res.status(500).json({ error: e?.message || String(e) });
+  }
+});
+
 // ── SWAP / EDIT — faithful in-context editing that keeps image 1, unlike generative NB. ──
 // Engines: GPT Image (OpenAI, DEFAULT — best at targeted "swap only this person" edits) and
 // Flux Kontext (fal.ai). 2 images = full-character swap; 1 image + prompt = an edit. The user's

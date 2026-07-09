@@ -1816,15 +1816,51 @@ async function renderLibrary(body) {
   panel.innerHTML = `
     <div class="lib-head">
       <h3>Library <span style="font-family:var(--mono);font-size:12px;color:var(--ink-faint)">${images.length} images</span></h3>
-      <div class="lib-filter">
-        <button class="mini-btn ${libFilter === 'all' ? 'on' : ''}" data-f="all">All</button>
-        <button class="mini-btn ${libFilter === 'fav' ? 'on' : ''}" data-f="fav">★ Favorites</button>
+      <div class="lib-actions">
+        <button class="mini-btn lib-upload" id="libUploadBtn" title="Upload images into this project — e.g. a swap you downloaded from ChatGPT">⬆ Upload</button>
+        <div class="lib-filter">
+          <button class="mini-btn ${libFilter === 'all' ? 'on' : ''}" data-f="all">All</button>
+          <button class="mini-btn ${libFilter === 'fav' ? 'on' : ''}" data-f="fav">★ Favorites</button>
+        </div>
       </div>
     </div>
+    <input type="file" id="libFileInput" accept="image/*" multiple hidden />
     <div id="libGrid"></div>`;
   body.appendChild(panel);
   $$('.lib-filter .mini-btn', panel).forEach(b => b.onclick = () => { libFilter = b.dataset.f; renderLibrary($('#wsBody')); $('#wsBody').firstChild?.remove(); });
+  const fileInput = $('#libFileInput', panel);
+  $('#libUploadBtn', panel).onclick = () => fileInput.click();
+  fileInput.onchange = (e) => { uploadToLibrary(e.target.files); e.target.value = ''; };
+  // Drag OS image files (or a ChatGPT download) straight onto the library.
+  panel.addEventListener('dragover', (e) => { if (dragHasFiles(e)) { e.preventDefault(); panel.classList.add('drag-over'); } });
+  panel.addEventListener('dragleave', (e) => { if (!panel.contains(e.relatedTarget)) panel.classList.remove('drag-over'); });
+  panel.addEventListener('drop', (e) => { if (!dragHasFiles(e)) return; e.preventDefault(); panel.classList.remove('drag-over'); uploadToLibrary(e.dataTransfer.files); });
+  wireLibPaste();
   drawLibGrid(images);
+}
+// Upload finished images (e.g. ChatGPT downloads) into the current project's Library — full-res, as-is.
+async function uploadToLibrary(files) {
+  const imgs = [...(files || [])].filter(f => (f.type || '').startsWith('image/'));
+  if (!imgs.length) { toast('Only image files can be uploaded.', true); return; }
+  toast(`Uploading ${imgs.length} image${imgs.length > 1 ? 's' : ''}…`);
+  try {
+    const images = [];
+    for (const f of imgs) images.push({ mimeType: f.type || 'image/png', data: await rawFileToB64(f) });
+    const { images: saved } = await api(`/api/projects/${state.current.id}/images/upload`, { method: 'POST', body: JSON.stringify({ images }) });
+    if (saved?.length) {
+      toast(`Added ${saved.length} to the Library ✓`);
+      if (state.activeTab === 'library') { const wb = $('#wsBody'); await renderLibrary(wb); wb.firstChild?.remove(); }
+    }
+  } catch (e) { toast(e.message || 'Upload failed.', true); }
+}
+let _libPasteWired = false;
+function wireLibPaste() {
+  if (_libPasteWired) return; _libPasteWired = true;
+  document.addEventListener('paste', (e) => {
+    if (state.activeTab !== 'library') return;
+    const files = filesFromPaste(e);
+    if (files.length) { e.preventDefault(); uploadToLibrary(files); }
+  });
 }
 function drawLibGrid(images) {
   const grid = $('#libGrid');

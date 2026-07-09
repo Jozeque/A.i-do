@@ -303,6 +303,9 @@ select:focus { border-color: var(--accent); }
 .lib-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; gap: 16px; }
 .lib-head h3 { font-family: var(--display); font-weight: 500; font-size: 24px; }
 .lib-filter { display: flex; gap: 6px; }
+.lib-actions { display: flex; align-items: center; gap: 10px; }
+.lib-upload:hover { color: var(--accent); border-color: var(--accent); }
+.library-panel.drag-over { outline: 2px dashed var(--accent); outline-offset: -8px; border-radius: 12px; }
 .lib-prompt-tip { font-size: 11px; color: var(--ink-faint); max-width: 360px; line-height: 1.4; }
 
 /* ── Gem editor (collapsible) ────────────────────────── */

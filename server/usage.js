@@ -96,6 +96,7 @@ export async function computeUsage(data, claudeModel) {
     }
     // Images — priced by each record's model: Nano Banana (Gemini) vs Swap/Edit (Flux, GPT Image).
     for (const img of p.images || []) {
+      if (img.model === 'upload') continue;   // imported (made elsewhere, e.g. ChatGPT) — no API cost to attribute
       const cost = imageCost(img.model, img.size), ts = img.createdAt || p.createdAt || Date.now();
       spend(ts, isSwapModel(img.model) ? { swap: cost, swapImages: 1 } : { nb: cost, nbImages: 1 });
     }
