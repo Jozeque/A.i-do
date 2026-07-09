@@ -13,6 +13,7 @@ import { createDataStore } from './data.js';
 import { computeUsage } from './usage.js';
 import { requireAuth, authEnabled, allowedEmails, webConfig } from './auth.js';
 import { createShowcase } from './showcase.js';
+import { Jimp } from 'jimp';   // resize swap outputs to the input image's exact pixel dimensions
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -166,6 +167,42 @@ function sniffImageMime(b64, fallback = 'image/jpeg') {
   } catch { /* fall through */ }
   return fallback || 'image/jpeg';
 }
+// Read pixel dimensions straight from an image buffer's header (JPEG/PNG/GIF/WebP) — no deps.
+function imageSize(buf) {
+  if (!buf || buf.length < 24) return null;
+  if (buf[0] === 0x89 && buf[1] === 0x50) return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };            // PNG
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return { w: buf.readUInt16LE(6), h: buf.readUInt16LE(8) }; // GIF
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf.toString('ascii', 8, 12) === 'WEBP') {          // WebP
+    const fmt = buf.toString('ascii', 12, 16);
+    try {
+      if (fmt === 'VP8 ') return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff };
+      if (fmt === 'VP8L') { const n = buf.readUInt32LE(21); return { w: 1 + (n & 0x3fff), h: 1 + ((n >> 14) & 0x3fff) }; }
+      if (fmt === 'VP8X') return { w: 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16)), h: 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16)) };
+    } catch { return null; }
+  }
+  if (buf[0] === 0xFF && buf[1] === 0xD8) {                                                                        // JPEG
+    let o = 2;
+    while (o + 9 < buf.length) {
+      if (buf[o] !== 0xFF) { o++; continue; }
+      let m = buf[o + 1];
+      while (m === 0xFF && o + 2 < buf.length) { o++; m = buf[o + 1]; }
+      if (m === 0xDA || m === 0xD9) break;
+      if ((m >= 0xD0 && m <= 0xD7) || m === 0x01) { o += 2; continue; }
+      if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) return { h: buf.readUInt16BE(o + 5), w: buf.readUInt16BE(o + 7) };
+      o += 2 + buf.readUInt16BE(o + 2);
+    }
+  }
+  return null;
+}
+// Snap real dimensions to Flux Kontext's nearest supported aspect ratio (log-distance = perceptual).
+const FLUX_AR = [['21:9', 21 / 9], ['16:9', 16 / 9], ['3:2', 1.5], ['4:3', 4 / 3], ['1:1', 1], ['3:4', 3 / 4], ['2:3', 2 / 3], ['9:16', 9 / 16], ['9:21', 9 / 21]];
+function nearestFluxAR(w, h) {
+  const r = w / h; let best = '1:1', d = Infinity;
+  for (const [label, val] of FLUX_AR) { const dd = Math.abs(Math.log(r / val)); if (dd < d) { d = dd; best = label; } }
+  return best;
+}
+// GPT Image edit output size closest to the input's orientation (it otherwise defaults to square).
+const gptSizeFor = (w, h) => { const r = w / h; return r > 1.15 ? '1536x1024' : (r < 0.87 ? '1024x1536' : '1024x1024'); };
 const slug = (s) => (s || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'project';
 
 // Project/image/upload paths now live in the seams (server/data.js, server/storage.js).
@@ -681,17 +718,27 @@ app.post('/api/projects/:pid/swap', async (req, res) => {
     const pid = req.params.pid;
     const isSwap = images.length >= 2;
     if (!prompt?.trim() && !isSwap) return res.status(400).json({ error: 'For a single-image adjustment, describe the change you want in the prompt.' });
-    const instruction = (prompt && prompt.trim()) || (isSwap
-      ? 'Replace the person in the first image with the character from the second image. Keep the first image exactly the same — the same pose, body position, framing, background, camera angle, and lighting — change only WHO the person is so they match the character in the second image. Seamless, photorealistic.'
-      : 'Apply the requested change while keeping everything else in the image exactly the same.');
+    // A full-character swap: bring the WHOLE character from image 2 (head to toe + styling) into
+    // image 1, keep everything else in image 1 identical, and blend it in naturally.
+    const FULL_SWAP = 'Full character swap: bring the ENTIRE character from the second image — face, hair, body, and complete clothing and styling from head to toe — into the first image. Keep the first image otherwise identical: the other people, their positions, the composition, framing, background, camera angle, and the exact aspect ratio must all stay the same. Blend the new character in naturally, matching the lighting, colour grade, perspective, scale, shadows, and grain of the first image so they look truly photographed into that scene. Photorealistic and seamless. Do not crop or re-frame.';
+    const instruction = isSwap
+      ? ((prompt && prompt.trim()) ? `${prompt.trim()}\n\n${FULL_SWAP}` : `Replace the person in the first image with the character from the second image. ${FULL_SWAP}`)
+      : `${prompt.trim()} Keep everything else in the image exactly the same, including the framing and aspect ratio.`;
+
+    // Image 1's true pixel size — the swap output is forced to match it exactly (below).
+    const dim = imageSize(Buffer.from(images[0].data, 'base64'));
 
     let buf, mime, usedModel;
     if (model === 'gptimage') {
       if (!OPENAI_API_KEY) return res.status(400).json({ error: 'OPENAI_API_KEY is not set. Add it to use GPT Image (ChatGPT).' });
-      // OpenAI gpt-image-1 multi-image edit (multipart form).
+      // OpenAI gpt-image-1 multi-image edit (multipart form). input_fidelity=high preserves faces/detail;
+      // size follows image 1's orientation so the edit doesn't default to a square frame.
       const form = new FormData();
       form.append('model', 'gpt-image-1');
       form.append('prompt', instruction);
+      form.append('input_fidelity', 'high');
+      form.append('quality', 'high');
+      if (dim) form.append('size', gptSizeFor(dim.w, dim.h));
       images.forEach((im, i) => form.append('image[]', new Blob([Buffer.from(im.data, 'base64')], { type: sniffImageMime(im.data, im.mimeType) }), `image${i}.png`));
       const r = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}` }, body: form });
       const out = await r.json().catch(() => ({}));
@@ -701,14 +748,29 @@ app.post('/api/projects/:pid/swap', async (req, res) => {
     } else {
       if (!FAL_KEY) return res.status(400).json({ error: 'FAL_KEY is not set. Add your fal.ai API key to enable Flux Kontext.' });
       const image_urls = images.map(im => `data:${sniffImageMime(im.data, im.mimeType)};base64,${im.data}`);
+      const body = { prompt: instruction, image_urls, safety_tolerance: '5' };
+      if (dim) body.aspect_ratio = nearestFluxAR(dim.w, dim.h);   // hold image 1's shape (no square / reframe)
       const r = await fetch('https://fal.run/fal-ai/flux-pro/kontext/max/multi', {
         method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: instruction, image_urls, safety_tolerance: '5' }),
+        body: JSON.stringify(body),
       });
       const out = await r.json().catch(() => ({}));
       if (!r.ok || !out.images?.length) return res.status(502).json({ error: `Flux Kontext failed: ${out.detail || out.error || JSON.stringify(out).slice(0, 200)}` });
       const first = out.images[0];
       buf = Buffer.from(await (await fetch(first.url)).arrayBuffer()); mime = first.content_type || 'image/jpeg'; usedModel = 'flux-kontext-max';
+    }
+
+    // "Exactly as the input" — force the result to image 1's exact pixel dimensions.
+    if (dim) {
+      try {
+        const jimg = await Jimp.read(buf);
+        if (jimg.width !== dim.w || jimg.height !== dim.h) {
+          jimg.resize({ w: dim.w, h: dim.h });
+          const outMime = mime === 'image/png' ? 'image/png' : 'image/jpeg';
+          buf = await jimg.getBuffer(outMime, outMime === 'image/jpeg' ? { quality: 92 } : undefined);
+          mime = outMime;
+        }
+      } catch { /* keep the engine's own output if the resize fails */ }
     }
 
     const imgId = id();

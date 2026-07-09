@@ -687,15 +687,15 @@ function renderSwap(body) {
   const hasGpt = !!cfg.hasOpenai;
   body.innerHTML = `
     <div class="swap-panel">
-      <p class="field-label">Faithful edit / swap — keeps image 1's pose, scene, framing, and lighting (unlike Nano Banana, which re-renders). Add a <b>second image</b> to <b>swap the character</b>, or use just image 1 + an instruction to <b>adjust</b> it.</p>
+      <p class="field-label">Full-character swap — drops the <b>whole character</b> from image 2 (head to toe + styling) into image 1 and blends it in, keeping image 1's scene, other people, and <b>exact framing</b>. Name who to replace in the prompt (e.g. "the man in the middle"). One image + an instruction = an adjustment.</p>
       ${noKey ? '<div class="swap-nokey">⚠ Needs a fal.ai key. Add <code>FAL_KEY</code> to your .env (and Render), then reload.</div>' : ''}
       <div class="swap-slots">
         ${slot('base', s.base, 'Image 1 — base (keep this)')}
         <div class="swap-arrow">⇄</div>
-        ${slot('char', s.char, 'Image 2 — new character (optional)', true)}
+        ${slot('char', s.char, 'Image 2 — new character (full body)', true)}
       </div>
       <div class="swap-hint">Click a slot to browse · paste (Ctrl/⌘V) · or drag an image straight in</div>
-      <textarea id="swapPrompt" class="swap-prompt" placeholder="Two images → leave blank to just swap the character, or describe it. One image → describe the adjustment (e.g. 'change the background to a night city street', 'make the jacket red leather').">${escapeHtml(s.prompt || '')}</textarea>
+      <textarea id="swapPrompt" class="swap-prompt" placeholder="Two images → name who to replace with image 2's character (e.g. 'replace the man in the middle with the woman in image 2'). One image → describe the adjustment (e.g. 'change the background to a night city street').">${escapeHtml(s.prompt || '')}</textarea>
       <div class="swap-controls">
         <div class="swap-model">
           <button class="seg ${s.model === 'flux' ? 'on' : ''}" data-model="flux">Flux Kontext</button>
