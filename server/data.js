@@ -102,16 +102,23 @@ function createFirestoreDataStore() {
   async function getProject(pid) {
     await init();
     const ref = _col.doc(pid);
-    const metaSnap = await ref.get();
+    // Fetch meta + all three subcollections IN PARALLEL — they're independent, and doing them
+    // sequentially cost ~4 network round trips per project open (the "switching is slow" lag).
+    const [metaSnap, chatsSnap, imagesSnap, charactersSnap] = await Promise.all([
+      ref.get(),
+      ref.collection('chats').get(),
+      ref.collection('images').get(),
+      ref.collection('characters').get(),
+    ]);
     if (!metaSnap.exists) throw new Error(`Project not found: ${pid}`);
     const { imageCount, chatCount, ...meta } = metaSnap.data(); // counts are internal cache
     const chats = {};
     for (const g of GEM_TABS) chats[g] = [];
-    (await ref.collection('chats').get()).forEach((d) => { chats[d.id] = d.data().messages || []; });
-    const images = (await ref.collection('images').get()).docs
+    chatsSnap.forEach((d) => { chats[d.id] = d.data().messages || []; });
+    const images = imagesSnap.docs
       .map((d) => d.data())
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    const characters = (await ref.collection('characters').get()).docs
+    const characters = charactersSnap.docs
       .map((d) => d.data())
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     return { ...meta, chats, images, characters };
