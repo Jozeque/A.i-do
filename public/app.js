@@ -649,6 +649,32 @@ function switchTab(tab) {
 }
 
 // ── Swap / Edit tab: faithful in-context editing (Flux Kontext / GPT Image) — keeps image 1. ──
+// Fill a slot ('base'/'char') from a File — used by browse, paste, and drop. Images re-encode to JPEG.
+async function loadSwapSlot(which, file) {
+  if (!file || !(file.type || '').startsWith('image/')) { toast("That doesn't look like an image.", true); return false; }
+  try {
+    state.swap = state.swap || { base: null, char: null, prompt: '', model: 'flux' };
+    state.swap[which] = { data: await fileToB64(file), mimeType: 'image/jpeg', preview: URL.createObjectURL(file) };
+    renderSwap($('#wsBody'));
+    return true;
+  } catch (e) { toast(e.message || 'Could not read that image.', true); return false; }
+}
+const swapFirstEmpty = () => (!state.swap?.base ? 'base' : (!state.swap.char ? 'char' : 'base'));
+// One document-level paste listener, active only on the Swap tab: an image on the clipboard lands
+// in the first empty slot; a text-only paste falls through so it can land in the prompt box.
+let _swapPasteWired = false;
+function wireSwapPaste() {
+  if (_swapPasteWired) return; _swapPasteWired = true;
+  document.addEventListener('paste', async (e) => {
+    if (state.activeTab !== 'swap') return;
+    const files = filesFromPaste(e);
+    if (!files.length) return;
+    e.preventDefault();
+    const which = swapFirstEmpty();
+    if (await loadSwapSlot(which, files[0])) toast(`Pasted into image ${which === 'base' ? '1' : '2'}.`);
+  });
+}
+
 function renderSwap(body) {
   const s = state.swap || (state.swap = { base: null, char: null, prompt: '', model: 'flux' });
   const slot = (which, im, label, opt) => `<label class="swap-slot${opt ? ' opt' : ''}" data-which="${which}">
@@ -668,6 +694,7 @@ function renderSwap(body) {
         <div class="swap-arrow">⇄</div>
         ${slot('char', s.char, 'Image 2 — new character (optional)', true)}
       </div>
+      <div class="swap-hint">Click a slot to browse · paste (Ctrl/⌘V) · or drag an image straight in</div>
       <textarea id="swapPrompt" class="swap-prompt" placeholder="Two images → leave blank to just swap the character, or describe it. One image → describe the adjustment (e.g. 'change the background to a night city street', 'make the jacket red leather').">${escapeHtml(s.prompt || '')}</textarea>
       <div class="swap-controls">
         <div class="swap-model">
@@ -678,11 +705,35 @@ function renderSwap(body) {
       </div>
       <div id="swapResults" class="results-grid"></div>
     </div>`;
-  $$('.swap-slot input', body).forEach(inp => inp.onchange = async (e) => {
-    const which = e.target.closest('.swap-slot').dataset.which;
-    const f = e.target.files[0]; if (!f) return;
-    state.swap[which] = { data: await fileToB64(f), mimeType: f.type || 'image/jpeg', preview: URL.createObjectURL(f) };
-    renderSwap(body);
+  wireSwapPaste();                                       // paste an image anywhere in the tab → first empty slot
+  const panel = $('.swap-panel', body);
+  $$('.swap-slot input', body).forEach(inp => inp.onchange = (e) => {
+    loadSwapSlot(e.target.closest('.swap-slot').dataset.which, e.target.files[0]);
+  });
+  // Drag & drop onto a specific slot — OS image files, or a Library thumbnail (text/avs-image).
+  $$('.swap-slot', body).forEach(sl => {
+    const which = sl.dataset.which;
+    const hot = (e) => dragHasFiles(e) || [...(e.dataTransfer.types || [])].includes('text/avs-image');
+    sl.addEventListener('dragover', (e) => { if (hot(e)) { e.preventDefault(); e.stopPropagation(); sl.classList.add('drag'); panel.classList.remove('drag-over'); } });
+    sl.addEventListener('dragleave', (e) => { if (!sl.contains(e.relatedTarget)) sl.classList.remove('drag'); });
+    sl.addEventListener('drop', async (e) => {
+      if (!hot(e)) return;
+      e.preventDefault(); e.stopPropagation(); sl.classList.remove('drag');
+      if (dragHasFiles(e)) { loadSwapSlot(which, [...e.dataTransfer.files].find(f => (f.type || '').startsWith('image/'))); return; }
+      const url = e.dataTransfer.getData('text/avs-image');
+      if (!url) return;
+      try { const a = await urlToAttachment(url); state.swap[which] = { data: a.data, mimeType: a.mimeType, preview: url }; renderSwap(body); }
+      catch { toast('Could not add that image.', true); }
+    });
+  });
+  // Drop anywhere else in the panel → first empty slot ("drop directly to the tab").
+  panel.addEventListener('dragover', (e) => { if (dragHasFiles(e)) { e.preventDefault(); panel.classList.add('drag-over'); } });
+  panel.addEventListener('dragleave', (e) => { if (!panel.contains(e.relatedTarget)) panel.classList.remove('drag-over'); });
+  panel.addEventListener('drop', (e) => {
+    if (!dragHasFiles(e)) return;
+    e.preventDefault(); panel.classList.remove('drag-over');
+    const f = [...e.dataTransfer.files].find(x => (x.type || '').startsWith('image/'));
+    if (f) loadSwapSlot(swapFirstEmpty(), f); else toast('Only image files can be dropped here.', true);
   });
   $$('.swap-clear', body).forEach(b => b.onclick = (e) => { e.preventDefault(); state.swap[b.dataset.which] = null; renderSwap(body); });
   $$('.swap-model .seg', body).forEach(b => b.onclick = () => { if (b.disabled) return; state.swap.model = b.dataset.model; renderSwap(body); });
@@ -896,7 +947,7 @@ async function favoriteToAttachment(im) {
 }
 
 // Drag an image card (from NB2 results / Library) onto a tab button to attach it there.
-const DROP_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor', 'generate'];
+const DROP_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor', 'generate', 'swap'];
 async function urlToAttachment(url) {
   const blob = await (await mediaFetch(url)).blob();
   const data = await fileToB64(blob);
@@ -907,6 +958,14 @@ async function dropImageOnTab(tab, url) {
   try {
     const att = await urlToAttachment(url);
     switchTab(tab);
+    if (tab === 'swap') {
+      state.swap = state.swap || { base: null, char: null, prompt: '', model: 'flux' };
+      const which = !state.swap.base ? 'base' : (!state.swap.char ? 'char' : 'base');
+      state.swap[which] = { data: att.data, mimeType: att.mimeType, preview: url };
+      renderSwap($('#wsBody'));
+      toast(`Image sent to Swap (image ${which === 'base' ? '1' : '2'}).`);
+      return;
+    }
     if (tab === 'generate') {
       if (!state.refImages.some(r => r.url === url)) state.refImages.push(att);
       renderRefImages();

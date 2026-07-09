@@ -554,6 +554,9 @@ textarea.char-text { resize: vertical; min-height: 46px; line-height: 1.5; }
 .swap-prompt { width: 100%; min-height: 70px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; color: var(--ink); padding: 12px; font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 12px; box-sizing: border-box; }
 #swapResults { margin-top: 20px; }
 .swap-slot.opt .swap-slot-inner { border-style: dotted; }
+.swap-slot.drag .swap-slot-inner { border-color: var(--accent); border-style: solid; background: rgba(232,176,75,.10); box-shadow: 0 0 0 2px rgba(232,176,75,.28) inset; }
+.swap-panel.drag-over { outline: 2px dashed var(--accent); outline-offset: 6px; border-radius: 12px; }
+.swap-hint { font-size: 12px; color: var(--ink-faint); text-align: center; margin: -4px 0 12px; }
 .swap-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .swap-model { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .swap-model .seg { background: var(--panel-2); color: var(--ink-dim); border: none; padding: 7px 14px; font-family: var(--mono); font-size: 12px; cursor: pointer; transition: background .15s, color .15s; }
