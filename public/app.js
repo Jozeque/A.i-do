@@ -865,7 +865,10 @@ function renderMessages(gemId) {
   let refImgs = [];
   scroll.innerHTML = msgs.map(m => {
     if (m.role === 'user') {
-      if (m.images && m.images.length) refImgs = m.images;
+      // Reset per user turn: a text-only turn carries NO reference, so an assistant reply never
+      // inherits a PREVIOUS prompt's image (matches the server, which only sends the current
+      // turn's images). This was the "stale / irrelevant reference gets attached" bug.
+      refImgs = (m.images && m.images.length) ? m.images : [];
       return renderMsg(m, []);
     }
     return renderMsg(m, refImgs);
@@ -880,6 +883,7 @@ function renderMessages(gemId) {
   $$('.gen-all', scroll).forEach(b => b.onclick = () => sendAllToGenerator(b));
   $$('.reuse-prompt', scroll).forEach(b => b.onclick = () => reusePromptInComposer(b));
   $$('.msg-copy', scroll).forEach(b => b.onclick = () => copyUserBlock(b));
+  $$('.ref-thumb', scroll).forEach(t => t.onclick = () => openLightbox([{ src: t.dataset.full, caption: 'Reference this output was built from' }], 0));
   scroll.scrollTop = nearBottom ? scroll.scrollHeight : prevTop;
 }
 
@@ -1050,6 +1054,16 @@ async function copyTextToClipboard(text) {
 // refImgs = the relevant attached image(s) to carry to the generator with the prompt.
 function renderAssistant(text, refImgs = []) {
   const imgsAttr = `data-imgs="${encodeURIComponent(JSON.stringify(refImgs || []))}"`;
+  // Reference strip: show the image(s) this output was actually built from, so a wrong or
+  // stale reference is visible at a glance. Click a thumb to enlarge in the lightbox.
+  let refStrip = '';
+  if (refImgs && refImgs.length && state.current) {
+    refStrip = `<div class="ref-strip"><span class="ref-label">reference</span>` +
+      refImgs.map(im => {
+        const url = `/media/${state.current.id}/uploads/${im.file}`;
+        return `<img class="ref-thumb" src="${url}" data-full="${url}" loading="lazy" title="Reference this output was built from — click to enlarge" />`;
+      }).join('') + `</div>`;
+  }
   // Split fenced code blocks first
   const parts = text.split(/```(?:[a-zA-Z]*\n)?/);
   let html = '';
@@ -1065,7 +1079,7 @@ function renderAssistant(text, refImgs = []) {
       html += formatProse(seg, imgsAttr);
     }
   });
-  return html;
+  return refStrip + html;
 }
 
 // For NB Frames the prompts come as "PROMPT 1 — name" plain paragraphs (no fences).
