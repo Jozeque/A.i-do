@@ -1592,13 +1592,18 @@ async function initAuth() {
       }
       btn?.classList.add('hidden'); setStatus('Checking access…');
       // Confirm the account is on the allowlist by hitting a protected route.
-      let ok = false;
-      try { await api('/api/projects'); ok = true; } catch { ok = false; }
-      if (ok) {
+      let err = null;
+      try { await api('/api/projects'); } catch (e) { err = e; }
+      if (!err) {
         overlay?.classList.add('hidden');
         if (!done) { done = true; resolve(); }
       } else {
-        setStatus(`${user.email} isn't on the allowlist for this studio.`);
+        const msg = (err && err.message) ? err.message : String(err);
+        // Show the REAL reason instead of always blaming the allowlist: "not on the allowlist"
+        // is a 403 (ALLOWED_EMAILS); anything else (token/session 401, server 500) is different.
+        setStatus(/allowlist/i.test(msg)
+          ? `${user.email} isn't on the allowlist (fix ALLOWED_EMAILS on the server).`
+          : `Signed in as ${user.email}, but access failed — ${msg}`);
         outBtn?.classList.remove('hidden');
       }
     });
