@@ -543,14 +543,12 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
       savedImgs.push(await storage.saveUpload(p.id, img.data, img.mimeType));
     }
 
-    // persist chat via the serialized, fresh-read updater so a concurrent generate/chat
-    // on this project can't clobber it
-    await updateProject(req.params.pid, (proj) => {
-      proj.chats[gemId] = proj.chats[gemId] || [];
-      proj.chats[gemId].push({ role: 'user', content: userText || '(image)', hadImages: images.length > 0, images: savedImgs, at: Date.now() });
-      proj.chats[gemId].push({ role: 'assistant', content: text, at: Date.now() });
-      proj.updatedAt = Date.now();
-    });
+    // Append via a targeted chat-doc write (reads only THIS gem's chat doc, not the whole
+    // project) — the old updateProject re-read every image doc twice per message.
+    await data.appendChat(req.params.pid, gemId, [
+      { role: 'user', content: userText || '(image)', hadImages: images.length > 0, images: savedImgs, at: Date.now() },
+      { role: 'assistant', content: text, at: Date.now() },
+    ]);
 
     res.json({ text, images: savedImgs });
   } catch (e) {

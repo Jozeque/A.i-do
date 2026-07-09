@@ -24,6 +24,7 @@ function createLocalDataStore(dataDir) {
   async function getProjectLight(pid) { const p = await getProject(pid); return { ...p, images: [] }; }
   async function getImages(pid) { const p = await getProject(pid); return p.images || []; }
   async function addImage(pid, rec) { return update(pid, (p) => { p.images = p.images || []; p.images.unshift(rec); p.updatedAt = Date.now(); }); }
+  async function appendChat(pid, gemId, newMsgs) { return update(pid, (p) => { p.chats = p.chats || {}; p.chats[gemId] = p.chats[gemId] || []; p.chats[gemId].push(...newMsgs); p.updatedAt = Date.now(); }); }
 
   async function saveProject(p) {
     await fsp.mkdir(projDir(p.id), { recursive: true });
@@ -77,7 +78,7 @@ function createLocalDataStore(dataDir) {
     await fsp.rm(projDir(pid), { recursive: true, force: true });
   }
 
-  return { backend: 'local', getProject, getProjectLight, getImages, addImage, saveProject, update, listProjects, deleteProject };
+  return { backend: 'local', getProject, getProjectLight, getImages, addImage, appendChat, saveProject, update, listProjects, deleteProject };
 }
 
 // ── Firestore backend (subcollections) ──────────────────────────────────────
@@ -164,6 +165,23 @@ function createFirestoreDataStore() {
     await ref.set({ imageCount: FieldValue.increment(1), updatedAt: rec.createdAt || Date.now() }, { merge: true });
   }
 
+  // Append chat message(s) to ONE gem's chat doc via a transaction — reads only that chat doc
+  // (not the whole project's images), so a chat message costs ~1 read instead of hundreds. The
+  // transaction keeps two concurrent messages on the same tab from clobbering each other.
+  async function appendChat(pid, gemId, newMsgs) {
+    await init();
+    const { FieldValue } = await import('firebase-admin/firestore');
+    const ref = _col.doc(pid);
+    const chatRef = ref.collection('chats').doc(gemId);
+    await _db.runTransaction(async (tx) => {
+      const snap = await tx.get(chatRef);
+      const msgs = snap.exists ? (snap.data().messages || []) : [];
+      msgs.push(...newMsgs);
+      tx.set(chatRef, { messages: msgs });
+      tx.set(ref, { updatedAt: Date.now(), chatCount: FieldValue.increment(newMsgs.length) }, { merge: true });
+    });
+  }
+
   // Persist the blob: meta + per-tab chat docs in one batch, then image docs DIFFED
   // (only new/changed written, removed deleted), chunked under the 500-op batch limit.
   async function saveProject(p) {
@@ -247,7 +265,7 @@ function createFirestoreDataStore() {
     await ref.delete();
   }
 
-  return { backend: 'firestore', getProject, getProjectLight, getImages, addImage, saveProject, update, listProjects, deleteProject };
+  return { backend: 'firestore', getProject, getProjectLight, getImages, addImage, appendChat, saveProject, update, listProjects, deleteProject };
 }
 
 export function createDataStore(dataDir, { backend = process.env.DATA_BACKEND || 'local' } = {}) {
