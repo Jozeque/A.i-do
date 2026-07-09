@@ -470,7 +470,10 @@ let _usageCache = { at: 0, data: null };
 app.get('/api/usage', async (req, res) => {
   try {
     const now = Date.now();
-    if (!req.query.fresh && _usageCache.data && now - _usageCache.at < 5 * 60 * 1000) return res.json({ ..._usageCache.data, cached: true });
+    // Cache 30 min — computeUsage reads EVERY project's subcollections (thousands of Firestore
+    // reads), so a short TTL burns the free-tier daily read quota fast. Expenses move slowly;
+    // add ?fresh=1 to force a recompute.
+    if (!req.query.fresh && _usageCache.data && now - _usageCache.at < 30 * 60 * 1000) return res.json({ ..._usageCache.data, cached: true });
     const out = await computeUsage(data, CLAUDE_MODEL);
     _usageCache = { at: now, data: out };
     res.json(out);
