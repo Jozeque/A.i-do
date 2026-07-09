@@ -699,7 +699,7 @@ function renderSwap(body) {
       <div class="swap-controls">
         <div class="swap-left">
           <div class="swap-model">
-            <button class="seg ${s.model === 'gptimage' ? 'on' : ''}" data-model="gptimage"${hasGpt ? '' : ' disabled title="Set OPENAI_API_KEY to enable GPT Image"'}>GPT Image${hasGpt ? '' : ' 🔒'}</button>
+            <button class="seg ${s.model === 'gptimage' ? 'on' : ''}" data-model="gptimage"${hasGpt ? '' : ' disabled title="Set OPENAI_API_KEY to enable GPT Image"'}>GPT Image 2${hasGpt ? '' : ' 🔒'}</button>
             <button class="seg ${s.model === 'flux' ? 'on' : ''}" data-model="flux">Flux Kontext</button>
           </div>
           ${s.model === 'gptimage' ? `<button class="swap-ab ${s.ab ? 'on' : ''}" id="swapAb" title="A/B — run two prompt-enhancement strategies and compare side by side (2× cost)">A/B</button>` : ''}

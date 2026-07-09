@@ -739,11 +739,10 @@ app.post('/api/projects/:pid/swap', async (req, res) => {
     const runGpt = async (instruction) => {
       if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not set. Add it to use GPT Image.');
       const form = new FormData();
-      form.append('model', 'gpt-image-1');
+      form.append('model', 'gpt-image-2');          // ChatGPT Images 2.0 — the model the web uses
       form.append('prompt', instruction);
-      form.append('input_fidelity', 'high');        // preserve faces / fine detail
       form.append('quality', 'high');
-      if (dim) form.append('size', gptSizeFor(dim.w, dim.h));   // match image 1's orientation (not square)
+      form.append('size', 'auto');                  // gpt-image-2 natively matches the input's aspect
       images.forEach((im, i) => form.append('image[]', new Blob([Buffer.from(im.data, 'base64')], { type: sniffImageMime(im.data, im.mimeType) }), `image${i}.png`));
       const r = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}` }, body: form });
       const out = await r.json().catch(() => ({}));
@@ -788,15 +787,15 @@ app.post('/api/projects/:pid/swap', async (req, res) => {
     // A/B — two GPT Image enhancement strategies on the same prompt + images (swap only).
     if (model === 'gptimage' && ab && isSwap) {
       const [ra, rb] = await Promise.all([runGpt(ENH.gptA).then(fitExact), runGpt(ENH.gptB).then(fitExact)]);
-      const a = await saveResult(ra, ENH.gptA, 'gpt-image-1', 'A/B · A (concise)');
-      const b = await saveResult(rb, ENH.gptB, 'gpt-image-1', 'A/B · B (explicit)');
+      const a = await saveResult(ra, ENH.gptA, 'gpt-image-2', 'A/B · A (concise)');
+      const b = await saveResult(rb, ENH.gptB, 'gpt-image-2', 'A/B · B (explicit)');
       return res.json({ images: [{ ...a, variant: 'A' }, { ...b, variant: 'B' }], ab: true });
     }
 
     // Single run.
     let instruction, usedModel, run;
     if (model === 'gptimage') {
-      usedModel = 'gpt-image-1'; run = runGpt;
+      usedModel = 'gpt-image-2'; run = runGpt;
       instruction = isSwap ? ENH.gptB : `${up}. Keep everything else in the image exactly the same.`;
     } else {
       usedModel = 'flux-kontext-max'; run = runFlux;

@@ -22,10 +22,11 @@ Prompt caching (in use on the big NB Frames prompt): cache read ≈ $0.10/1M, ca
 ## Swap / Edit engines — per image (the Swap tab)
 | Engine | Per render | Notes |
 |---|---|---|
-| Flux Kontext [max] (fal.ai) | ~$0.08 | in-context edit; default engine |
-| GPT Image (OpenAI `gpt-image-1`) | ~$0.06 | 1024 gen (~$0.042) + input-image tokens; fallback |
+| GPT Image 2 (OpenAI `gpt-image-2`) | ~$0.21 (high) | **DEFAULT** — ChatGPT Images 2.0, the web's model; best targeted swaps. Token-priced: $8/1M img-in, $30/1M img-out, +$2/1M cached |
+| Flux Kontext [max] (fal.ai) | ~$0.08 | in-context edit; one click away |
+| GPT Image 1 (legacy `gpt-image-1`) | ~$0.06 | previous model (kept for old records) |
 
-Estimates — kept in sync with `SWAP_PRICE` in `server/usage.js`; counted in the Expenses tab under "Swap / Edit".
+Estimates — kept in sync with `SWAP_PRICE` in `server/usage.js`; counted in the Expenses tab under "Swap / Edit". A/B mode = 2 GPT Image 2 renders (~$0.42).
 
 ## Kling video — per second (via fal.ai; not yet wired into the app)
 | Tier | No audio | Audio | Voice control |

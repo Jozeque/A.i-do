@@ -42,13 +42,15 @@ async function gemSysTokens() {
   }
   return (_sysTok = out);
 }
-// Swap / Edit engines (per image): Flux Kontext [max] via fal.ai (~$0.08), GPT Image via OpenAI
-// (~$0.06/edit — gen + input-image tokens). Estimates; keep in sync with docs/pricing.md.
-const SWAP_PRICE = { flux: 0.08, gptimage: 0.06 };
+// Swap / Edit engines (per image): Flux Kontext [max] via fal.ai (~$0.08); GPT Image 2 via OpenAI
+// (gpt-image-2 high ≈ $0.21/edit + reference inputs); legacy gpt-image-1 ≈ $0.06. Estimates; keep
+// in sync with docs/pricing.md.
+const SWAP_PRICE = { flux: 0.08, gptimage: 0.06, gptimage2: 0.22 };
 const isSwapModel = (model) => /flux|gpt-image/.test(model || '');
 const imageCost = (model, size) => {
   const m = model || '';
   if (m.includes('flux')) return SWAP_PRICE.flux;
+  if (m.includes('gpt-image-2')) return SWAP_PRICE.gptimage2;
   if (m.includes('gpt-image')) return SWAP_PRICE.gptimage;
   const t = NB[m] || NB['gemini-3.1-flash-image'];
   return t[size] ?? t['1K'] ?? 0.067;
