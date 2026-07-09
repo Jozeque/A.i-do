@@ -718,12 +718,13 @@ app.post('/api/projects/:pid/swap', async (req, res) => {
     const pid = req.params.pid;
     const isSwap = images.length >= 2;
     if (!prompt?.trim() && !isSwap) return res.status(400).json({ error: 'For a single-image adjustment, describe the change you want in the prompt.' });
-    // A full-character swap: bring the WHOLE character from image 2 (head to toe + styling) into
-    // image 1, keep everything else in image 1 identical, and blend it in naturally.
-    const FULL_SWAP = 'Full character swap: bring the ENTIRE character from the second image — face, hair, body, and complete clothing and styling from head to toe — into the first image. Keep the first image otherwise identical: the other people, their positions, the composition, framing, background, camera angle, and the exact aspect ratio must all stay the same. Blend the new character in naturally, matching the lighting, colour grade, perspective, scale, shadows, and grain of the first image so they look truly photographed into that scene. Photorealistic and seamless. Do not crop or re-frame.';
+    // Kontext works best with SHORT, subject-described edits + an explicit "keep" clause (BFL guide).
+    // Long paragraphs and positional "first/second image" language degrade multi-image swaps — the
+    // model keys off the subjects named in the prompt, so the user's own targeting drives the swap.
+    const KEEP = 'Keep the other people, the composition, framing, background and lighting exactly the same.';
     const instruction = isSwap
-      ? ((prompt && prompt.trim()) ? `${prompt.trim()}\n\n${FULL_SWAP}` : `Replace the person in the first image with the character from the second image. ${FULL_SWAP}`)
-      : `${prompt.trim()} Keep everything else in the image exactly the same, including the framing and aspect ratio.`;
+      ? ((prompt && prompt.trim()) ? `${prompt.trim()}. ${KEEP}` : `Replace the person with the full character — face, body and clothing — from the other image. ${KEEP}`)
+      : `${prompt.trim()}. Keep everything else in the image exactly the same.`;
 
     // Image 1's true pixel size — the swap output is forced to match it exactly (below).
     const dim = imageSize(Buffer.from(images[0].data, 'base64'));
