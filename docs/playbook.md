@@ -42,4 +42,9 @@ Add to it whenever we discover something._
   ```
   → 2144×1206, SAR 1:1, ~1–4 MB from a 4K source. Batch the whole folder with a `for` loop.
 
+## Reference medium — the gem matches it (photo vs illustration)
+- The analyzer + NB Frames gem are **medium-aware**. A photographic reference → camera body + lens + grade + grain (as before). A NON-photographic reference (storyboard, illustration, painting, 3D render, animation, comic, watercolour…) → the gem renders in THAT style (linework, shading, surface texture) and names **no camera or lens**.
+- Before this, a storyboard illustration was analyzed as "Alexa Mini + Cooke lens." The tune panel now has a **Medium & style** field the analyzer fills; if it reads an illustrated medium, the frames come out illustrated, not photoreal.
+- To deliberately turn a drawn reference into a photograph, set the **Medium** field to "Photograph / cinematic film still" by hand.
+
 _Add new learnings here as we find them._

@@ -110,6 +110,7 @@ function gemEditorBody(gemId, meta) {
       <span class="field-label">Cinematography fields — these compile into the direction layered on the base NB Frames gem (for this project only). Analyze fills them; edit any by hand. Describe each as an adaptable range or family (e.g. a focal-length range, not one locked focal length) so the look stays modular across different shots and frame sizes — EXCEPT the camera body and lens series, which are named specifically (e.g. ARRI Alexa Mini LF + Cooke S4/i primes) and stay constant.</span>
       <div class="builder-grid">
         <label class="bf">Campaign / subject<input id="bf_campaign" placeholder="e.g. Clalit Smile dental campaign" /></label>
+        <label class="bf">Medium &amp; style<input id="bf_medium" placeholder="e.g. Photograph / cinematic film still — or Storyboard illustration, Digital painting, 3D render, Anime…" /></label>
         <label class="bf">Look &amp; vibe<input id="bf_look" list="dl_look" placeholder="e.g. Clinical-luxe" /></label>
         <label class="bf">Lighting style<input id="bf_lighting" list="dl_lighting" placeholder="e.g. High-key bright &amp; even" /></label>
         <label class="bf">Lens &amp; camera<input id="bf_lens" list="dl_lens" placeholder="e.g. ARRI Alexa Mini LF + Cooke S4/i primes, short-tele ~70–135mm (name the rig; focal length is a range)" /></label>
@@ -153,8 +154,8 @@ async function loadGemEditor(gemId) {
 
   if (gemId === 'nb-frames') {
     const b = builder || {};
-    const fieldIds = ['campaign', 'look', 'lighting', 'lens', 'palette', 'grain', 'environment', 'aspectRatio', 'wardrobe', 'extra'];
-    const styleIds = ['look', 'lighting', 'lens', 'palette', 'grain', 'environment', 'aspectRatio', 'wardrobe', 'extra'];
+    const fieldIds = ['campaign', 'medium', 'look', 'lighting', 'lens', 'palette', 'grain', 'environment', 'aspectRatio', 'wardrobe', 'extra'];
+    const styleIds = ['medium', 'look', 'lighting', 'lens', 'palette', 'grain', 'environment', 'aspectRatio', 'wardrobe', 'extra'];
     fieldIds.forEach(k => { const el = $('#bf_' + k); if (el) el.value = b[k] || ''; });
     const cp = $('#gemCompiled'); if (cp) cp.textContent = override || '— (analyze a reference or fill the fields, then Save) —';
 
