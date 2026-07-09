@@ -948,26 +948,73 @@ function sendPromptToGenerator(btn) {
   }, 60);
 }
 
-// Generate ALL of an NB Frames output's prompts at once — one image per prompt, fired in
-// parallel — and drop the results into the Nano Banana 2 grid. One click instead of three.
-async function sendAllToGenerator(btn) {
+// "Send all N": first open a REVIEW popup so the user can verify / edit the reference
+// image(s) the frames will generate with — then fire them all in parallel.
+let _sendAll = null;
+function sendAllToGenerator(btn) {
   let prompts = [], imgs = [];
   try { prompts = JSON.parse(decodeURIComponent(btn.dataset.prompts || '%5B%5D')); } catch {}
   try { imgs = JSON.parse(decodeURIComponent(btn.dataset.imgs || '%5B%5D')); } catch {}
   prompts = prompts.filter(p => p && p.trim());
   if (!prompts.length) return;
   if (!state.config.hasGemini) { toast('Add your GEMINI_API_KEY to .env first.', true); return; }
+  // Working reference set: the frames' own reference(s) + anything the user adds in the popup.
+  const refs = imgs.map(im => ({ mimeType: im.mimeType || 'image/jpeg', file: im.file, thumbUrl: `/media/${state.current.id}/uploads/${im.file}` }));
+  _sendAll = { prompts, refs };
+  renderSendAllModal();
+}
+
+function renderSendAllModal() {
+  if (!_sendAll) return;
+  const { prompts, refs } = _sendAll;
+  let modal = $('#sendAllModal');
+  if (!modal) { modal = document.createElement('div'); modal.id = 'sendAllModal'; modal.className = 'modal-overlay'; document.body.appendChild(modal); }
+  const thumbs = refs.length
+    ? refs.map((r, i) => `<div class="sa-ref"><img src="${r.thumbUrl}" loading="lazy" /><button class="sa-ref-x" data-i="${i}" title="Remove this reference">×</button></div>`).join('')
+    : `<div class="sa-none">No reference attached — the ${prompts.length} frames will generate from the prompt text alone. Add one below if they should use a reference.</div>`;
+  modal.innerHTML = `
+    <div class="modal-card">
+      <div class="modal-head"><h3>Send all ${prompts.length} to Nano Banana 2</h3><button class="modal-x" id="saCancel">✕</button></div>
+      <p class="modal-sub">These ${prompts.length} frames will generate with the reference(s) below. Remove any that are wrong, or add the right one, then generate.</p>
+      <div class="sa-refs">${thumbs}</div>
+      <label class="sa-add">＋ Add reference image<input type="file" id="saFile" accept="image/*" multiple hidden /></label>
+      <div class="modal-actions">
+        <button class="modal-btn ghost" id="saCancel2">Cancel</button>
+        <button class="modal-btn accent" id="saGo">⚡ Generate ${prompts.length} →</button>
+      </div>
+    </div>`;
+  modal.classList.remove('hidden');
+  const close = () => { modal.classList.add('hidden'); _sendAll = null; };
+  $('#saCancel', modal).onclick = close;
+  $('#saCancel2', modal).onclick = close;
+  modal.onclick = (e) => { if (e.target === modal) close(); };
+  $$('.sa-ref-x', modal).forEach(b => b.onclick = () => { _sendAll.refs.splice(+b.dataset.i, 1); renderSendAllModal(); });
+  $('#saFile', modal).onchange = async (e) => {
+    for (const f of e.target.files) {
+      try { _sendAll.refs.push({ mimeType: f.type || 'image/jpeg', data: await fileToB64(f), thumbUrl: URL.createObjectURL(f) }); } catch {}
+    }
+    renderSendAllModal();
+  };
+  $('#saGo', modal).onclick = async () => {
+    const { prompts, refs } = _sendAll;
+    close();
+    // Resolve every reference to base64 — freshly-uploaded ones already have data; existing
+    // ones are fetched from /media.
+    const refImages = [];
+    for (const r of refs) {
+      if (r.data) { refImages.push({ mimeType: r.mimeType, data: r.data }); continue; }
+      try {
+        const blob = await (await mediaFetch(r.thumbUrl)).blob();
+        refImages.push({ mimeType: r.mimeType || blob.type || 'image/jpeg', data: await fileToB64(blob) });
+      } catch { /* skip a ref that can't be fetched */ }
+    }
+    runSendAll(prompts, refImages);
+  };
+}
+
+// Fire every prompt in parallel (one image each) and drop the results into the NB2 grid.
+async function runSendAll(prompts, refImages) {
   if (state.generating) { toast('A generation is already running — wait for it to finish.', true); return; }
-
-  // The prompts share the ONE reference the frames were built from — resolve it once.
-  const refImages = [];
-  for (const im of imgs) {
-    try {
-      const blob = await (await mediaFetch(`/media/${state.current.id}/uploads/${im.file}`)).blob();
-      refImages.push({ mimeType: im.mimeType || blob.type || 'image/jpeg', data: await fileToB64(blob) });
-    } catch { /* skip a ref that can't be fetched */ }
-  }
-
   switchTab('generate');
   await new Promise(r => setTimeout(r, 0));   // let the generate tab paint
   const aspectRatio = $('#genAR')?.value || undefined;
@@ -981,15 +1028,12 @@ async function sendAllToGenerator(btn) {
     const s = Math.round((Date.now() - t0) / 1000);
     $$('.gen-skel .gen-load-time', grid).forEach(el => el.textContent = s + 's');
   }, 1000);
-
-  // Fire every prompt in parallel; each returns one image.
   const jobs = prompts.map(prompt =>
     api(`/api/projects/${state.current.id}/generate`, {
       method: 'POST', body: JSON.stringify({ prompt, count: 1, aspectRatio, refImages, model: state.nbModel }),
     }).then(r => r.images || []).catch(() => [])
   );
   const results = (await Promise.all(jobs)).flat();
-
   clearInterval(genTimer);
   $$('.gen-skel', grid).forEach(s => s.remove());
   if (results.length) {
