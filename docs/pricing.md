@@ -19,6 +19,14 @@ Prompt caching (in use on the big NB Frames prompt): cache read ≈ $0.10/1M, ca
 
 \* Pro "standard 1024" can bill at $0.039; the 1K–2K tier is $0.134. The app renders at **1K**.
 
+## Swap / Edit engines — per image (the Swap tab)
+| Engine | Per render | Notes |
+|---|---|---|
+| Flux Kontext [max] (fal.ai) | ~$0.08 | in-context edit; default engine |
+| GPT Image (OpenAI `gpt-image-1`) | ~$0.06 | 1024 gen (~$0.042) + input-image tokens; fallback |
+
+Estimates — kept in sync with `SWAP_PRICE` in `server/usage.js`; counted in the Expenses tab under "Swap / Edit".
+
 ## Kling video — per second (via fal.ai; not yet wired into the app)
 | Tier | No audio | Audio | Voice control |
 |---|---|---|---|

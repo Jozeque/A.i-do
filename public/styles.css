@@ -479,7 +479,7 @@ textarea.char-text { resize: vertical; min-height: 46px; line-height: 1.5; }
 .exp-head { margin-bottom: 22px; }
 .exp-head h1 { font-family: var(--display); font-weight: 500; font-size: 30px; margin: 0 0 6px; color: var(--ink); }
 .exp-head p { color: var(--ink-dim); max-width: 640px; margin: 0; line-height: 1.5; }
-.exp-cards { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 14px; margin-bottom: 8px; }
+.exp-cards { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 8px; }
 .exp-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
 .exp-card.exp-hero { background: linear-gradient(150deg, rgba(232,176,75,.16), rgba(232,176,75,.03)); border-color: #6b5628; }
 .exp-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); }
@@ -501,7 +501,8 @@ textarea.char-text { resize: vertical; min-height: 46px; line-height: 1.5; }
 .exp-empty { color: var(--ink-faint); text-align: center !important; padding: 18px; }
 .exp-note { margin-top: 22px; font-size: 12px; line-height: 1.65; color: var(--ink-faint); max-width: 720px; }
 .exp-note b { color: var(--ink-dim); }
-@media (max-width: 720px) { .exp-cards { grid-template-columns: 1fr; } }
+@media (max-width: 1040px) { .exp-cards { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .exp-cards { grid-template-columns: 1fr; } }
 
 /* "Send all N" — generate every NB Frames prompt at once, in parallel */
 .pc-sendall { margin: 2px 0 12px; }
