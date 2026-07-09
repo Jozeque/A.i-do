@@ -115,6 +115,8 @@ function compileNbFramesDirection(b) {
     'Never weld one focal length or frame size onto every frame; within these ranges, pick the value that fits the brief in front of you.'
   );
   out.push('');
+  out.push('This look applies to fresh generations and preserve-the-reference edits only. For a surgical FACE SWAP or head/body composite, IGNORE this entire block — add no camera, lens, grade, grain, or look instruction; a transplant must stay minimal so the model does not re-render the frame.');
+  out.push('');
   if (campaign)    out.push(`Project / campaign: ${campaign}.`);
   if (look)        out.push(`Overall look & vibe: ${look}. Carry this feeling through composition, styling, grade, and mood across all three prompts.`);
   if (lighting)    out.push(`Lighting approach: ${lighting}. Motivate it from sources within the scene and keep it consistent across the set.`);
@@ -122,7 +124,7 @@ function compileNbFramesDirection(b) {
   if (palette)     out.push(`Color & palette: ${palette}. Hold this grade across every frame.`);
   if (grain)       out.push(`Grain & capture texture: ${grain}. Carry this exact grain and finish in every frame — it is part of the reference's look, matched from the attached reference, never cleaner or grainier than what the reference shows.`);
   if (environment) out.push(`Environment bias: ${environment}. Populate the surroundings with architecture, objects, textiles, light, and authentic atmosphere, and add people only when the brief calls for them.`);
-  if (aspectRatio) out.push(`Default aspect ratio: render in ${aspectRatio} unless the brief specifies otherwise — the look itself does not depend on the frame shape.`);
+  if (aspectRatio) out.push(`Target aspect ratio: ${aspectRatio}. The app applies this at render time, so keep every prompt shape-agnostic — do NOT write the ratio, frame shape, or orientation into the prompt (per the base rules).`);
   if (wardrobe)    out.push(`Wardrobe & styling: ${wardrobe}.`);
   if (extra)       out.push(`Additional direction: ${extra}`);
 
@@ -680,7 +682,13 @@ app.post('/api/projects/:pid/characters', async (req, res) => {
     //    several figures, so 1K left each face too small to capture the likeness.
     const AR = '16:9';
     const toInline = (img) => ({ inlineData: { mimeType: sniffImageMime(img.data, img.mimeType), data: img.data } });
-    const contents = [...images.map(toInline), ...wardrobeImages.map(toInline)];
+    // Label the two image roles so Nano Banana Pro binds identity vs wardrobe correctly —
+    // unlabelled, it guesses from order and wardrobe faces/bodies can leak into the identity.
+    const contents = [{ text: 'Identity reference photos (the person — copy face, bone structure, skin, hair, and build from these):' }, ...images.map(toInline)];
+    if (wardrobeImages.length) {
+      contents.push({ text: 'Wardrobe reference(s) (CLOTHING ONLY — take just the garments, never the body, face, or pose):' });
+      contents.push(...wardrobeImages.map(toInline));
+    }
     contents.push({ text: `${nbPrompt}\n\nCompose the sheet as a ${AR_WORDS[AR]} (${AR}) landscape image; recompose to fill the full frame rather than copying any reference photo's shape.` });
     let result;
     try {
