@@ -676,7 +676,7 @@ function wireSwapPaste() {
 }
 
 function renderSwap(body) {
-  const s = state.swap || (state.swap = { base: null, char: null, prompt: '', model: 'flux' });
+  const s = state.swap || (state.swap = { base: null, char: null, prompt: '', model: (state.config?.hasOpenai ? 'gptimage' : 'flux'), ab: false });
   const slot = (which, im, label, opt) => `<label class="swap-slot${opt ? ' opt' : ''}" data-which="${which}">
     <input type="file" accept="image/*" hidden />
     <div class="swap-slot-inner">${im ? `<img src="${im.preview}" />` : `<span>＋ ${label}</span>`}</div>
@@ -697,11 +697,14 @@ function renderSwap(body) {
       <div class="swap-hint">Click a slot to browse · paste (Ctrl/⌘V) · or drag an image straight in</div>
       <textarea id="swapPrompt" class="swap-prompt" placeholder="Two images → name who to replace with image 2's character (e.g. 'replace the man in the middle with the woman in image 2'). One image → describe the adjustment (e.g. 'change the background to a night city street').">${escapeHtml(s.prompt || '')}</textarea>
       <div class="swap-controls">
-        <div class="swap-model">
-          <button class="seg ${s.model === 'flux' ? 'on' : ''}" data-model="flux">Flux Kontext</button>
-          <button class="seg ${s.model === 'gptimage' ? 'on' : ''}" data-model="gptimage"${hasGpt ? '' : ' disabled title="Set OPENAI_API_KEY to enable GPT Image"'}>GPT Image${hasGpt ? '' : ' 🔒'}</button>
+        <div class="swap-left">
+          <div class="swap-model">
+            <button class="seg ${s.model === 'gptimage' ? 'on' : ''}" data-model="gptimage"${hasGpt ? '' : ' disabled title="Set OPENAI_API_KEY to enable GPT Image"'}>GPT Image${hasGpt ? '' : ' 🔒'}</button>
+            <button class="seg ${s.model === 'flux' ? 'on' : ''}" data-model="flux">Flux Kontext</button>
+          </div>
+          ${s.model === 'gptimage' ? `<button class="swap-ab ${s.ab ? 'on' : ''}" id="swapAb" title="A/B — run two prompt-enhancement strategies and compare side by side (2× cost)">A/B</button>` : ''}
         </div>
-        <button class="new-project-btn" id="swapBtn"${noKey ? ' disabled' : ''}>⇄ Run</button>
+        <button class="new-project-btn" id="swapBtn"${noKey ? ' disabled' : ''}>${s.ab && s.model === 'gptimage' ? '⇄ Run A/B' : '⇄ Run'}</button>
       </div>
       <div id="swapResults" class="results-grid"></div>
     </div>`;
@@ -737,6 +740,7 @@ function renderSwap(body) {
   });
   $$('.swap-clear', body).forEach(b => b.onclick = (e) => { e.preventDefault(); state.swap[b.dataset.which] = null; renderSwap(body); });
   $$('.swap-model .seg', body).forEach(b => b.onclick = () => { if (b.disabled) return; state.swap.model = b.dataset.model; renderSwap(body); });
+  const abBtn = $('#swapAb', body); if (abBtn) abBtn.onclick = () => { state.swap.ab = !state.swap.ab; renderSwap(body); };
   const pt = $('#swapPrompt', body); if (pt) pt.oninput = () => { state.swap.prompt = pt.value; };
   const btn = $('#swapBtn', body); if (btn && !noKey) btn.onclick = () => doSwap(body);
 }
@@ -745,28 +749,33 @@ async function doSwap(body) {
   const s = state.swap;
   if (!s.base) { toast('Attach image 1 (the base).', true); return; }
   if (!s.char && !s.prompt.trim()) { toast('Add a second image to swap, or describe an adjustment in the prompt.', true); return; }
+  const ab = !!(s.ab && s.model === 'gptimage' && s.char);   // A/B needs GPT Image + a second image
   const btn = $('#swapBtn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Working…';
   const results = $('#swapResults');
-  results.insertAdjacentHTML('afterbegin', '<div class="skeleton gen-skel"><div class="gen-load"><span class="spinner-lg"></span><span class="gen-load-label">Working…</span></div></div>');
+  results.insertAdjacentHTML('afterbegin', `<div class="skeleton gen-skel"><div class="gen-load"><span class="spinner-lg"></span><span class="gen-load-label">${ab ? 'Running A/B…' : 'Working…'}</span></div></div>`);
   try {
     const images = [{ mimeType: s.base.mimeType, data: s.base.data }];
     if (s.char) images.push({ mimeType: s.char.mimeType, data: s.char.data });
-    const { image } = await api(`/api/projects/${state.current.id}/swap`, {
-      method: 'POST', body: JSON.stringify({ prompt: s.prompt, images, model: s.model }),
+    const resp = await api(`/api/projects/${state.current.id}/swap`, {
+      method: 'POST', body: JSON.stringify({ prompt: s.prompt, images, model: s.model, ab }),
     });
     results.querySelector('.gen-skel')?.remove();
-    if (image) {
-      state.current.images = [stripUrl(image), ...(state.current.images || [])];
-      results.insertAdjacentHTML('afterbegin', imgCard(image));
+    const list = resp.images || (resp.image ? [resp.image] : []);
+    if (list.length) {
+      for (const im of list) state.current.images = [stripUrl(im), ...(state.current.images || [])];
+      const html = list.map(im => im.variant
+        ? `<div class="ab-cell"><span class="ab-badge">${im.variant}</span>${imgCard(im)}</div>`
+        : imgCard(im)).join('');
+      results.insertAdjacentHTML('afterbegin', html);
       $$('.img-card', results).forEach(c => c.classList.add('gen-reveal'));
       wireImageCards(results);
-      toast('Done ✓ — saved to the Library');
+      toast(resp.ab ? 'A/B done ✓ — compare A vs B (both saved to the Library)' : 'Done ✓ — saved to the Library');
     }
   } catch (e) {
     results.querySelector('.gen-skel')?.remove();
     toast(e.message, true);
   } finally {
-    const b = $('#swapBtn'); if (b) { b.disabled = false; b.textContent = '⇄ Run'; }
+    const b = $('#swapBtn'); if (b) { b.disabled = false; b.textContent = (s.ab && s.model === 'gptimage') ? '⇄ Run A/B' : '⇄ Run'; }
   }
 }
 

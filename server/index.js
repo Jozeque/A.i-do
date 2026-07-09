@@ -708,77 +708,102 @@ app.post('/api/projects/:pid/generate', async (req, res) => {
 });
 
 // ── SWAP / EDIT — faithful in-context editing that keeps image 1, unlike generative NB. ──
-// Two engines: Flux Kontext (fal.ai, default) and GPT Image (OpenAI, fallback for edge cases).
-// With 2 images it's a character swap; with 1 image + a prompt it's an adjustment/edit.
-// body: { prompt?, images:[{mimeType,data}], model?: 'flux'|'gptimage' }
+// Engines: GPT Image (OpenAI, DEFAULT — best at targeted "swap only this person" edits) and
+// Flux Kontext (fal.ai). 2 images = full-character swap; 1 image + prompt = an edit. The user's
+// own prompt always leads; the server wraps it with a preservation "enhancement".
+// A/B (ab=true, GPT Image + swap): runs TWO enhancement strategies on the same prompt+images and
+// returns both, so we can compare which wrapper produces better swaps.
+// body: { prompt?, images:[{mimeType,data}], model?: 'gptimage'|'flux', ab?: bool }
 app.post('/api/projects/:pid/swap', async (req, res) => {
   try {
-    const { prompt, images = [], model = 'flux' } = req.body;
+    const { prompt, images = [], model = 'gptimage', ab = false } = req.body;
     if (!images.length) return res.status(400).json({ error: 'Attach at least image 1 (the base to edit).' });
     const pid = req.params.pid;
     const isSwap = images.length >= 2;
-    if (!prompt?.trim() && !isSwap) return res.status(400).json({ error: 'For a single-image adjustment, describe the change you want in the prompt.' });
-    // Kontext works best with SHORT, subject-described edits + an explicit "keep" clause (BFL guide).
-    // Long paragraphs and positional "first/second image" language degrade multi-image swaps — the
-    // model keys off the subjects named in the prompt, so the user's own targeting drives the swap.
-    const KEEP = 'Keep the other people, the composition, framing, background and lighting exactly the same.';
-    const instruction = isSwap
-      ? ((prompt && prompt.trim()) ? `${prompt.trim()}. ${KEEP}` : `Replace the person with the full character — face, body and clothing — from the other image. ${KEEP}`)
-      : `${prompt.trim()}. Keep everything else in the image exactly the same.`;
+    const up = (prompt || '').trim();               // the user's own prompt — always the core
+    if (!up && !isSwap) return res.status(400).json({ error: 'For a single-image adjustment, describe the change you want in the prompt.' });
 
-    // Image 1's true pixel size — the swap output is forced to match it exactly (below).
+    // Behind-the-scenes enhancement wrappers around the user's prompt (`up`). GPT Image follows
+    // detailed instructions well, so A = concise / B = explicit are worth A/B-testing.
+    const ENH = {
+      gptA: `${up} — keep everyone else and the rest of the scene exactly as in the original: same faces, poses, positions, background, framing, and lighting. Photorealistic and seamless.`,
+      gptB: `Edit the first image. ${up}. Bring that replacement person entirely from the second image — copy their face, hair, body, and full outfit and match their likeness exactly. Everyone and everything else in the first image must stay identical: the other people's faces, poses and positions, the background, props, camera framing, and lighting. Blend the new person in with matching light, perspective, scale, and grain so the result reads as one real, untouched photograph.`,
+      // Flux Kontext wants SHORT, subject-described edits + a brief keep clause (BFL guide).
+      flux: `${up}. Keep the other people, the composition, framing, background and lighting exactly the same.`,
+    };
+
+    // Image 1's true pixel size — every output is forced to match it exactly.
     const dim = imageSize(Buffer.from(images[0].data, 'base64'));
 
-    let buf, mime, usedModel;
-    if (model === 'gptimage') {
-      if (!OPENAI_API_KEY) return res.status(400).json({ error: 'OPENAI_API_KEY is not set. Add it to use GPT Image (ChatGPT).' });
-      // OpenAI gpt-image-1 multi-image edit (multipart form). input_fidelity=high preserves faces/detail;
-      // size follows image 1's orientation so the edit doesn't default to a square frame.
+    // Engine calls return { buf, mime } and throw on failure (caught below).
+    const runGpt = async (instruction) => {
+      if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not set. Add it to use GPT Image.');
       const form = new FormData();
       form.append('model', 'gpt-image-1');
       form.append('prompt', instruction);
-      form.append('input_fidelity', 'high');
+      form.append('input_fidelity', 'high');        // preserve faces / fine detail
       form.append('quality', 'high');
-      if (dim) form.append('size', gptSizeFor(dim.w, dim.h));
+      if (dim) form.append('size', gptSizeFor(dim.w, dim.h));   // match image 1's orientation (not square)
       images.forEach((im, i) => form.append('image[]', new Blob([Buffer.from(im.data, 'base64')], { type: sniffImageMime(im.data, im.mimeType) }), `image${i}.png`));
       const r = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}` }, body: form });
       const out = await r.json().catch(() => ({}));
       const b64 = out?.data?.[0]?.b64_json;
-      if (!r.ok || !b64) return res.status(502).json({ error: `GPT Image failed: ${out?.error?.message || JSON.stringify(out).slice(0, 200)}` });
-      buf = Buffer.from(b64, 'base64'); mime = 'image/png'; usedModel = 'gpt-image-1';
-    } else {
-      if (!FAL_KEY) return res.status(400).json({ error: 'FAL_KEY is not set. Add your fal.ai API key to enable Flux Kontext.' });
+      if (!r.ok || !b64) throw new Error(`GPT Image failed: ${out?.error?.message || JSON.stringify(out).slice(0, 200)}`);
+      return { buf: Buffer.from(b64, 'base64'), mime: 'image/png' };
+    };
+    const runFlux = async (instruction) => {
+      if (!FAL_KEY) throw new Error('FAL_KEY is not set. Add your fal.ai API key to enable Flux Kontext.');
       const image_urls = images.map(im => `data:${sniffImageMime(im.data, im.mimeType)};base64,${im.data}`);
       const body = { prompt: instruction, image_urls, safety_tolerance: '5' };
-      if (dim) body.aspect_ratio = nearestFluxAR(dim.w, dim.h);   // hold image 1's shape (no square / reframe)
+      if (dim) body.aspect_ratio = nearestFluxAR(dim.w, dim.h);   // hold image 1's shape
       const r = await fetch('https://fal.run/fal-ai/flux-pro/kontext/max/multi', {
-        method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       const out = await r.json().catch(() => ({}));
-      if (!r.ok || !out.images?.length) return res.status(502).json({ error: `Flux Kontext failed: ${out.detail || out.error || JSON.stringify(out).slice(0, 200)}` });
+      if (!r.ok || !out.images?.length) throw new Error(`Flux Kontext failed: ${out.detail || out.error || JSON.stringify(out).slice(0, 200)}`);
       const first = out.images[0];
-      buf = Buffer.from(await (await fetch(first.url)).arrayBuffer()); mime = first.content_type || 'image/jpeg'; usedModel = 'flux-kontext-max';
-    }
-
-    // "Exactly as the input" — force the result to image 1's exact pixel dimensions.
-    if (dim) {
+      return { buf: Buffer.from(await (await fetch(first.url)).arrayBuffer()), mime: first.content_type || 'image/jpeg' };
+    };
+    // Force the output to image 1's exact pixel dimensions.
+    const fitExact = async ({ buf, mime }) => {
+      if (!dim) return { buf, mime };
       try {
         const jimg = await Jimp.read(buf);
         if (jimg.width !== dim.w || jimg.height !== dim.h) {
           jimg.resize({ w: dim.w, h: dim.h });
           const outMime = mime === 'image/png' ? 'image/png' : 'image/jpeg';
-          buf = await jimg.getBuffer(outMime, outMime === 'image/jpeg' ? { quality: 92 } : undefined);
-          mime = outMime;
+          return { buf: await jimg.getBuffer(outMime, outMime === 'image/jpeg' ? { quality: 92 } : undefined), mime: outMime };
         }
       } catch { /* keep the engine's own output if the resize fails */ }
+      return { buf, mime };
+    };
+    const saveResult = async ({ buf, mime }, instruction, usedModel, note) => {
+      const imgId = id();
+      const { file: fname } = await storage.saveImage(pid, imgId, buf, mime);
+      const rec = { id: imgId, prompt: instruction, file: fname, createdAt: Date.now(), favorite: false, note: note || '', model: usedModel, size: null, refs: [] };
+      await data.addImage(pid, rec);
+      return { ...rec, url: `/media/${pid}/images/${fname}` };
+    };
+
+    // A/B — two GPT Image enhancement strategies on the same prompt + images (swap only).
+    if (model === 'gptimage' && ab && isSwap) {
+      const [ra, rb] = await Promise.all([runGpt(ENH.gptA).then(fitExact), runGpt(ENH.gptB).then(fitExact)]);
+      const a = await saveResult(ra, ENH.gptA, 'gpt-image-1', 'A/B · A (concise)');
+      const b = await saveResult(rb, ENH.gptB, 'gpt-image-1', 'A/B · B (explicit)');
+      return res.json({ images: [{ ...a, variant: 'A' }, { ...b, variant: 'B' }], ab: true });
     }
 
-    const imgId = id();
-    const { file: fname } = await storage.saveImage(pid, imgId, buf, mime);
-    const rec = { id: imgId, prompt: instruction, file: fname, createdAt: Date.now(), favorite: false, note: '', model: usedModel, size: null, refs: [] };
-    await data.addImage(pid, rec);
-    res.json({ image: { ...rec, url: `/media/${pid}/images/${fname}` } });
+    // Single run.
+    let instruction, usedModel, run;
+    if (model === 'gptimage') {
+      usedModel = 'gpt-image-1'; run = runGpt;
+      instruction = isSwap ? ENH.gptB : `${up}. Keep everything else in the image exactly the same.`;
+    } else {
+      usedModel = 'flux-kontext-max'; run = runFlux;
+      instruction = isSwap ? (up ? ENH.flux : 'Replace the person with the full character — face, body and clothing — from the other image. Keep the other people, the composition, framing, background and lighting exactly the same.') : `${up}. Keep everything else in the image exactly the same.`;
+    }
+    const saved = await saveResult(await fitExact(await run(instruction)), instruction, usedModel, '');
+    res.json({ image: saved });
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });
   }

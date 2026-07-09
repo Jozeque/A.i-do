@@ -562,3 +562,8 @@ textarea.char-text { resize: vertical; min-height: 46px; line-height: 1.5; }
 .swap-model .seg { background: var(--panel-2); color: var(--ink-dim); border: none; padding: 7px 14px; font-family: var(--mono); font-size: 12px; cursor: pointer; transition: background .15s, color .15s; }
 .swap-model .seg.on { background: var(--accent); color: #1a1206; font-weight: 700; }
 .swap-model .seg:disabled { color: var(--ink-faint); cursor: default; }
+.swap-left { display: inline-flex; align-items: center; gap: 10px; }
+.swap-ab { background: var(--panel-2); color: var(--ink-dim); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; font-family: var(--mono); font-size: 12px; letter-spacing: .04em; cursor: pointer; transition: background .15s, color .15s; }
+.swap-ab.on { background: var(--accent); color: #1a1206; font-weight: 700; border-color: var(--accent); }
+.ab-cell { position: relative; }
+.ab-badge { position: absolute; top: 10px; left: 10px; z-index: 3; background: var(--accent); color: #1a1206; font-weight: 800; padding: 3px 11px; border-radius: 6px; font-size: 13px; font-family: var(--mono); box-shadow: 0 2px 8px rgba(0,0,0,.35); }
