@@ -20,6 +20,9 @@ function createLocalDataStore(dataDir) {
   async function getProject(pid) {
     return JSON.parse(await fsp.readFile(metaPath(pid), 'utf8'));
   }
+  // Local reads the whole file anyway; these keep the seam interface consistent with Firestore.
+  async function getProjectLight(pid) { const p = await getProject(pid); return { ...p, images: [] }; }
+  async function getImages(pid) { const p = await getProject(pid); return p.images || []; }
 
   async function saveProject(p) {
     await fsp.mkdir(projDir(p.id), { recursive: true });
@@ -73,7 +76,7 @@ function createLocalDataStore(dataDir) {
     await fsp.rm(projDir(pid), { recursive: true, force: true });
   }
 
-  return { backend: 'local', getProject, saveProject, update, listProjects, deleteProject };
+  return { backend: 'local', getProject, getProjectLight, getImages, saveProject, update, listProjects, deleteProject };
 }
 
 // ── Firestore backend (subcollections) ──────────────────────────────────────
@@ -122,6 +125,30 @@ function createFirestoreDataStore() {
       .map((d) => d.data())
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     return { ...meta, chats, images, characters };
+  }
+
+  // Fast open: everything EXCEPT the (potentially huge) images subcollection. The frontend
+  // opens a project on this, then lazy-loads images via getImages when a tab needs them.
+  async function getProjectLight(pid) {
+    await init();
+    const ref = _col.doc(pid);
+    const [metaSnap, chatsSnap, charactersSnap] = await Promise.all([
+      ref.get(), ref.collection('chats').get(), ref.collection('characters').get(),
+    ]);
+    if (!metaSnap.exists) throw new Error(`Project not found: ${pid}`);
+    const { imageCount, chatCount, ...meta } = metaSnap.data();
+    const chats = {};
+    for (const g of GEM_TABS) chats[g] = [];
+    chatsSnap.forEach((d) => { chats[d.id] = d.data().messages || []; });
+    const characters = charactersSnap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return { ...meta, chats, images: [], characters };
+  }
+
+  // Just the images subcollection (for the lazy Library / Generate load).
+  async function getImages(pid) {
+    await init();
+    const snap = await _col.doc(pid).collection('images').get();
+    return snap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }
 
   // Persist the blob: meta + per-tab chat docs in one batch, then image docs DIFFED
@@ -207,7 +234,7 @@ function createFirestoreDataStore() {
     await ref.delete();
   }
 
-  return { backend: 'firestore', getProject, saveProject, update, listProjects, deleteProject };
+  return { backend: 'firestore', getProject, getProjectLight, getImages, saveProject, update, listProjects, deleteProject };
 }
 
 export function createDataStore(dataDir, { backend = process.env.DATA_BACKEND || 'local' } = {}) {

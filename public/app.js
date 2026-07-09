@@ -454,7 +454,8 @@ async function newProject() {
 }
 
 async function openProject(pid) {
-  state.current = await api(`/api/projects/${pid}`);
+  state.current = await api(`/api/projects/${pid}?light=1`);   // fast open; images load lazily below
+  state.current.images = state.current.images || [];
   try { localStorage.setItem('avs:lastProject', pid); } catch {}
   state.attachments = {};
   state.drafts = {};
@@ -468,6 +469,14 @@ async function openProject(pid) {
   await loadProjects();
   switchTab(state.activeTab);
   syncProject(pid);                // live-stream this project's chats / images / characters
+  // Load the (potentially large) image library in the BACKGROUND so the switch is instant.
+  // The Library tab fetches its own; this keeps state.current.images ready for Generate + drag.
+  api(`/api/projects/${pid}/images`).then(imgs => {
+    if (state.current?.id !== pid) return;             // user switched away meanwhile
+    state.current.images = imgs.map(stripUrl);
+    // Generate shows recent renders from state.current.images; Library self-fetches, so leave it.
+    if (state.activeTab === 'generate' && !state.generating) switchTab(state.activeTab);
+  }).catch(() => {});
 }
 function showEmpty() {
   $('#workspace').classList.add('hidden');

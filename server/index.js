@@ -351,7 +351,8 @@ app.post('/api/projects', async (req, res) => {
 });
 
 app.get('/api/projects/:pid', async (req, res) => {
-  try { res.json(await loadProject(req.params.pid)); }
+  // ?light=1 skips the images subcollection (loaded lazily by the client) — fast project open.
+  try { res.json(await (req.query.light ? data.getProjectLight(req.params.pid) : loadProject(req.params.pid))); }
   catch (e) { res.status(404).json({ error: 'Project not found' }); }
 });
 
@@ -405,6 +406,8 @@ app.post('/api/projects/:pid/gems/nb-frames/analyze', async (req, res) => {
     const system = `${kit ? kit + '\n\n' : ''}You are a visual-style analyst. Examine the attached reference image(s) and extract their VISUAL STYLE as a REUSABLE LOOK — structured data an AI image generator can apply to MANY future images. Focus on style and craft, NOT the identity of any specific person.
 
 STEP 1 — IDENTIFY THE MEDIUM FIRST, because it changes how you describe everything. Is this a PHOTOGRAPH / cinematic film still (a real camera captured it), or a NON-photographic illustrated style — a storyboard or marker sketch, a line / ink / pencil / charcoal drawing, a digital or traditional painting, watercolour or gouache, a 3D / CGI render, cel or 2D animation, anime, comic / graphic-novel art, vector / flat design, or collage? An illustration was NEVER shot on a camera, so for one you must NOT invent a camera body, lens, focal length, Kelvin colour temperature, or photographic film grain — you describe its artistic medium and technique instead. Put this in the "medium" field and let it govern every other field.
+
+Distinguish 2D from 3D carefully — this is the most common mistake: a hand-drawn or digital 2D image (illustration, storyboard, sketch, painting, comic, anime, marker / ink / pencil art) is FLAT — built from pen or brush strokes, outlines, and painted shapes, its shading DRAWN on (flat fills, cel blocks, cross-hatching, or painterly gradients), never lit in 3D. A 3D / CGI render has actual built geometry with volumetric lighting, ray-traced reflections, cast shadows with real depth, and rendered materials — it looks LIT and "built", not "drawn". If you see visible strokes, linework, outlines, flat or cel shading, or a painterly hand, it is a 2D ILLUSTRATION or PAINTING — do NOT call it "3D". Reserve "3D / CGI render" for genuine rendered geometry with real light behaviour; when unsure between 2D styles, prefer "illustration" or "digital painting".
 
 MOST IMPORTANT — capture the transferable CINEMATOGRAPHY, not this one frame's scene. The user reuses this look across many different shots, subjects, scenes, TIMES OF DAY, and aspect ratios. So extract what makes the image beautiful as CRAFT — its color science, contrast and grade, how light is shaped and sculpts the subject, lens character, texture, finish, and composition tendencies — and describe each as a FAMILY or RANGE (its DNA), never the single locked value of this one frame. CRITICALLY, do NOT bake in the reference's circumstantial facts — its time of day, its light SOURCE, its specific LOCATION, or the subject's exact OUTFIT. If the reference was shot in daylight, that does NOT make this a daylight project: describe the lighting's character so it can be re-created at night, golden hour, or indoors, adapting the source to whatever the user later briefs. FOR A PHOTOGRAPH, you MUST name the specific real-world CAMERA BODY and LENS SERIES whose optical and colour character produce this look (e.g. "ARRI Alexa Mini LF with Cooke S4/i primes", "Sony Venice 2 with Zeiss Supremes", "RED V-Raptor with Zeiss Master Primes" — choose the one that genuinely matches, never a reflex default), paired with a focal-length RANGE (e.g. "~70–135mm-equivalent"): that rig is the CONSTANT look DNA, the focal length the per-shot variable. FOR A NON-PHOTOGRAPHIC image, do the OPPOSITE — never name a camera or lens; describe the ARTISTIC style faithfully — the medium and technique, the linework (weight, looseness, cross-hatching), the shading/rendering (flat, cel, painterly, soft-gradient, hatched), the colour handling, and the surface / paper / canvas / digital texture. The look must stay modular to the user's brief while preserving the reference's overall cinematography.
 
@@ -767,8 +770,9 @@ app.delete('/api/projects/:pid/characters/:charId', async (req, res) => {
 // ── image library management ───────────────────────────────────────────────────
 app.get('/api/projects/:pid/images', async (req, res) => {
   try {
-    const p = await loadProject(req.params.pid);
-    res.json(p.images.map(im => ({ ...im, url: `/media/${p.id}/images/${im.file}` })));
+    const pid = req.params.pid;
+    const images = await data.getImages(pid);   // reads ONLY the images subcollection
+    res.json(images.map(im => ({ ...im, url: `/media/${pid}/images/${im.file}` })));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
