@@ -23,6 +23,7 @@ function createLocalDataStore(dataDir) {
   // Local reads the whole file anyway; these keep the seam interface consistent with Firestore.
   async function getProjectLight(pid) { const p = await getProject(pid); return { ...p, images: [] }; }
   async function getImages(pid) { const p = await getProject(pid); return p.images || []; }
+  async function addImage(pid, rec) { return update(pid, (p) => { p.images = p.images || []; p.images.unshift(rec); p.updatedAt = Date.now(); }); }
 
   async function saveProject(p) {
     await fsp.mkdir(projDir(p.id), { recursive: true });
@@ -76,7 +77,7 @@ function createLocalDataStore(dataDir) {
     await fsp.rm(projDir(pid), { recursive: true, force: true });
   }
 
-  return { backend: 'local', getProject, getProjectLight, getImages, saveProject, update, listProjects, deleteProject };
+  return { backend: 'local', getProject, getProjectLight, getImages, addImage, saveProject, update, listProjects, deleteProject };
 }
 
 // ── Firestore backend (subcollections) ──────────────────────────────────────
@@ -149,6 +150,18 @@ function createFirestoreDataStore() {
     await init();
     const snap = await _col.doc(pid).collection('images').get();
     return snap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }
+
+  // Append ONE generated image WITHOUT reading the whole project — writes just the image doc
+  // and bumps the cached count. (A full saveProject re-reads every image doc to diff them, so
+  // appending via getProject+saveProject cost hundreds of Firestore reads per generation — the
+  // burst that tripped the quota when "Send all 3" fired several generations at once.)
+  async function addImage(pid, rec) {
+    await init();
+    const { FieldValue } = await import('firebase-admin/firestore');
+    const ref = _col.doc(pid);
+    await ref.collection('images').doc(String(rec.id)).set(rec);
+    await ref.set({ imageCount: FieldValue.increment(1), updatedAt: rec.createdAt || Date.now() }, { merge: true });
   }
 
   // Persist the blob: meta + per-tab chat docs in one batch, then image docs DIFFED
@@ -234,7 +247,7 @@ function createFirestoreDataStore() {
     await ref.delete();
   }
 
-  return { backend: 'firestore', getProject, getProjectLight, getImages, saveProject, update, listProjects, deleteProject };
+  return { backend: 'firestore', getProject, getProjectLight, getImages, addImage, saveProject, update, listProjects, deleteProject };
 }
 
 export function createDataStore(dataDir, { backend = process.env.DATA_BACKEND || 'local' } = {}) {

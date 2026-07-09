@@ -578,7 +578,7 @@ app.post('/api/projects/:pid/generate', async (req, res) => {
     if (!prompt || !prompt.trim()) return res.status(400).json({ error: 'Prompt is empty.' });
     // Resolve the model from the UI toggle (allowlisted); fall back to the .env default.
     const model = NB_MODELS[req.body.model] || NB2_MODEL;
-    const p = await loadProject(req.params.pid);
+    const p = { id: req.params.pid };   // just the id — never read the whole project (all images) to generate
 
     const contents = [];
     const savedRefs = [];
@@ -651,13 +651,11 @@ app.post('/api/projects/:pid/generate', async (req, res) => {
       const why = [...new Set(errors)].join(' · ');
       return res.status(502).json({ error: why ? `No images generated — ${why}` : 'No images generated.', details: errors });
     }
-    // Append the new image records via the serialized, fresh-read updater so a concurrent
-    // generate/chat on this project can't overwrite them (the bug that dropped images).
-    await updateProject(req.params.pid, (proj) => {
-      proj.images = proj.images || [];
-      for (const rec of recs) proj.images.unshift(rec);
-      proj.updatedAt = Date.now();
-    });
+    // Write each new image as its OWN Firestore doc (no full-project read/diff). Appending via
+    // updateProject re-read the ENTIRE image library twice per call, so parallel "Send all"
+    // generations fired thousands of reads at once and tripped the quota. Separate docs also
+    // can't clobber each other, so the old write-lock isn't needed here.
+    for (const rec of recs) await data.addImage(req.params.pid, rec);
     res.json({ images: saved, errors });
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });
