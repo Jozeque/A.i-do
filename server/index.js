@@ -62,6 +62,9 @@ const genai = process.env.GEMINI_API_KEY
 // re-renders too much; Kontext is an in-context editor that preserves image 1 far better.
 // Raw HTTP (no SDK dep). Set FAL_KEY in .env / Render to enable the Swap tab.
 const FAL_KEY = process.env.FAL_KEY || '';
+// OpenAI GPT Image (ChatGPT's editor) — a fallback swap/edit engine for the edge cases where
+// Flux struggles. Optional; set OPENAI_API_KEY to enable it as a model option in the Swap tab.
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 // ── Gem system prompts (read fresh so you can edit them live) ────────────────
 const GEM_FILES = {
@@ -289,6 +292,7 @@ app.get('/api/health', (req, res) => {
     hasAnthropic: !!anthropic,
     hasGemini: !!genai,
     hasFal: !!FAL_KEY,
+    hasOpenai: !!OPENAI_API_KEY,
     authEnabled: authEnabled(),
     storage: storage.backend,
     data: data.backend,
@@ -666,34 +670,50 @@ app.post('/api/projects/:pid/generate', async (req, res) => {
   }
 });
 
-// ── SWAP — Flux Kontext (fal.ai): put the character from image 2 into image 1, keep the rest ──
-// Nano Banana re-renders too much for this; Flux Kontext is an in-context editor that preserves
-// image 1 (pose, scene, lighting) and changes only the character. body: { prompt?, images:[...] }
+// ── SWAP / EDIT — faithful in-context editing that keeps image 1, unlike generative NB. ──
+// Two engines: Flux Kontext (fal.ai, default) and GPT Image (OpenAI, fallback for edge cases).
+// With 2 images it's a character swap; with 1 image + a prompt it's an adjustment/edit.
+// body: { prompt?, images:[{mimeType,data}], model?: 'flux'|'gptimage' }
 app.post('/api/projects/:pid/swap', async (req, res) => {
-  if (!FAL_KEY) return res.status(400).json({ error: 'FAL_KEY is not set. Add your fal.ai API key to .env (and Render) to enable Swap.' });
   try {
-    const { prompt, images = [] } = req.body;
-    if (images.length < 2) return res.status(400).json({ error: 'Attach two images: image 1 (the base to keep) and image 2 (the new character).' });
+    const { prompt, images = [], model = 'flux' } = req.body;
+    if (!images.length) return res.status(400).json({ error: 'Attach at least image 1 (the base to edit).' });
     const pid = req.params.pid;
-    const image_urls = images.map(im => `data:${sniffImageMime(im.data, im.mimeType)};base64,${im.data}`);
-    const instruction = (prompt && prompt.trim()) ||
-      'Replace the person in the first image with the character from the second image. Keep the first image exactly the same — the same pose, body position, framing, background, camera angle, and lighting — change only WHO the person is so they match the character in the second image. Seamless, photorealistic.';
-    // Flux Kontext [max] multi-image edit via fal.ai's sync endpoint (Kontext is fast).
-    const r = await fetch('https://fal.run/fal-ai/flux-pro/kontext/max/multi', {
-      method: 'POST',
-      headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: instruction, image_urls, safety_tolerance: '5' }),
-    });
-    const out = await r.json().catch(() => ({}));
-    if (!r.ok || !out.images?.length) {
-      return res.status(502).json({ error: `Flux Kontext failed: ${out.detail || out.error || JSON.stringify(out).slice(0, 200)}` });
+    const isSwap = images.length >= 2;
+    if (!prompt?.trim() && !isSwap) return res.status(400).json({ error: 'For a single-image adjustment, describe the change you want in the prompt.' });
+    const instruction = (prompt && prompt.trim()) || (isSwap
+      ? 'Replace the person in the first image with the character from the second image. Keep the first image exactly the same — the same pose, body position, framing, background, camera angle, and lighting — change only WHO the person is so they match the character in the second image. Seamless, photorealistic.'
+      : 'Apply the requested change while keeping everything else in the image exactly the same.');
+
+    let buf, mime, usedModel;
+    if (model === 'gptimage') {
+      if (!OPENAI_API_KEY) return res.status(400).json({ error: 'OPENAI_API_KEY is not set. Add it to use GPT Image (ChatGPT).' });
+      // OpenAI gpt-image-1 multi-image edit (multipart form).
+      const form = new FormData();
+      form.append('model', 'gpt-image-1');
+      form.append('prompt', instruction);
+      images.forEach((im, i) => form.append('image[]', new Blob([Buffer.from(im.data, 'base64')], { type: sniffImageMime(im.data, im.mimeType) }), `image${i}.png`));
+      const r = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}` }, body: form });
+      const out = await r.json().catch(() => ({}));
+      const b64 = out?.data?.[0]?.b64_json;
+      if (!r.ok || !b64) return res.status(502).json({ error: `GPT Image failed: ${out?.error?.message || JSON.stringify(out).slice(0, 200)}` });
+      buf = Buffer.from(b64, 'base64'); mime = 'image/png'; usedModel = 'gpt-image-1';
+    } else {
+      if (!FAL_KEY) return res.status(400).json({ error: 'FAL_KEY is not set. Add your fal.ai API key to enable Flux Kontext.' });
+      const image_urls = images.map(im => `data:${sniffImageMime(im.data, im.mimeType)};base64,${im.data}`);
+      const r = await fetch('https://fal.run/fal-ai/flux-pro/kontext/max/multi', {
+        method: 'POST', headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: instruction, image_urls, safety_tolerance: '5' }),
+      });
+      const out = await r.json().catch(() => ({}));
+      if (!r.ok || !out.images?.length) return res.status(502).json({ error: `Flux Kontext failed: ${out.detail || out.error || JSON.stringify(out).slice(0, 200)}` });
+      const first = out.images[0];
+      buf = Buffer.from(await (await fetch(first.url)).arrayBuffer()); mime = first.content_type || 'image/jpeg'; usedModel = 'flux-kontext-max';
     }
-    const first = out.images[0];
-    const imgResp = await fetch(first.url);
-    const buf = Buffer.from(await imgResp.arrayBuffer());
+
     const imgId = id();
-    const { file: fname } = await storage.saveImage(pid, imgId, buf, first.content_type || 'image/jpeg');
-    const rec = { id: imgId, prompt: instruction, file: fname, createdAt: Date.now(), favorite: false, note: '', model: 'flux-kontext-max', size: null, refs: [] };
+    const { file: fname } = await storage.saveImage(pid, imgId, buf, mime);
+    const rec = { id: imgId, prompt: instruction, file: fname, createdAt: Date.now(), favorite: false, note: '', model: usedModel, size: null, refs: [] };
     await data.addImage(pid, rec);
     res.json({ image: { ...rec, url: `/media/${pid}/images/${fname}` } });
   } catch (e) {

@@ -626,26 +626,34 @@ function switchTab(tab) {
   restoreDrafts();                               // restore the incoming tab's text inputs
 }
 
-// ── Swap tab: Flux Kontext (fal.ai) character swap — keep image 1, replace only the character ──
+// ── Swap / Edit tab: faithful in-context editing (Flux Kontext / GPT Image) — keeps image 1. ──
 function renderSwap(body) {
-  const s = state.swap || (state.swap = { base: null, char: null, prompt: '' });
-  const slot = (which, im, label) => `<label class="swap-slot" data-which="${which}">
+  const s = state.swap || (state.swap = { base: null, char: null, prompt: '', model: 'flux' });
+  const slot = (which, im, label, opt) => `<label class="swap-slot${opt ? ' opt' : ''}" data-which="${which}">
     <input type="file" accept="image/*" hidden />
     <div class="swap-slot-inner">${im ? `<img src="${im.preview}" />` : `<span>＋ ${label}</span>`}</div>
     ${im ? `<button class="swap-clear" data-which="${which}" title="Remove">×</button>` : ''}
   </label>`;
-  const noKey = !(state.config && state.config.hasFal);
+  const cfg = state.config || {};
+  const noKey = !(cfg.hasFal || cfg.hasOpenai);
+  const hasGpt = !!cfg.hasOpenai;
   body.innerHTML = `
     <div class="swap-panel">
-      <p class="field-label">Character swap — put the character from <b>image 2</b> into <b>image 1</b>, keeping image 1's pose, scene, framing, and lighting. Powered by <b>Flux Kontext</b> (fal.ai) — far more faithful than Nano Banana for this.</p>
-      ${noKey ? '<div class="swap-nokey">⚠ Swap needs a fal.ai key. Add <code>FAL_KEY</code> to your .env (and Render), then reload.</div>' : ''}
+      <p class="field-label">Faithful edit / swap — keeps image 1's pose, scene, framing, and lighting (unlike Nano Banana, which re-renders). Add a <b>second image</b> to <b>swap the character</b>, or use just image 1 + an instruction to <b>adjust</b> it.</p>
+      ${noKey ? '<div class="swap-nokey">⚠ Needs a fal.ai key. Add <code>FAL_KEY</code> to your .env (and Render), then reload.</div>' : ''}
       <div class="swap-slots">
         ${slot('base', s.base, 'Image 1 — base (keep this)')}
         <div class="swap-arrow">⇄</div>
-        ${slot('char', s.char, 'Image 2 — new character')}
+        ${slot('char', s.char, 'Image 2 — new character (optional)', true)}
       </div>
-      <textarea id="swapPrompt" class="swap-prompt" placeholder="Optional — leave blank to keep image 1 identical and only change who the character is. Or describe the swap in your own words.">${escapeHtml(s.prompt || '')}</textarea>
-      <button class="new-project-btn" id="swapBtn"${noKey ? ' disabled' : ''}>⇄ Swap character</button>
+      <textarea id="swapPrompt" class="swap-prompt" placeholder="Two images → leave blank to just swap the character, or describe it. One image → describe the adjustment (e.g. 'change the background to a night city street', 'make the jacket red leather').">${escapeHtml(s.prompt || '')}</textarea>
+      <div class="swap-controls">
+        <div class="swap-model">
+          <button class="seg ${s.model === 'flux' ? 'on' : ''}" data-model="flux">Flux Kontext</button>
+          <button class="seg ${s.model === 'gptimage' ? 'on' : ''}" data-model="gptimage"${hasGpt ? '' : ' disabled title="Set OPENAI_API_KEY to enable GPT Image"'}>GPT Image${hasGpt ? '' : ' 🔒'}</button>
+        </div>
+        <button class="new-project-btn" id="swapBtn"${noKey ? ' disabled' : ''}>⇄ Run</button>
+      </div>
       <div id="swapResults" class="results-grid"></div>
     </div>`;
   $$('.swap-slot input', body).forEach(inp => inp.onchange = async (e) => {
@@ -655,20 +663,23 @@ function renderSwap(body) {
     renderSwap(body);
   });
   $$('.swap-clear', body).forEach(b => b.onclick = (e) => { e.preventDefault(); state.swap[b.dataset.which] = null; renderSwap(body); });
+  $$('.swap-model .seg', body).forEach(b => b.onclick = () => { if (b.disabled) return; state.swap.model = b.dataset.model; renderSwap(body); });
   const pt = $('#swapPrompt', body); if (pt) pt.oninput = () => { state.swap.prompt = pt.value; };
   const btn = $('#swapBtn', body); if (btn && !noKey) btn.onclick = () => doSwap(body);
 }
 
 async function doSwap(body) {
   const s = state.swap;
-  if (!s.base || !s.char) { toast('Attach both images — image 1 (base) and image 2 (new character).', true); return; }
-  const btn = $('#swapBtn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Swapping…';
+  if (!s.base) { toast('Attach image 1 (the base).', true); return; }
+  if (!s.char && !s.prompt.trim()) { toast('Add a second image to swap, or describe an adjustment in the prompt.', true); return; }
+  const btn = $('#swapBtn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Working…';
   const results = $('#swapResults');
-  results.insertAdjacentHTML('afterbegin', '<div class="skeleton gen-skel"><div class="gen-load"><span class="spinner-lg"></span><span class="gen-load-label">Swapping…</span></div></div>');
+  results.insertAdjacentHTML('afterbegin', '<div class="skeleton gen-skel"><div class="gen-load"><span class="spinner-lg"></span><span class="gen-load-label">Working…</span></div></div>');
   try {
+    const images = [{ mimeType: s.base.mimeType, data: s.base.data }];
+    if (s.char) images.push({ mimeType: s.char.mimeType, data: s.char.data });
     const { image } = await api(`/api/projects/${state.current.id}/swap`, {
-      method: 'POST',
-      body: JSON.stringify({ prompt: s.prompt, images: [{ mimeType: s.base.mimeType, data: s.base.data }, { mimeType: s.char.mimeType, data: s.char.data }] }),
+      method: 'POST', body: JSON.stringify({ prompt: s.prompt, images, model: s.model }),
     });
     results.querySelector('.gen-skel')?.remove();
     if (image) {
@@ -676,13 +687,13 @@ async function doSwap(body) {
       results.insertAdjacentHTML('afterbegin', imgCard(image));
       $$('.img-card', results).forEach(c => c.classList.add('gen-reveal'));
       wireImageCards(results);
-      toast('Swapped ✓ — saved to the Library');
+      toast('Done ✓ — saved to the Library');
     }
   } catch (e) {
     results.querySelector('.gen-skel')?.remove();
     toast(e.message, true);
   } finally {
-    const b = $('#swapBtn'); if (b) { b.disabled = false; b.textContent = '⇄ Swap character'; }
+    const b = $('#swapBtn'); if (b) { b.disabled = false; b.textContent = '⇄ Run'; }
   }
 }
 

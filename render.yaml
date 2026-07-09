@@ -23,6 +23,8 @@ services:
         sync: false
       - key: FAL_KEY                 # fal.ai key — powers the Swap tab (Flux Kontext). Optional.
         sync: false
+      - key: OPENAI_API_KEY          # OpenAI key — GPT Image fallback engine in the Swap tab. Optional.
+        sync: false
       # --- Google sign-in (Firebase). Set all of these to lock the app to 2 emails. ---
       - key: ALLOWED_EMAILS          # comma-separated: "you@gmail.com,liran@gmail.com"
         sync: false

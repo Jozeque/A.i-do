@@ -552,3 +552,9 @@ textarea.char-text { resize: vertical; min-height: 46px; line-height: 1.5; }
 .swap-arrow { color: var(--accent); font-size: 22px; flex: 0 0 auto; }
 .swap-prompt { width: 100%; min-height: 70px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; color: var(--ink); padding: 12px; font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 12px; box-sizing: border-box; }
 #swapResults { margin-top: 20px; }
+.swap-slot.opt .swap-slot-inner { border-style: dotted; }
+.swap-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.swap-model { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.swap-model .seg { background: var(--panel-2); color: var(--ink-dim); border: none; padding: 7px 14px; font-family: var(--mono); font-size: 12px; cursor: pointer; transition: background .15s, color .15s; }
+.swap-model .seg.on { background: var(--accent); color: #1a1206; font-weight: 700; }
+.swap-model .seg:disabled { color: var(--ink-faint); cursor: default; }
