@@ -548,7 +548,8 @@ async function openExpenses() {
 
 function renderExpenses(view, u) {
   const money = (n) => '$' + (n || 0).toFixed(2);
-  const nParts = state.expSplit || 2;
+  const split = state.expSplit || 2;   // number = equal ways; '1:2' = ⅓ · ⅔ split
+  const splitOpts = [{ v: '2', label: '2 · 50/50' }, { v: '1:2', label: '⅓ · ⅔' }, { v: '3', label: '3' }, { v: '4', label: '4' }, { v: '5', label: '5' }];
   const row = (b) => `<tr>
     <td>${escapeHtml(b.label)}</td>
     <td class="exp-num">${money(b.nb)}<span class="exp-sub">${b.nbImages} img</span></td>
@@ -566,7 +567,7 @@ function renderExpenses(view, u) {
       <div class="exp-card exp-hero">
         <div class="exp-card-label">All-time total</div>
         <div class="exp-card-num">${money(u.total.total)}</div>
-        <div class="exp-split">Split <select id="expSplit">${[2, 3, 4, 5].map(n => `<option value="${n}"${n === nParts ? ' selected' : ''}>${n}</option>`).join('')}</select> ways → <b>${money(u.total.total / nParts)}</b> each</div>
+        <div class="exp-split">Split <select id="expSplit">${splitOpts.map(o => `<option value="${o.v}"${String(split) === o.v ? ' selected' : ''}>${o.label}</option>`).join('')}</select> → ${split === '1:2' ? `⅓ <b>${money(u.total.total / 3)}</b> · ⅔ <b>${money(u.total.total * 2 / 3)}</b>` : `<b>${money(u.total.total / (parseInt(split, 10) || 2))}</b> each`}</div>
       </div>
       <div class="exp-card"><div class="exp-card-label">Nano Banana · Google</div><div class="exp-card-num">${money(u.total.nb)}</div><div class="exp-card-sub">${u.total.nbImages} images · exact</div></div>
       <div class="exp-card"><div class="exp-card-label">Swap / Edit · fal + OpenAI</div><div class="exp-card-num">${money(u.total.swap || 0)}</div><div class="exp-card-sub">${u.total.swapImages || 0} renders · est.</div></div>
@@ -581,7 +582,7 @@ function renderExpenses(view, u) {
       <tbody>${u.weeks.map(row).join('') || '<tr><td colspan="6" class="exp-empty">—</td></tr>'}</tbody></table>
     <p class="exp-note"><b>Nano Banana is exact</b> — billed per image by model + resolution. <b>Claude and Swap/Edit are estimated</b> (Claude from message sizes ±~15%; Swap ≈ $0.08 Flux / $0.21 GPT Image 2 per render). <b>Subscriptions</b> (ChatGPT Plus $20/mo) are fixed monthly costs added to each month since July 2026 — shown in months, not weeks. For invoices, check the Anthropic, Google AI Studio, fal.ai, and OpenAI dashboards.${u.cached ? ' · cached' : ''}</p>`;
   const sel = view.querySelector('#expSplit');
-  if (sel) sel.onchange = () => { state.expSplit = parseInt(sel.value, 10); renderExpenses(view, u); };
+  if (sel) sel.onchange = () => { state.expSplit = sel.value.includes(':') ? sel.value : parseInt(sel.value, 10); renderExpenses(view, u); };
 }
 
 async function renderShowcaseList() {
