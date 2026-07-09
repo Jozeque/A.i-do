@@ -502,3 +502,9 @@ textarea.char-text { resize: vertical; min-height: 46px; line-height: 1.5; }
 .exp-note { margin-top: 22px; font-size: 12px; line-height: 1.65; color: var(--ink-faint); max-width: 720px; }
 .exp-note b { color: var(--ink-dim); }
 @media (max-width: 720px) { .exp-cards { grid-template-columns: 1fr; } }
+
+/* "Send all N" — generate every NB Frames prompt at once, in parallel */
+.pc-sendall { margin: 2px 0 12px; }
+.gen-all { display: inline-flex; align-items: center; gap: 6px; background: var(--accent); color: #1a1206; border: none; border-radius: 8px; padding: 8px 16px; font-family: var(--mono); font-size: 13px; font-weight: 700; cursor: pointer; transition: filter .15s; }
+.gen-all:hover { filter: brightness(1.08); }
+.gen-all:disabled { opacity: .5; cursor: default; }

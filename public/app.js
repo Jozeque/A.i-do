@@ -877,6 +877,7 @@ function renderMessages(gemId) {
     setTimeout(() => b.textContent = 'copy', 1400);
   });
   $$('.gen-link', scroll).forEach(b => b.onclick = () => sendPromptToGenerator(b));
+  $$('.gen-all', scroll).forEach(b => b.onclick = () => sendAllToGenerator(b));
   $$('.reuse-prompt', scroll).forEach(b => b.onclick = () => reusePromptInComposer(b));
   $$('.msg-copy', scroll).forEach(b => b.onclick = () => copyUserBlock(b));
   scroll.scrollTop = nearBottom ? scroll.scrollHeight : prevTop;
@@ -941,6 +942,62 @@ function sendPromptToGenerator(btn) {
     renderRefImages();
     toast(added ? `Prompt + ${added} reference image${added > 1 ? 's' : ''} sent (generator reset).` : 'Prompt sent (generator reset).');
   }, 60);
+}
+
+// Generate ALL of an NB Frames output's prompts at once — one image per prompt, fired in
+// parallel — and drop the results into the Nano Banana 2 grid. One click instead of three.
+async function sendAllToGenerator(btn) {
+  let prompts = [], imgs = [];
+  try { prompts = JSON.parse(decodeURIComponent(btn.dataset.prompts || '%5B%5D')); } catch {}
+  try { imgs = JSON.parse(decodeURIComponent(btn.dataset.imgs || '%5B%5D')); } catch {}
+  prompts = prompts.filter(p => p && p.trim());
+  if (!prompts.length) return;
+  if (!state.config.hasGemini) { toast('Add your GEMINI_API_KEY to .env first.', true); return; }
+  if (state.generating) { toast('A generation is already running — wait for it to finish.', true); return; }
+
+  // The prompts share the ONE reference the frames were built from — resolve it once.
+  const refImages = [];
+  for (const im of imgs) {
+    try {
+      const blob = await (await mediaFetch(`/media/${state.current.id}/uploads/${im.file}`)).blob();
+      refImages.push({ mimeType: im.mimeType || blob.type || 'image/jpeg', data: await fileToB64(blob) });
+    } catch { /* skip a ref that can't be fetched */ }
+  }
+
+  switchTab('generate');
+  await new Promise(r => setTimeout(r, 0));   // let the generate tab paint
+  const aspectRatio = $('#genAR')?.value || undefined;
+  const grid = ensureGenGrid();
+  state.generating = true;
+  const t0 = Date.now();
+  grid.insertAdjacentHTML('afterbegin', prompts.map(() =>
+    '<div class="skeleton gen-skel"><div class="gen-load"><span class="spinner-lg"></span><span class="gen-load-label">Generating…</span><span class="gen-load-time">0s</span></div></div>'
+  ).join(''));
+  const genTimer = setInterval(() => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    $$('.gen-skel .gen-load-time', grid).forEach(el => el.textContent = s + 's');
+  }, 1000);
+
+  // Fire every prompt in parallel; each returns one image.
+  const jobs = prompts.map(prompt =>
+    api(`/api/projects/${state.current.id}/generate`, {
+      method: 'POST', body: JSON.stringify({ prompt, count: 1, aspectRatio, refImages, model: state.nbModel }),
+    }).then(r => r.images || []).catch(() => [])
+  );
+  const results = (await Promise.all(jobs)).flat();
+
+  clearInterval(genTimer);
+  $$('.gen-skel', grid).forEach(s => s.remove());
+  if (results.length) {
+    state.current.images = [...results.map(stripUrl), ...state.current.images];
+    grid.insertAdjacentHTML('afterbegin', results.map(imgCard).join(''));
+    $$('.img-card', grid).slice(0, results.length).forEach(c => c.classList.add('gen-reveal'));
+    wireImageCards(grid);
+    toast(`${results.length} of ${prompts.length} generated`);
+  } else {
+    toast('All generations failed — try again.', true);
+  }
+  state.generating = false;
 }
 
 function renderMsg(m, refImgs = []) {
@@ -1017,17 +1074,24 @@ function formatProse(seg, imgsAttr = '') {
   if (!seg.trim()) return '';
   const promptSplit = seg.split(/(?=PROMPT\s*\d\s*[—\-:])/g);
   if (promptSplit.length > 1) {
-    return promptSplit.map(chunk => {
+    const prompts = [];
+    const cards = promptSplit.map(chunk => {
       const m = chunk.match(/^\**PROMPT\s*\d\s*[—\-:].*$/m);
       if (!m) return chunk.replace(/[\s*]/g, '') ? inlineFmt(chunk) : '';   // skip stray "**"/blank chunks
       const headLine = m[0];
       const bodyText = chunk.replace(headLine, '').trim().replace(/^\*+|\*+$/g, '').trim();
+      prompts.push(bodyText);
       const enc = encodeURIComponent(bodyText);
       return `<div class="prompt-card"><div class="pc-head">${escapeHtml(headLine.replace(/\*+/g, '').replace(/^PROMPT\s*/i, 'Prompt '))}</div>` +
         `<pre style="margin:8px 14px"><button class="copy-block" data-text="${enc}">copy</button>${escapeHtml(bodyText)}</pre>` +
         `<div class="pc-actions"><button class="reuse-prompt" data-text="${enc}" ${imgsAttr}>↻ Reuse prompt</button>` +
         `<button class="gen-link" data-text="${enc}" ${imgsAttr}>⚡ Send to Nano Banana 2</button></div></div>`;
     }).join('');
+    // One click → generate ALL prompts at once (each prompt → one image), fired in parallel.
+    const sendAll = prompts.length > 1
+      ? `<div class="pc-sendall"><button class="gen-all" data-prompts="${encodeURIComponent(JSON.stringify(prompts))}" ${imgsAttr}>⚡ Send all ${prompts.length} to Nano Banana 2 →</button></div>`
+      : '';
+    return sendAll + cards;
   }
   return inlineFmt(seg);
 }
