@@ -58,6 +58,11 @@ const genai = process.env.GEMINI_API_KEY
   ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
   : null;
 
+// fal.ai — Flux Kontext for faithful character/subject swaps. Nano Banana is generative and
+// re-renders too much; Kontext is an in-context editor that preserves image 1 far better.
+// Raw HTTP (no SDK dep). Set FAL_KEY in .env / Render to enable the Swap tab.
+const FAL_KEY = process.env.FAL_KEY || '';
+
 // ── Gem system prompts (read fresh so you can edit them live) ────────────────
 const GEM_FILES = {
   'nb-frames': 'nb-frames.txt',
@@ -283,6 +288,7 @@ app.get('/api/health', (req, res) => {
     nb2Size: NB2_IMAGE_SIZE,
     hasAnthropic: !!anthropic,
     hasGemini: !!genai,
+    hasFal: !!FAL_KEY,
     authEnabled: authEnabled(),
     storage: storage.backend,
     data: data.backend,
@@ -655,6 +661,41 @@ app.post('/api/projects/:pid/generate', async (req, res) => {
     // can't clobber each other, so the old write-lock isn't needed here.
     for (const rec of recs) await data.addImage(req.params.pid, rec);
     res.json({ images: saved, errors });
+  } catch (e) {
+    res.status(500).json({ error: e?.message || String(e) });
+  }
+});
+
+// ── SWAP — Flux Kontext (fal.ai): put the character from image 2 into image 1, keep the rest ──
+// Nano Banana re-renders too much for this; Flux Kontext is an in-context editor that preserves
+// image 1 (pose, scene, lighting) and changes only the character. body: { prompt?, images:[...] }
+app.post('/api/projects/:pid/swap', async (req, res) => {
+  if (!FAL_KEY) return res.status(400).json({ error: 'FAL_KEY is not set. Add your fal.ai API key to .env (and Render) to enable Swap.' });
+  try {
+    const { prompt, images = [] } = req.body;
+    if (images.length < 2) return res.status(400).json({ error: 'Attach two images: image 1 (the base to keep) and image 2 (the new character).' });
+    const pid = req.params.pid;
+    const image_urls = images.map(im => `data:${sniffImageMime(im.data, im.mimeType)};base64,${im.data}`);
+    const instruction = (prompt && prompt.trim()) ||
+      'Replace the person in the first image with the character from the second image. Keep the first image exactly the same — the same pose, body position, framing, background, camera angle, and lighting — change only WHO the person is so they match the character in the second image. Seamless, photorealistic.';
+    // Flux Kontext [max] multi-image edit via fal.ai's sync endpoint (Kontext is fast).
+    const r = await fetch('https://fal.run/fal-ai/flux-pro/kontext/max/multi', {
+      method: 'POST',
+      headers: { Authorization: `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: instruction, image_urls, safety_tolerance: '5' }),
+    });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok || !out.images?.length) {
+      return res.status(502).json({ error: `Flux Kontext failed: ${out.detail || out.error || JSON.stringify(out).slice(0, 200)}` });
+    }
+    const first = out.images[0];
+    const imgResp = await fetch(first.url);
+    const buf = Buffer.from(await imgResp.arrayBuffer());
+    const imgId = id();
+    const { file: fname } = await storage.saveImage(pid, imgId, buf, first.content_type || 'image/jpeg');
+    const rec = { id: imgId, prompt: instruction, file: fname, createdAt: Date.now(), favorite: false, note: '', model: 'flux-kontext-max', size: null, refs: [] };
+    await data.addImage(pid, rec);
+    res.json({ image: { ...rec, url: `/media/${pid}/images/${fname}` } });
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });
   }

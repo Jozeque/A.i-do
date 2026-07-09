@@ -620,9 +620,70 @@ function switchTab(tab) {
   body.innerHTML = '';
   if (tab === 'generate') renderGenerate(body);
   else if (tab === 'characters') renderCharacters(body);
+  else if (tab === 'swap') renderSwap(body);
   else if (tab === 'library') renderLibrary(body);
   else renderChat(body, tab);
   restoreDrafts();                               // restore the incoming tab's text inputs
+}
+
+// ── Swap tab: Flux Kontext (fal.ai) character swap — keep image 1, replace only the character ──
+function renderSwap(body) {
+  const s = state.swap || (state.swap = { base: null, char: null, prompt: '' });
+  const slot = (which, im, label) => `<label class="swap-slot" data-which="${which}">
+    <input type="file" accept="image/*" hidden />
+    <div class="swap-slot-inner">${im ? `<img src="${im.preview}" />` : `<span>＋ ${label}</span>`}</div>
+    ${im ? `<button class="swap-clear" data-which="${which}" title="Remove">×</button>` : ''}
+  </label>`;
+  const noKey = !(state.config && state.config.hasFal);
+  body.innerHTML = `
+    <div class="swap-panel">
+      <p class="field-label">Character swap — put the character from <b>image 2</b> into <b>image 1</b>, keeping image 1's pose, scene, framing, and lighting. Powered by <b>Flux Kontext</b> (fal.ai) — far more faithful than Nano Banana for this.</p>
+      ${noKey ? '<div class="swap-nokey">⚠ Swap needs a fal.ai key. Add <code>FAL_KEY</code> to your .env (and Render), then reload.</div>' : ''}
+      <div class="swap-slots">
+        ${slot('base', s.base, 'Image 1 — base (keep this)')}
+        <div class="swap-arrow">⇄</div>
+        ${slot('char', s.char, 'Image 2 — new character')}
+      </div>
+      <textarea id="swapPrompt" class="swap-prompt" placeholder="Optional — leave blank to keep image 1 identical and only change who the character is. Or describe the swap in your own words.">${escapeHtml(s.prompt || '')}</textarea>
+      <button class="new-project-btn" id="swapBtn"${noKey ? ' disabled' : ''}>⇄ Swap character</button>
+      <div id="swapResults" class="results-grid"></div>
+    </div>`;
+  $$('.swap-slot input', body).forEach(inp => inp.onchange = async (e) => {
+    const which = e.target.closest('.swap-slot').dataset.which;
+    const f = e.target.files[0]; if (!f) return;
+    state.swap[which] = { data: await fileToB64(f), mimeType: f.type || 'image/jpeg', preview: URL.createObjectURL(f) };
+    renderSwap(body);
+  });
+  $$('.swap-clear', body).forEach(b => b.onclick = (e) => { e.preventDefault(); state.swap[b.dataset.which] = null; renderSwap(body); });
+  const pt = $('#swapPrompt', body); if (pt) pt.oninput = () => { state.swap.prompt = pt.value; };
+  const btn = $('#swapBtn', body); if (btn && !noKey) btn.onclick = () => doSwap(body);
+}
+
+async function doSwap(body) {
+  const s = state.swap;
+  if (!s.base || !s.char) { toast('Attach both images — image 1 (base) and image 2 (new character).', true); return; }
+  const btn = $('#swapBtn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Swapping…';
+  const results = $('#swapResults');
+  results.insertAdjacentHTML('afterbegin', '<div class="skeleton gen-skel"><div class="gen-load"><span class="spinner-lg"></span><span class="gen-load-label">Swapping…</span></div></div>');
+  try {
+    const { image } = await api(`/api/projects/${state.current.id}/swap`, {
+      method: 'POST',
+      body: JSON.stringify({ prompt: s.prompt, images: [{ mimeType: s.base.mimeType, data: s.base.data }, { mimeType: s.char.mimeType, data: s.char.data }] }),
+    });
+    results.querySelector('.gen-skel')?.remove();
+    if (image) {
+      state.current.images = [stripUrl(image), ...(state.current.images || [])];
+      results.insertAdjacentHTML('afterbegin', imgCard(image));
+      $$('.img-card', results).forEach(c => c.classList.add('gen-reveal'));
+      wireImageCards(results);
+      toast('Swapped ✓ — saved to the Library');
+    }
+  } catch (e) {
+    results.querySelector('.gen-skel')?.remove();
+    toast(e.message, true);
+  } finally {
+    const b = $('#swapBtn'); if (b) { b.disabled = false; b.textContent = '⇄ Swap character'; }
+  }
 }
 
 // Per-tab draft persistence: any composer/prompt input marked [data-draft] is remembered

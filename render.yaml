@@ -21,6 +21,8 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: FAL_KEY                 # fal.ai key — powers the Swap tab (Flux Kontext). Optional.
+        sync: false
       # --- Google sign-in (Firebase). Set all of these to lock the app to 2 emails. ---
       - key: ALLOWED_EMAILS          # comma-separated: "you@gmail.com,liran@gmail.com"
         sync: false
