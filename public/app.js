@@ -22,12 +22,32 @@ const api = async (url, opts = {}) => {
   if (!r.ok) throw new Error(data.error || `Request failed (${r.status})`);
   return data;
 };
-const fileToB64 = (file) => new Promise((res, rej) => {
+// Read a file as base64. USER-UPLOADED images are downscaled (<=1568px) and re-encoded to JPEG,
+// so oversized or HEIC/odd-format references don't 400 the APIs (Anthropic caps images at 5 MB
+// and only accepts JPEG/PNG/GIF/WebP) or bloat the request. Blobs (already-valid server images
+// being re-attached) pass through raw. The server's sniffImageMime corrects the media type.
+const rawFileToB64 = (file) => new Promise((res, rej) => {
   const fr = new FileReader();
   fr.onload = () => res(fr.result.split(',')[1]);
   fr.onerror = rej;
   fr.readAsDataURL(file);
 });
+const imgFileToB64 = (file, maxDim = 1568, quality = 0.9) => new Promise((resolve, reject) => {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    resolve(c.toDataURL('image/jpeg', quality).split(',')[1]);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Couldn't read this image — if it's an iPhone HEIC photo, export it as JPEG or PNG first.")); };
+  img.src = url;
+});
+const fileToB64 = (file) =>
+  (file instanceof File && (file.type || '').startsWith('image/')) ? imgFileToB64(file) : rawFileToB64(file);
 // Pull image files out of a clipboard paste event (returns [] if none).
 const filesFromPaste = (e) => {
   const out = [];
