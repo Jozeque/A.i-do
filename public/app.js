@@ -854,6 +854,8 @@ function renderChat(body, gemId) {
   };
 
   // attachments
+  state.current.chats = state.current.chats || {};
+  state.current.chats[gemId] = state.current.chats[gemId] || [];   // a brand-new gem has no chat doc yet
   state.attachments[gemId] = state.attachments[gemId] || [];
   $('#attachBtn').onclick = () => $('#fileInput').click();
   $('#fileInput').onchange = async (e) => {
@@ -1340,6 +1342,8 @@ async function sendChat(gemId) {
 
   // optimistic user msg (keep a reference so we can fill in saved image refs from the response)
   const userMsg = { role: 'user', content: text || '(image)', hadImages: atts.length > 0, at: Date.now() };
+  state.current.chats = state.current.chats || {};
+  state.current.chats[gemId] = state.current.chats[gemId] || [];   // guard: new gem (no Firestore doc yet)
   state.current.chats[gemId].push(userMsg);
   renderMessages(gemId);
   ta.value = ''; ta.style.height = 'auto';
