@@ -91,6 +91,7 @@ const GEM_META = {
   'kling': { name: 'Kling Prompter', blurb: 'Attach your still + describe the motion. Returns <b>3</b> Kling 3.0 video prompts (fidelity / physics / cinematic).' },
   'kling-advisor': { name: 'Kling Advisor', blurb: 'Describe your source clip + the change you want. Returns the best Kling 3.0 Omni <b>video-to-video</b> prompt (restyle / relight / transform) with why &amp; what to watch.' },
   'nb-advisor': { name: 'NB Advisor', blurb: 'Attach image(s) + say what to change. Returns the best Nano Banana 2 edit prompt with a quick rationale.' },
+  'gpt-advisor': { name: 'GPT Advisor', blurb: 'Say what you want — a swap, an edit, or a new image — and attach reference(s). Returns the best <b>GPT Image 2 (ChatGPT)</b> prompt, tuned to keep your frame\'s look &amp; color.' },
 };
 
 // Suggestion lists for the NB Frames per-project cinematography builder (datalists; free text still allowed).
@@ -288,7 +289,7 @@ const state = {
   config: null,
   projects: [],
   current: null,        // full project object
-  activeTab: (['nb-frames','characters','kling','kling-advisor','nb-advisor','generate','library'].includes(localStorage.getItem('avs:lastTab')) ? localStorage.getItem('avs:lastTab') : 'nb-frames'),
+  activeTab: (['nb-frames','characters','kling','kling-advisor','nb-advisor','gpt-advisor','swap','generate','library'].includes(localStorage.getItem('avs:lastTab')) ? localStorage.getItem('avs:lastTab') : 'nb-frames'),
   attachments: {},      // per-gem: array of {name, mimeType, data, url}
   refImages: [],        // for generate panel
   klingMode: localStorage.getItem('avs:klingMode') || 'single',  // 'single' (3 variations) | 'multi' (multi-shot)
@@ -918,6 +919,7 @@ function chatPlaceholder(gemId) {
     'kling': 'Describe the motion you want from the attached still…',
     'kling-advisor': 'Describe your source clip + how to restyle / transform it…',
     'nb-advisor': 'What do you want to change in the attached image?',
+    'gpt-advisor': 'Describe the swap / edit / image you want (attach the frame + any reference)…',
   }[gemId];
 }
 
@@ -959,7 +961,7 @@ async function favoriteToAttachment(im) {
 }
 
 // Drag an image card (from NB2 results / Library) onto a tab button to attach it there.
-const DROP_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor', 'generate', 'swap'];
+const DROP_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor', 'gpt-advisor', 'generate', 'swap'];
 async function urlToAttachment(url) {
   const blob = await (await mediaFetch(url)).blob();
   const data = await fileToB64(blob);

@@ -73,6 +73,7 @@ const GEM_FILES = {
   'kling': 'kling.txt',
   'kling-advisor': 'kling-advisor.txt',
   'nb-advisor': 'nb-advisor.txt',
+  'gpt-advisor': 'gpt-advisor.txt',
 };
 async function readGem(gemId) {
   const file = GEM_FILES[gemId];

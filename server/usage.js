@@ -29,7 +29,7 @@ const tok = (s) => Math.round((s || '').length / 4);
 const GEM_FILES = {
   'nb-frames': ['nb-frames.txt', 'cinematography-kit.txt'],
   'kling': ['kling.txt'], 'kling-advisor': ['kling-advisor.txt'],
-  'nb-advisor': ['nb-advisor.txt'], 'character-builder': ['character-builder.txt'],
+  'nb-advisor': ['nb-advisor.txt'], 'gpt-advisor': ['gpt-advisor.txt'], 'character-builder': ['character-builder.txt'],
 };
 let _sysTok = null;
 async function gemSysTokens() {
