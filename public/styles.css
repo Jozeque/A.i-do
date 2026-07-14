@@ -282,7 +282,8 @@ select:focus { border-color: var(--accent); }
 }
 .img-card:hover { transform: translateY(-2px); border-color: var(--ink-faint); }
 .img-card .imgwrap { aspect-ratio: 1; background: var(--bg); overflow: hidden; cursor: zoom-in; position: relative; }
-.fav-badge { position: absolute; top: 8px; right: 8px; z-index: 2; display: none; width: 26px; height: 26px; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,0,0,.55); color: var(--gold); font-size: 15px; line-height: 1; text-shadow: 0 0 8px rgba(255,207,69,.65); pointer-events: none; backdrop-filter: blur(2px); }
+.fav-badge { position: absolute; top: 8px; right: 8px; z-index: 2; display: none; width: 26px; height: 26px; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,0,0,.55); color: var(--gold); font-size: 15px; line-height: 1; text-shadow: 0 0 8px rgba(255,207,69,.65); cursor: pointer; backdrop-filter: blur(2px); transition: background .12s, color .12s, transform .12s; }
+.fav-badge:hover { background: rgba(217,75,61,.9); color: #fff; text-shadow: none; transform: scale(1.08); }
 .img-card.favorited .fav-badge { display: flex; }
 .img-card .imgwrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .img-card .card-foot { padding: 9px 11px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }

@@ -1807,7 +1807,7 @@ function paintGenResults() {
 // ── image card (shared by generate + library) ───────────────────────────────────
 function imgCard(im) {
   return `<div class="img-card${im.favorite ? ' favorited' : ''}" data-id="${im.id}">
-    <div class="imgwrap"><img src="${im.url}" loading="lazy" data-prompt="${encodeURIComponent(im.prompt)}" /><div class="fav-badge" title="Favorite">★</div></div>
+    <div class="imgwrap"><img src="${im.url}" loading="lazy" data-prompt="${encodeURIComponent(im.prompt)}" /><div class="fav-badge" title="Remove from favorites">★</div></div>
     <div class="card-foot">
       <span class="when">${timeAgo(im.createdAt)}</span>
       <div class="card-actions">
@@ -1838,13 +1838,17 @@ function wireImageCards(scope) {
       const idx = imgs.indexOf(card.querySelector('img'));
       openLightbox(list, idx < 0 ? 0 : idx);
     };
-    card.querySelector('.fav').onclick = async (e) => {
-      const on = !e.currentTarget.classList.contains('on');
-      await api(`/api/projects/${state.current.id}/images/${imgId}`, { method: 'PATCH', body: JSON.stringify({ favorite: on }) });
-      e.currentTarget.classList.toggle('on', on);
+    const setFav = async (on) => {
+      try { await api(`/api/projects/${state.current.id}/images/${imgId}`, { method: 'PATCH', body: JSON.stringify({ favorite: on }) }); }
+      catch (err) { toast(err.message || 'Could not update favorite.', true); return; }
+      card.querySelector('.fav')?.classList.toggle('on', on);
       card.classList.toggle('favorited', on);   // show/hide the on-image gold star badge
       const rec = state.current.images.find(x => x.id === imgId); if (rec) rec.favorite = on;
+      if (!on && libFilter === 'fav' && card.closest('.library-panel')) card.remove();   // drop out of the Favorites view
     };
+    card.querySelector('.fav').onclick = (e) => { e.stopPropagation(); setFav(!e.currentTarget.classList.contains('on')); };
+    const favBadge = card.querySelector('.fav-badge');
+    if (favBadge) favBadge.onclick = (e) => { e.stopPropagation(); setFav(false); };   // tap the gold badge to un-favorite
     card.querySelector('.del').onclick = async () => {
       if (!confirm('Delete this image?')) return;
       await api(`/api/projects/${state.current.id}/images/${imgId}`, { method: 'DELETE' });
