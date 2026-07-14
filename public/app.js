@@ -1120,6 +1120,20 @@ function sendPromptToGenerator(btn) {
 // "Send all N": first open a REVIEW popup so the user can verify / edit the reference
 // image(s) the frames will generate with — then fire them all in parallel.
 let _sendAll = null;
+let _saPickerOpen = false;
+// Reference images already used anywhere in this project (deduped, newest-first) — pickable in the Send-all popup.
+function recentProjectRefs() {
+  const seen = new Set(), out = [];
+  for (const img of (state.current?.images || [])) {
+    for (const r of (img.refs || [])) {
+      const file = r.file || (r.url ? r.url.split('/').pop() : null);
+      if (!file || seen.has(file)) continue;
+      seen.add(file);
+      out.push({ file, mimeType: r.mimeType || 'image/jpeg', thumbUrl: r.url || `/media/${state.current.id}/uploads/${file}` });
+    }
+  }
+  return out.slice(0, 24);
+}
 function sendAllToGenerator(btn) {
   let prompts = [], imgs = [];
   try { prompts = JSON.parse(decodeURIComponent(btn.dataset.prompts || '%5B%5D')); } catch {}
@@ -1130,6 +1144,7 @@ function sendAllToGenerator(btn) {
   // Working reference set: the frames' own reference(s) + anything the user adds in the popup.
   const refs = imgs.map(im => ({ mimeType: im.mimeType || 'image/jpeg', file: im.file, thumbUrl: `/media/${state.current.id}/uploads/${im.file}` }));
   _sendAll = { prompts, refs };
+  _saPickerOpen = false;
   renderSendAllModal();
 }
 
@@ -1137,6 +1152,7 @@ function renderSendAllModal() {
   if (!_sendAll) return;
   const { prompts, refs } = _sendAll;
   const nm = state.nbModel || 'nb2';
+  const recentRefs = recentProjectRefs();
   let modal = $('#sendAllModal');
   if (!modal) { modal = document.createElement('div'); modal.id = 'sendAllModal'; modal.className = 'modal-overlay'; document.body.appendChild(modal); }
   const thumbs = refs.length
@@ -1147,7 +1163,15 @@ function renderSendAllModal() {
       <div class="modal-head"><h3>Send all ${prompts.length} to Nano Banana ${nm === 'pro' ? 'Pro' : '2'}</h3><button class="modal-x" id="saCancel">✕</button></div>
       <p class="modal-sub">These ${prompts.length} frames will generate with the reference(s) below. Remove any that are wrong, or add the right one, then generate.</p>
       <div class="sa-refs">${thumbs}</div>
-      <label class="sa-add">＋ Add reference image<input type="file" id="saFile" accept="image/*" multiple hidden /></label>
+      <div class="sa-addwrap">
+        <button class="sa-add" id="saAddBtn" type="button">＋ Add reference</button>
+        <div class="sa-picker ${_saPickerOpen ? '' : 'hidden'}" id="saPicker">
+          <label class="sa-pick-upload">⬆ Upload from device<input type="file" id="saFile" accept="image/*" multiple hidden /></label>
+          ${recentRefs.length
+            ? `<div class="sa-pick-head">Recent references in this project</div><div class="sa-pick-grid">${recentRefs.map((r, i) => `<button class="sa-pick-thumb${_sendAll.refs.some(x => x.file === r.file) ? ' picked' : ''}" type="button" data-ri="${i}" title="Use this reference"><img src="${r.thumbUrl}" loading="lazy" /></button>`).join('')}</div>`
+            : `<div class="sa-pick-empty">No recent references in this project yet — upload one above.</div>`}
+        </div>
+      </div>
       <div class="sa-model">
         <span class="sa-model-lbl">Model</span>
         <div class="mode-toggle" id="saModelToggle" title="NB2 = fast, ~half the cost. NB Pro = max fidelity for faces / identity / jewelry, up to 4K (~2× cost).">
@@ -1161,12 +1185,19 @@ function renderSendAllModal() {
       </div>
     </div>`;
   modal.classList.remove('hidden');
-  const close = () => { modal.classList.add('hidden'); _sendAll = null; };
+  const close = () => { modal.classList.add('hidden'); _sendAll = null; _saPickerOpen = false; };
   $('#saCancel', modal).onclick = close;
   $('#saCancel2', modal).onclick = close;
   modal.onclick = (e) => { if (e.target === modal) close(); };
   $$('.sa-ref-x', modal).forEach(b => b.onclick = () => { _sendAll.refs.splice(+b.dataset.i, 1); renderSendAllModal(); });
   $$('#saModelToggle .seg', modal).forEach(b => b.onclick = () => { state.nbModel = b.dataset.model; try { localStorage.setItem('avs:nbModel', state.nbModel); } catch {} renderSendAllModal(); });
+  $('#saAddBtn', modal).onclick = () => { _saPickerOpen = !_saPickerOpen; $('#saPicker', modal).classList.toggle('hidden', !_saPickerOpen); };
+  $$('.sa-pick-thumb', modal).forEach(b => b.onclick = () => {
+    const r = recentRefs[+b.dataset.ri];
+    if (r && !_sendAll.refs.some(x => x.file === r.file)) _sendAll.refs.push({ mimeType: r.mimeType, file: r.file, thumbUrl: r.thumbUrl });
+    _saPickerOpen = true;
+    renderSendAllModal();
+  });
   $('#saFile', modal).onchange = async (e) => {
     for (const f of e.target.files) {
       try { _sendAll.refs.push({ mimeType: f.type || 'image/jpeg', data: await fileToB64(f), thumbUrl: URL.createObjectURL(f) }); } catch {}
