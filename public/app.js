@@ -1121,6 +1121,23 @@ function sendPromptToGenerator(btn) {
 // image(s) the frames will generate with — then fire them all in parallel.
 let _sendAll = null;
 let _saPickerOpen = false;
+let _saPasteWired = false;
+// Paste an image (Ctrl/⌘V) directly into the open Send-all popup → add it as a reference.
+function wireSendAllPaste() {
+  if (_saPasteWired) return; _saPasteWired = true;
+  document.addEventListener('paste', async (e) => {
+    const modal = $('#sendAllModal');
+    if (!_sendAll || !modal || modal.classList.contains('hidden')) return;   // only while the popup is open
+    const files = filesFromPaste(e);
+    if (!files.length) return;
+    e.preventDefault();
+    for (const f of files) {
+      try { _sendAll.refs.push({ mimeType: f.type || 'image/png', data: await fileToB64(f), thumbUrl: URL.createObjectURL(f) }); } catch {}
+    }
+    renderSendAllModal();
+    toast(`Reference image${files.length > 1 ? 's' : ''} pasted.`);
+  });
+}
 // Reference images already used anywhere in this project (deduped, newest-first) — pickable in the Send-all popup.
 function recentProjectRefs() {
   const seen = new Set(), out = [];
@@ -1161,7 +1178,7 @@ function renderSendAllModal() {
   modal.innerHTML = `
     <div class="modal-card">
       <div class="modal-head"><h3>Send all ${prompts.length} to Nano Banana ${nm === 'pro' ? 'Pro' : '2'}</h3><button class="modal-x" id="saCancel">✕</button></div>
-      <p class="modal-sub">These ${prompts.length} frames will generate with the reference(s) below. Remove any that are wrong, or add the right one, then generate.</p>
+      <p class="modal-sub">These ${prompts.length} frames will generate with the reference(s) below. Remove any that are wrong, add another, or paste (Ctrl/⌘V) one straight in — then generate.</p>
       <div class="sa-refs">${thumbs}</div>
       <div class="sa-addwrap">
         <button class="sa-add" id="saAddBtn" type="button">＋ Add reference</button>
@@ -1186,6 +1203,7 @@ function renderSendAllModal() {
     </div>`;
   modal.classList.remove('hidden');
   const close = () => { modal.classList.add('hidden'); _sendAll = null; _saPickerOpen = false; };
+  wireSendAllPaste();   // paste (Ctrl/⌘V) a reference directly into the open popup
   $('#saCancel', modal).onclick = close;
   $('#saCancel2', modal).onclick = close;
   modal.onclick = (e) => { if (e.target === modal) close(); };
