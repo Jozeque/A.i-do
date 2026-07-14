@@ -1136,6 +1136,7 @@ function sendAllToGenerator(btn) {
 function renderSendAllModal() {
   if (!_sendAll) return;
   const { prompts, refs } = _sendAll;
+  const nm = state.nbModel || 'nb2';
   let modal = $('#sendAllModal');
   if (!modal) { modal = document.createElement('div'); modal.id = 'sendAllModal'; modal.className = 'modal-overlay'; document.body.appendChild(modal); }
   const thumbs = refs.length
@@ -1143,10 +1144,17 @@ function renderSendAllModal() {
     : `<div class="sa-none">No reference attached — the ${prompts.length} frames will generate from the prompt text alone. Add one below if they should use a reference.</div>`;
   modal.innerHTML = `
     <div class="modal-card">
-      <div class="modal-head"><h3>Send all ${prompts.length} to Nano Banana 2</h3><button class="modal-x" id="saCancel">✕</button></div>
+      <div class="modal-head"><h3>Send all ${prompts.length} to Nano Banana ${nm === 'pro' ? 'Pro' : '2'}</h3><button class="modal-x" id="saCancel">✕</button></div>
       <p class="modal-sub">These ${prompts.length} frames will generate with the reference(s) below. Remove any that are wrong, or add the right one, then generate.</p>
       <div class="sa-refs">${thumbs}</div>
       <label class="sa-add">＋ Add reference image<input type="file" id="saFile" accept="image/*" multiple hidden /></label>
+      <div class="sa-model">
+        <span class="sa-model-lbl">Model</span>
+        <div class="mode-toggle" id="saModelToggle" title="NB2 = fast, ~half the cost. NB Pro = max fidelity for faces / identity / jewelry, up to 4K (~2× cost).">
+          <button class="seg ${nm === 'nb2' ? 'active' : ''}" data-model="nb2" type="button">NB2 · fast</button>
+          <button class="seg ${nm === 'pro' ? 'active' : ''}" data-model="pro" type="button">NB&nbsp;Pro · max fidelity</button>
+        </div>
+      </div>
       <div class="modal-actions">
         <button class="modal-btn ghost" id="saCancel2">Cancel</button>
         <button class="modal-btn accent" id="saGo">⚡ Generate ${prompts.length} →</button>
@@ -1158,6 +1166,7 @@ function renderSendAllModal() {
   $('#saCancel2', modal).onclick = close;
   modal.onclick = (e) => { if (e.target === modal) close(); };
   $$('.sa-ref-x', modal).forEach(b => b.onclick = () => { _sendAll.refs.splice(+b.dataset.i, 1); renderSendAllModal(); });
+  $$('#saModelToggle .seg', modal).forEach(b => b.onclick = () => { state.nbModel = b.dataset.model; try { localStorage.setItem('avs:nbModel', state.nbModel); } catch {} renderSendAllModal(); });
   $('#saFile', modal).onchange = async (e) => {
     for (const f of e.target.files) {
       try { _sendAll.refs.push({ mimeType: f.type || 'image/jpeg', data: await fileToB64(f), thumbUrl: URL.createObjectURL(f) }); } catch {}

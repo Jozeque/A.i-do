@@ -536,6 +536,8 @@ textarea.char-text { resize: vertical; min-height: 46px; line-height: 1.5; }
 .sa-none { color: var(--ink-faint); font-size: 13px; line-height: 1.5; background: var(--panel-2); border: 1px dashed var(--line); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
 .sa-add { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--ink-dim); font-size: 13px; border: 1px dashed var(--line); border-radius: 8px; padding: 8px 14px; transition: color .15s, border-color .15s; }
 .sa-add:hover { color: var(--accent); border-color: var(--accent); }
+.sa-model { display: flex; align-items: center; gap: 12px; margin: 2px 0 4px; }
+.sa-model-lbl { font-size: 13px; color: var(--ink-dim); font-family: var(--mono); letter-spacing: .04em; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 .modal-btn { border: none; border-radius: 8px; padding: 9px 18px; font-family: var(--mono); font-size: 13px; font-weight: 700; cursor: pointer; }
 .modal-btn.ghost { background: var(--panel-2); color: var(--ink-dim); border: 1px solid var(--line); }
