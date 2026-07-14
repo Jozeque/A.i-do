@@ -1806,8 +1806,8 @@ function paintGenResults() {
 
 // ── image card (shared by generate + library) ───────────────────────────────────
 function imgCard(im) {
-  return `<div class="img-card" data-id="${im.id}">
-    <div class="imgwrap"><img src="${im.url}" loading="lazy" data-prompt="${encodeURIComponent(im.prompt)}" /></div>
+  return `<div class="img-card${im.favorite ? ' favorited' : ''}" data-id="${im.id}">
+    <div class="imgwrap"><img src="${im.url}" loading="lazy" data-prompt="${encodeURIComponent(im.prompt)}" /><div class="fav-badge" title="Favorite">★</div></div>
     <div class="card-foot">
       <span class="when">${timeAgo(im.createdAt)}</span>
       <div class="card-actions">
@@ -1842,6 +1842,7 @@ function wireImageCards(scope) {
       const on = !e.currentTarget.classList.contains('on');
       await api(`/api/projects/${state.current.id}/images/${imgId}`, { method: 'PATCH', body: JSON.stringify({ favorite: on }) });
       e.currentTarget.classList.toggle('on', on);
+      card.classList.toggle('favorited', on);   // show/hide the on-image gold star badge
       const rec = state.current.images.find(x => x.id === imgId); if (rec) rec.favorite = on;
     };
     card.querySelector('.del').onclick = async () => {
