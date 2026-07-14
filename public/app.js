@@ -1426,6 +1426,26 @@ async function sendChat(gemId) {
 }
 
 // ── GENERATE panel (Nano Banana 2) ──────────────────────────────────────────────
+let _genPasteWired = false;
+// Paste an image ANYWHERE on the Nano Banana 2 tab (not only in the prompt box) → add as a reference.
+function wireGenPaste() {
+  if (_genPasteWired) return; _genPasteWired = true;
+  document.addEventListener('paste', async (e) => {
+    if (state.activeTab !== 'generate') return;
+    const files = filesFromPaste(e);
+    if (!files.length) return;   // text-only paste → let it land in the prompt box
+    e.preventDefault();
+    const text = e.clipboardData.getData('text');
+    const gp = $('#genPrompt');
+    if (text && gp) insertAtCursor(gp, text);   // pasted text + reference image(s) together
+    for (const f of files) {
+      const data = await fileToB64(f);
+      state.refImages.push({ name: f.name || 'pasted.png', mimeType: f.type, data, url: URL.createObjectURL(f) });
+    }
+    renderRefImages();
+    toast(`Reference image${files.length > 1 ? 's' : ''} pasted.`);
+  });
+}
 function renderGenerate(body) {
   const nm = state.nbModel || 'nb2';
   const panel = document.createElement('div');
@@ -1509,19 +1529,7 @@ function renderGenerate(body) {
   };
   const gp = $('#genPrompt');
   gp.oninput = () => { gp.style.height = 'auto'; gp.style.height = Math.max(gp.scrollHeight, 200) + 'px'; };
-  gp.addEventListener('paste', async (e) => {
-    const files = filesFromPaste(e);
-    if (!files.length) return;
-    e.preventDefault();
-    const text = e.clipboardData.getData('text');
-    if (text) insertAtCursor(gp, text);              // prompt text + reference image(s) together
-    for (const f of files) {
-      const data = await fileToB64(f);
-      state.refImages.push({ name: f.name || 'pasted.png', mimeType: f.type, data, url: URL.createObjectURL(f) });
-    }
-    renderRefImages();
-    toast('Pasted prompt + reference image.');
-  });
+  wireGenPaste();   // paste an image anywhere on the tab (not only in the prompt box) → reference
   $('#genBtn').onclick = doGenerate;
   $$('#nbModelToggle .seg').forEach(b => b.onclick = () => {
     state.nbModel = b.dataset.model;
