@@ -295,6 +295,7 @@ const state = {
   klingMode: localStorage.getItem('avs:klingMode') || 'single',  // 'single' (3 variations) | 'multi' (multi-shot)
   nbModel: localStorage.getItem('avs:nbModel') || 'nb2',         // 'nb2' (flash) | 'pro' (Nano Banana Pro)
   genAR: localStorage.getItem('avs:genAR') ?? '16:9',            // generator aspect ratio — defaults to 16:9, remembers last pick
+  expSplit: localStorage.getItem('avs:expSplit') || 3,           // expense split — defaults to 3 ways, remembers last pick
 };
 
 // ── boot ──────────────────────────────────────────────────────────────────────
@@ -549,7 +550,7 @@ async function openExpenses() {
 
 function renderExpenses(view, u) {
   const money = (n) => '$' + (n || 0).toFixed(2);
-  const split = state.expSplit || 2;   // number = equal ways; '1:2' = ⅓ · ⅔ split
+  const split = state.expSplit || 3;   // number = equal ways; '1:2' = ⅓ · ⅔ split
   const splitOpts = [{ v: '2', label: '2 · 50/50' }, { v: '1:2', label: '⅓ · ⅔' }, { v: '3', label: '3' }, { v: '4', label: '4' }, { v: '5', label: '5' }];
   const row = (b) => `<tr>
     <td>${escapeHtml(b.label)}</td>
@@ -557,6 +558,7 @@ function renderExpenses(view, u) {
     <td class="exp-num">${money(b.swap || 0)}<span class="exp-sub">${b.swapImages || 0} swap</span></td>
     <td class="exp-num">${money(b.claude)}<span class="exp-sub">${b.claudeCalls} calls</span></td>
     <td class="exp-num">${b.sub ? money(b.sub) : '—'}</td>
+    <td class="exp-num">${b.credits ? money(b.credits) : '—'}</td>
     <td class="exp-num exp-tot">${money(b.total)}</td></tr>`;
   const claudePct = u.total.total ? Math.round((u.total.claude / u.total.total) * 100) : 0;
   view.innerHTML = `
@@ -574,16 +576,17 @@ function renderExpenses(view, u) {
       <div class="exp-card"><div class="exp-card-label">Swap / Edit · fal + OpenAI</div><div class="exp-card-num">${money(u.total.swap || 0)}</div><div class="exp-card-sub">${u.total.swapImages || 0} renders · est.</div></div>
       <div class="exp-card"><div class="exp-card-label">Claude · Anthropic</div><div class="exp-card-num">${money(u.total.claude)}</div><div class="exp-card-sub">${u.total.claudeCalls} prompts · est.</div></div>
       <div class="exp-card"><div class="exp-card-label">Subscriptions</div><div class="exp-card-num">${money(u.total.sub || 0)}</div><div class="exp-card-sub">ChatGPT Plus · $20/mo</div></div>
+      <div class="exp-card"><div class="exp-card-label">Extra credits</div><div class="exp-card-num">${money(u.total.credits || 0)}</div><div class="exp-card-sub">one-off top-ups</div></div>
     </div>
     <h2 class="exp-h2">By month</h2>
-    <table class="exp-table"><thead><tr><th>Month</th><th>Nano Banana</th><th>Swap/Edit</th><th>Claude</th><th>Subs</th><th>Total</th></tr></thead>
-      <tbody>${u.months.map(row).join('') || '<tr><td colspan="6" class="exp-empty">No usage yet.</td></tr>'}</tbody></table>
+    <table class="exp-table"><thead><tr><th>Month</th><th>Nano Banana</th><th>Swap/Edit</th><th>Claude</th><th>Subs</th><th>Credits</th><th>Total</th></tr></thead>
+      <tbody>${u.months.map(row).join('') || '<tr><td colspan="7" class="exp-empty">No usage yet.</td></tr>'}</tbody></table>
     <h2 class="exp-h2">Recent weeks</h2>
-    <table class="exp-table"><thead><tr><th>Week</th><th>Nano Banana</th><th>Swap/Edit</th><th>Claude</th><th>Subs</th><th>Total</th></tr></thead>
-      <tbody>${u.weeks.map(row).join('') || '<tr><td colspan="6" class="exp-empty">—</td></tr>'}</tbody></table>
-    <p class="exp-note"><b>Nano Banana is exact</b> — billed per image by model + resolution. <b>Claude and Swap/Edit are estimated</b> (Claude from message sizes ±~15%; Swap ≈ $0.08 Flux / $0.21 GPT Image 2 per render). <b>Subscriptions</b> (ChatGPT Plus $20/mo) are fixed monthly costs added to each month since July 2026 — shown in months, not weeks. For invoices, check the Anthropic, Google AI Studio, fal.ai, and OpenAI dashboards.${u.cached ? ' · cached' : ''}</p>`;
+    <table class="exp-table"><thead><tr><th>Week</th><th>Nano Banana</th><th>Swap/Edit</th><th>Claude</th><th>Subs</th><th>Credits</th><th>Total</th></tr></thead>
+      <tbody>${u.weeks.map(row).join('') || '<tr><td colspan="7" class="exp-empty">—</td></tr>'}</tbody></table>
+    <p class="exp-note"><b>Nano Banana is exact</b> — billed per image by model + resolution. <b>Claude and Swap/Edit are estimated</b> (Claude from message sizes ±~15%; Swap ≈ $0.08 Flux / $0.21 GPT Image 2 per render). <b>Subscriptions</b> (ChatGPT Plus $20/mo) are fixed monthly costs added to each month since July 2026 — shown in months, not weeks. <b>Extra credits</b> are one-off prepaid top-ups, added to the month they were bought (months only). For invoices, check the Anthropic, Google AI Studio, fal.ai, and OpenAI dashboards.${u.cached ? ' · cached' : ''}</p>`;
   const sel = view.querySelector('#expSplit');
-  if (sel) sel.onchange = () => { state.expSplit = sel.value.includes(':') ? sel.value : parseInt(sel.value, 10); renderExpenses(view, u); };
+  if (sel) sel.onchange = () => { state.expSplit = sel.value.includes(':') ? sel.value : parseInt(sel.value, 10); try { localStorage.setItem('avs:expSplit', sel.value); } catch {} renderExpenses(view, u); };
 }
 
 async function renderShowcaseList() {

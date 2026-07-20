@@ -49,6 +49,10 @@ const SWAP_PRICE = { flux: 0.08, gptimage: 0.06, gptimage2: 0.22 };
 // Fixed recurring subscriptions tracked in Expenses (NOT API usage). `since` = first month billed
 // (YYYY-MM). Added to every month from `since` to the current month so the monthly split includes them.
 const SUBSCRIPTIONS = [{ name: 'ChatGPT Plus', monthly: 20, since: '2026-07' }];
+// One-off costs tied to a SINGLE month — not recurring, not per-image API usage (e.g. a prepaid
+// API credit top-up bought that month). `month` = YYYY-MM; added once, to that month only. To log
+// another top-up later, just add a line here.
+const ADJUSTMENTS = [{ label: 'Extra credits', amount: 105, month: '2026-07' }];
 const isSwapModel = (model) => /flux|gpt-image/.test(model || '');
 const imageCost = (model, size) => {
   const m = model || '';
@@ -71,7 +75,7 @@ export async function computeUsage(data, claudeModel) {
   const sysTok = await gemSysTokens();
   const rate = CLAUDE[claudeModel] || CLAUDE._default;
   const months = new Map(), weeks = new Map();
-  const mk = () => ({ claude: 0, nb: 0, swap: 0, sub: 0, claudeCalls: 0, nbImages: 0, swapImages: 0 });
+  const mk = () => ({ claude: 0, nb: 0, swap: 0, sub: 0, credits: 0, claudeCalls: 0, nbImages: 0, swapImages: 0 });
   const total = mk();
   const addM = (ts, f) => { const k = mKey(ts); let b = months.get(k); if (!b) { b = mk(); b.key = k; b.label = mLabel(k); b.sort = k; months.set(k, b); } f(b); };
   const addW = (ts, f) => { const w = weekStartTs(ts); let b = weeks.get(w); if (!b) { b = mk(); b.key = String(w); b.label = wLabel(w); b.sort = w; weeks.set(w, b); } f(b); };
@@ -117,7 +121,13 @@ export async function computeUsage(data, claudeModel) {
       if (++m > 12) { m = 1; y++; }
     }
   }
-  const round = (b) => ({ key: b.key, label: b.label, claude: +b.claude.toFixed(4), nb: +b.nb.toFixed(4), swap: +b.swap.toFixed(4), sub: +b.sub.toFixed(4), total: +(b.claude + b.nb + b.swap + b.sub).toFixed(4), claudeCalls: b.claudeCalls, nbImages: b.nbImages, swapImages: b.swapImages });
+  // One-off adjustments (credit top-ups, etc.) — add once to their month only (like subs, not weeks).
+  for (const a of ADJUSTMENTS) {
+    const [y, m] = a.month.split('-').map(Number);
+    addM(new Date(y, m - 1, 15).getTime(), b => { b.credits += a.amount; });
+    total.credits += a.amount;
+  }
+  const round = (b) => ({ key: b.key, label: b.label, claude: +b.claude.toFixed(4), nb: +b.nb.toFixed(4), swap: +b.swap.toFixed(4), sub: +b.sub.toFixed(4), credits: +(b.credits || 0).toFixed(4), total: +(b.claude + b.nb + b.swap + b.sub + (b.credits || 0)).toFixed(4), claudeCalls: b.claudeCalls, nbImages: b.nbImages, swapImages: b.swapImages });
   return {
     total: round({ ...total, key: 'all', label: 'All-time' }),
     months: [...months.values()].sort((a, b) => (a.sort < b.sort ? 1 : -1)).map(round),
