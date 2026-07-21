@@ -83,10 +83,9 @@
     border-bottom-color: var(--line);
   }
   .nav { display: flex; align-items: center; justify-content: space-between; height: 74px; }
-  .brand {
-    font-family: var(--sans); font-weight: 600; font-size: 1.12rem;
-    text-transform: uppercase; letter-spacing: .34em; color: var(--bone); padding-left: .34em;
-  }
+  .brand { display: inline-flex; align-items: center; color: var(--bone); }
+  .brand .wordmark { height: 33px; width: auto; display: block; }
+  .foot-brand .wordmark { height: 39px; }
   .nav-right { display: flex; align-items: center; gap: 38px; }
   .nav-links { display: flex; align-items: center; gap: 34px; }
   .nav-links a.link {
@@ -272,6 +271,18 @@
 </style>
 </head>
 <body>
+<!-- SHYOW wordmark (Threefold Y) — defined once, used in the nav + footer. -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute;overflow:hidden">
+  <symbol id="shyow-wordmark" viewBox="0 0 1200 260">
+    <path fill="currentColor" d="M240 97.5A36 36 0 1 0 204 133.5L204 126.5A29 29 0 1 1 233 97.5ZM168 162.5A36 36 0 1 0 204 126.5L204 133.5A29 29 0 1 1 175 162.5Z"/>
+    <path fill="currentColor" d="M330 65H337V195H330ZM415 65H422V195H415ZM337 126.5H415V133.5H337Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M560 195L560 107L536 107L536 195ZM553 199L553 124L543 124L543 199Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M487.51 68.49L543.05 124.02L560.02 107.05L504.49 51.51ZM489.64 60.71L535.98 107.05L543.05 99.98L496.71 53.64Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M591.51 51.51L535.98 107.05L552.95 124.02L608.49 68.49ZM599.29 53.64L552.95 99.98L560.02 107.05L606.36 60.71Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M688 130A64 65 0 1 1 816 130A64 65 0 1 1 688 130ZM695 130A57 58 0 1 1 809 130A57 58 0 1 1 695 130Z"/>
+    <path fill="currentColor" d="M878.64 65.97L916.14 195.97L922.86 194.03L885.36 64.03ZM922.86 195.97L960.36 65.97L953.64 64.03L916.14 194.03ZM953.64 65.97L991.14 195.97L997.86 194.03L960.36 64.03ZM997.86 195.97L1035.36 65.97L1028.64 64.03L991.14 194.03Z"/>
+  </symbol>
+</svg>
 <!-- ════════════════════════════════════════════════════════════════════
      SHYOW — landing page (single page).
      • Work grid: auto-populated from the studio Showcase (GET /api/showcase);
@@ -282,7 +293,7 @@
 
 <header id="hdr">
   <div class="wrap nav">
-    <a class="brand" href="#top" aria-label="Shyow — home">Shyow</a>
+    <a class="brand" href="#top" aria-label="Shyow — home"><svg class="wordmark" viewBox="0 0 1200 260" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
     <div class="nav-right">
       <nav class="nav-links" id="navlinks" aria-label="Primary">
         <a class="link" href="#work">Work</a>
@@ -504,7 +515,7 @@
 <footer>
   <div class="wrap foot">
     <div class="foot-brand">
-      <a class="brand" href="#top" aria-label="Shyow — home">Shyow</a>
+      <a class="brand" href="#top" aria-label="Shyow — home"><svg class="wordmark" viewBox="0 0 1200 260" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
       <div class="foot-tag">Films, built differently.</div>
     </div>
     <div class="foot-links">
