@@ -101,7 +101,7 @@ Studio statement, without individual profiles.)
 - **Real work / media:** the Selected Work grid shows neutral placeholder frames
   (format categories only — no fabricated client names) until real films are added via the
   app's Showcase tab (`/api/showcase`), which then auto-populates the grid.
-- **Contact email domain:** the page uses `hello@shyow.studio` to match the corrected
-  brand name. Confirm this mailbox/domain is registered and receiving, or update it.
+- **Contact:** email was removed at the client's request — WhatsApp is the sole contact
+  channel (contact-section button + footer link).
 - **Client logos:** `client-2.png` and `client-3.png` use generic alt text ("Client logo")
   pending confirmation of the correct, approved client names.
