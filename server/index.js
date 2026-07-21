@@ -101,6 +101,21 @@ async function readGemWithKit(gemId) {
 // ── Per-project cinematography builder for NB Frames ─────────────────────────
 // Structured fields the user fills per project; compiled into the gem override
 // text that is appended to the base NB Frames gem at chat time.
+//
+// Standing block prepended to EVERY compiled direction so every tuned project inherits the same
+// subject-fidelity + scope discipline automatically (the generalized version of what was hand-written
+// into the PANDORA-ACTION extra). This is what keeps outputs loyal to the reference and free of
+// unrequested subjects, independent of — and above — the look fields.
+const FIDELITY_SCOPE_BLOCK = `SUBJECT FIDELITY & SCOPE — the top priority for this project, above the look direction below. (For a surgical face swap or composite edit, ignore this whole block, exactly as the base gem says — a transplant must stay minimal so the model does not re-render the frame.)
+
+WHO IS IN THE SHOT — read this first. Include only the people the brief names or the attached reference image(s) actually show. If the reference is an empty location, an establishing plate, or a product with no person in it — and the brief does not ask for one — render a SCENE-ONLY frame: just the environment in the project look, with NO invented subject, and do not mention one. Never insert the subject into a shot where they are not attached or requested, and never pad the frame with unrequested people. The identity and realism locks below apply ONLY to frames that actually contain the subject.
+
+IDENTITY LOCK — when a real referenced subject is in the shot. Bind them to the attached reference image(s): keep their face, bone structure, skin tone, eye colour, hair, and any signature jewelry, accessories, or wardrobe the reference shows IDENTICAL — piece for piece, same design and placement — and never redesign, restyle, rearrange, add, remove, or beautify a feature or a piece. Say it plainly, e.g. "keep the subject's face and everything they are wearing exactly as in the reference images — do not redesign or restyle anything."
+
+PRESERVATION, NOT INVENTION — the anti-drift rule. Keep the subject's REAL skin exactly as the reference shows it: the real pores, texture, fine lines, uneven tone, marks and flaws — never smoothed, airbrushed, retouched, or idealised, so they read as a photographed human, not a polished CG render. But this is PRESERVATION: carry that texture over FROM the reference; do NOT spell out generic pore, subsurface-scattering, or catchlight detail as things to render — cataloguing the face that way makes the model re-invent its OWN version of the subject. Hold the line: KEEP the real skin and flaws from the reference — yes; DESCRIBE how to draw the face from scratch — no.
+
+Spend the prompt's detail only on what is genuinely NEW — the scene, environment, pose, action, gesture, and framing. The look, grade, lighting, and grain notes below set the IMAGE and the scene, never a licence to re-render the subject's face or skin. Run identity-critical frames on Nano Banana Pro at 2K, not NB2.`;
+
 function compileNbFramesDirection(b) {
   if (!b || typeof b !== 'object') return '';
   const v = (x) => (x && String(x).trim()) ? String(x).trim() : '';
@@ -119,6 +134,8 @@ function compileNbFramesDirection(b) {
   // family of RANGES (never the fixed settings of one reference frame), so it stays modular
   // across the different shots, subjects, and frame sizes the user will ask for later.
   const out = [];
+  out.push(FIDELITY_SCOPE_BLOCK);
+  out.push('');
   out.push('PROJECT LOOK DIRECTION — apply this to every frame generated for this project.');
   out.push('');
   out.push(
