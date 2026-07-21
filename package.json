@@ -11,13 +11,11 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@google/genai": "^2.7.0",
-    "aws4fetch": "^1.0.20",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "firebase-admin": "^13.0.0",
     "googleapis": "^144.0.0",
     "jimp": "^1.6.1",
-    "multer": "^1.4.5-lts.1",
-    "sharp": "^0.35.3"
+    "multer": "^1.4.5-lts.1"
   }
 }

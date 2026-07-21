@@ -9,8 +9,7 @@ services:
   - type: web
     name: ai-video-studio
     runtime: node
-    plan: starter              # always-on ($7/mo). Free spins the whole service down after
-                               # ~15 min idle → 30–60s cold start on the next visit (app + landing).
+    plan: free                 # upgrade to "starter" ($7/mo) for always-on (no sleep)
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
@@ -53,19 +52,6 @@ services:
         sync: false
       - key: DRIVE_ROOT_FOLDER       # the Drive folder media lives under
         value: AI Video Studio
-      # --- Cloudflare R2: public showcase videos + posters on a real CDN (free egress, HTTP
-      #     range). Set all five to move portfolio playback off the Drive proxy. If any is
-      #     unset, showcase falls back to Drive automatically. ---
-      - key: R2_ACCOUNT_ID
-        sync: false
-      - key: R2_ACCESS_KEY_ID
-        sync: false
-      - key: R2_SECRET_ACCESS_KEY
-        sync: false
-      - key: R2_BUCKET               # e.g. "sheyo-showcase"
-        sync: false
-      - key: R2_PUBLIC_BASE_URL      # e.g. https://pub-xxxx.r2.dev (or a custom CDN domain)
-        sync: false
       # --- interim fallback gate, only used if the Firebase vars above are NOT set ---
       - key: APP_USER         # username for the password gate (e.g. "studio")
         sync: false
