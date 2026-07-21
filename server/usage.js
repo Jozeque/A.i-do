@@ -48,11 +48,17 @@ async function gemSysTokens() {
 const SWAP_PRICE = { flux: 0.08, gptimage: 0.06, gptimage2: 0.22 };
 // Fixed recurring subscriptions tracked in Expenses (NOT API usage). `since` = first month billed
 // (YYYY-MM). Added to every month from `since` to the current month so the monthly split includes them.
-const SUBSCRIPTIONS = [{ name: 'ChatGPT Plus', monthly: 20, since: '2026-07' }];
+const SUBSCRIPTIONS = [
+  { name: 'ChatGPT Plus', monthly: 20, since: '2026-07' },
+  { name: 'Render', monthly: 25, since: '2026-07' },
+];
 // One-off costs tied to a SINGLE month — not recurring, not per-image API usage (e.g. a prepaid
 // API credit top-up bought that month). `month` = YYYY-MM; added once, to that month only. To log
 // another top-up later, just add a line here.
-const ADJUSTMENTS = [{ label: 'Extra credits', amount: 105, month: '2026-07' }];
+const ADJUSTMENTS = [
+  { label: 'Extra credits', amount: 105, month: '2026-07' }, // 1st July top-up
+  { label: 'Extra credits', amount: 105, month: '2026-07' }, // 2nd July top-up
+];
 const isSwapModel = (model) => /flux|gpt-image/.test(model || '');
 const imageCost = (model, size) => {
   const m = model || '';
