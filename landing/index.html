@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Shyow — Independent Cinematic AI Production Lab</title>
-<meta name="description" content="Shyow is an independent production lab creating directed, designed and finished films for brands and agencies — broadcast-ready work, built with a proprietary AI production system." />
+<title>Shyow · Cinematic AI Production Lab</title>
+<meta name="description" content="Shyow is a production lab creating directed, designed and finished films for brands and agencies. Broadcast-ready work, built with a proprietary AI production system." />
 <meta name="theme-color" content="#0A0A0B" />
-<meta property="og:title" content="Shyow — Independent Cinematic AI Production Lab" />
+<meta property="og:title" content="Shyow · Cinematic AI Production Lab" />
 <meta property="og:description" content="Directed by filmmakers. Powered by a proprietary AI production system. Finished for the real world." />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Shyow" />
@@ -24,7 +24,7 @@
     --faint:    #74736E;
     --line:      rgba(238,236,229,.13);
     --line-soft: rgba(238,236,229,.07);
-    --signal:   #FF4F2E;   /* used sparingly — numbers, markers, hover, dividers */
+    --signal:   #FF4F2E;   /* used sparingly - numbers, markers, hover, dividers */
     --maxw: 1240px;
     --pad: clamp(20px, 5vw, 64px);
     --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
@@ -55,7 +55,7 @@
   }
   .eyebrow::before { content: ""; width: 26px; height: 1px; background: var(--signal); flex: none; }
 
-  /* ── buttons — flat, sharp, editorial (no glow / no big radius) ── */
+  /* ── buttons - flat, sharp, editorial (no glow / no big radius) ── */
   .btn {
     display: inline-flex; align-items: center; gap: 10px;
     font-family: var(--mono); font-size: .74rem; text-transform: uppercase; letter-spacing: .16em;
@@ -101,13 +101,13 @@
   .menu-btn { display: none; background: none; border: 0; color: var(--bone); cursor: pointer; padding: 8px; }
   .menu-btn svg { width: 26px; height: 26px; }
 
-  /* ── hero — footage-led, film-title treatment ── */
+  /* ── hero - footage-led, film-title treatment ── */
   .hero {
     position: relative; min-height: 100vh; min-height: 100svh; display: flex; align-items: flex-end;
     padding: 140px 0 clamp(56px, 9vh, 104px); overflow: hidden;
   }
   .hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; pointer-events: none; }
-  /* subtle legibility scrim only — footage stays visible */
+  /* subtle legibility scrim only - footage stays visible */
   .hero-scrim {
     position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background: linear-gradient(180deg, rgba(10,10,11,.60) 0%, rgba(10,10,11,.26) 34%, rgba(10,10,11,.40) 68%, rgba(10,10,11,.88) 100%);
@@ -137,7 +137,7 @@
   .section-head p { margin-top: 20px; color: var(--silver); font-size: 1.08rem; max-width: 56ch; }
   .rule { height: 1px; background: var(--line); }
 
-  /* ── brand statement — editorial manifesto ── */
+  /* ── brand statement - editorial manifesto ── */
   .statement { padding: clamp(96px, 17vh, 190px) 0; }
   .statement .wrap { max-width: 1040px; }
   .statement h2 {
@@ -181,7 +181,7 @@
   .work-title { font-family: var(--serif); font-size: clamp(1.15rem, 2vw, 1.5rem); line-height: 1.1; }
   .work-meta { font-family: var(--mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .12em; color: var(--faint); }
 
-  /* ── clients — quiet credibility strip ── */
+  /* ── clients - quiet credibility strip ── */
   .clients { padding: clamp(58px, 9vh, 104px) 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
   .clients .eyebrow { display: flex; justify-content: center; }
   .clients-row {
@@ -195,7 +195,7 @@
   .clients-row img:hover { opacity: .82; }
   .clients-row img.sq { height: 50px; }
 
-  /* ── process — numbered pipeline, flat rows ── */
+  /* ── process - numbered pipeline, flat rows ── */
   .process-list { border-top: 1px solid var(--line); }
   .step {
     display: grid; grid-template-columns: auto 1fr; gap: clamp(20px, 5vw, 72px);
@@ -206,7 +206,7 @@
   .step-body h3 { font-family: var(--serif); font-size: clamp(1.35rem, 2.6vw, 2rem); line-height: 1.08; }
   .step-body p { color: var(--silver); font-size: 1.04rem; max-width: 52ch; }
 
-  /* ── capabilities — flat hairline grid ── */
+  /* ── capabilities - flat hairline grid ── */
   .caps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
   .cap { background: var(--obsidian); padding: clamp(30px, 4vw, 52px); }
   .cap-no { font-family: var(--mono); font-size: .72rem; color: var(--signal); letter-spacing: .1em; }
@@ -271,7 +271,7 @@
 </style>
 </head>
 <body>
-<!-- SHYOW wordmark (Threefold Y) — defined once, used in the nav + footer. -->
+<!-- SHYOW wordmark (Threefold Y) - defined once, used in the nav + footer. -->
 <svg width="0" height="0" aria-hidden="true" style="position:absolute;overflow:hidden">
   <symbol id="shyow-wordmark" viewBox="0 0 1200 260">
     <path fill="currentColor" d="M240 97.5A36 36 0 1 0 204 133.5L204 126.5A29 29 0 1 1 233 97.5ZM168 162.5A36 36 0 1 0 204 126.5L204 133.5A29 29 0 1 1 175 162.5Z"/>
@@ -284,7 +284,7 @@
   </symbol>
 </svg>
 <!-- ════════════════════════════════════════════════════════════════════
-     SHYOW — landing page (single page).
+     SHYOW - landing page (single page).
      • Work grid: auto-populated from the studio Showcase (GET /api/showcase);
        the neutral placeholder frames below show only until real films are added.
      • WhatsApp number: set WA_NUMBER in the <script> at the bottom (one place).
@@ -293,7 +293,7 @@
 
 <header id="hdr">
   <div class="wrap nav">
-    <a class="brand" href="#top" aria-label="Shyow — home"><svg class="wordmark" viewBox="0 0 1200 260" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
+    <a class="brand" href="#top" aria-label="Shyow home"><svg class="wordmark" viewBox="0 0 1200 260" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
     <div class="nav-right">
       <nav class="nav-links" id="navlinks" aria-label="Primary">
         <a class="link" href="#work">Work</a>
@@ -343,12 +343,12 @@
       <span class="eyebrow reveal">The Studio</span>
       <h2 class="reveal" style="margin-top:26px"><span class="dim">We don&rsquo;t make AI content.</span><br>We make films.</h2>
       <div class="body reveal">
-        <p>Technology is part of our production system — not the idea itself. Every project is directed, designed, controlled, edited and finished by senior filmmakers.</p>
+        <p>Technology is part of our production system, not the idea itself. Every project is directed, designed, controlled, edited and finished by senior filmmakers.</p>
         <p>From the first creative decision to the final master, every frame is built to serve the film.</p>
       </div>
       <div class="sig reveal">
         <b>Directed by filmmakers · Powered by a proprietary AI production system · Finished for the real world.</b><br>
-        Direction · AI visual production · Post — three disciplines, one production room.
+        Direction · AI visual production · Post: three disciplines, one production room.
       </div>
     </div>
   </section>
@@ -361,7 +361,7 @@
         <h2>Films, worlds and campaign visuals, built from brief to final frame.</h2>
       </div>
       <div class="work-grid" id="workGrid">
-        <!-- Neutral placeholder frames — replaced by real films from /api/showcase once uploaded. -->
+        <!-- Neutral placeholder frames - replaced by real films from /api/showcase once uploaded. -->
         <article class="work feature reveal">
           <div class="work-frame">
             <div class="poster" style="background:#141319"></div>
@@ -515,7 +515,7 @@
 <footer>
   <div class="wrap foot">
     <div class="foot-brand">
-      <a class="brand" href="#top" aria-label="Shyow — home"><svg class="wordmark" viewBox="0 0 1200 260" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
+      <a class="brand" href="#top" aria-label="Shyow home"><svg class="wordmark" viewBox="0 0 1200 260" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
       <div class="foot-tag">Films, built differently.</div>
     </div>
     <div class="foot-links">
@@ -527,8 +527,8 @@
 
 <script>
   // ── ONE place to set your WhatsApp number (international format, digits only, no +) ──
-  const WA_NUMBER = "972523993994";          // Shyow — +972 52-399-3994
-  const WA_TEXT = "Hi Shyow — I'd like to talk about a production.";
+  const WA_NUMBER = "972523993994";          // Shyow - +972 52-399-3994
+  const WA_TEXT = "Hi Shyow, I'd like to talk about a production.";
   const waHref = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(WA_TEXT)}`;
   document.querySelectorAll('[data-wa]').forEach(a => { a.href = waHref; a.target = "_blank"; a.rel = "noopener"; });
 
