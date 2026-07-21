@@ -472,8 +472,13 @@
       card.className = 'card reveal in' + (i === 0 ? ' feature' : '');
       const v = document.createElement('video');
       v.className = 'poster';
-      Object.assign(v, { src: it.url, muted: true, loop: true, playsInline: true, preload: 'metadata' });
-      Object.assign(v.style, { objectFit: 'cover', width: '100%', height: '100%' });
+      // preload="none" + a poster still = the grid shows instant thumbnails and fetches ZERO
+      // video bytes until you interact. The video src is attached lazily on first hover/click,
+      // then streams from the CDN (Cloudflare R2) with proper HTTP range — starts fast, seeks.
+      Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none' });
+      if (it.poster) v.poster = it.poster;
+      Object.assign(v.style, { objectFit: 'cover', width: '100%', height: '100%', background: '#17151f' });
+      const ensureSrc = () => { if (!v.getAttribute('src')) v.setAttribute('src', it.url); };
       const play = document.createElement('span');
       play.className = 'play';
       play.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
@@ -483,9 +488,10 @@
       meta.querySelector('h3').textContent = it.title || 'Untitled';
       meta.querySelector('.tag').textContent = it.caption || '';
       card.append(v, play, meta);
-      card.addEventListener('mouseenter', () => v.play().catch(() => {}));
-      card.addEventListener('mouseleave', () => { v.pause(); v.currentTime = 0; });
+      card.addEventListener('mouseenter', () => { ensureSrc(); v.play().catch(() => {}); });
+      card.addEventListener('mouseleave', () => { v.pause(); });
       card.addEventListener('click', () => {
+        ensureSrc();
         v.muted = false;
         (v.requestFullscreen || v.webkitRequestFullscreen || (() => {})).call(v);
         v.play().catch(() => {});
