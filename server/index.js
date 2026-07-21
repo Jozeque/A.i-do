@@ -261,6 +261,16 @@ if (authEnabled()) {
   console.log('  🔒 Shared-password protection ON (APP_PASSWORD set)');
 }
 
+// ── Marketing domain vs. the app ───────────────────────────────────────────────
+// The public landing page is the ROOT of the marketing domain (shyow.io / www); the
+// platform (app shell) is served on every OTHER host — app.shyow.io, the onrender URL,
+// and localhost. Override the landing-host list with LANDING_HOSTS if the domain changes.
+const LANDING_HOSTS = (process.env.LANDING_HOSTS || 'shyow.io,www.shyow.io')
+  .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+const isLandingHost = (req) => LANDING_HOSTS.includes((req.hostname || '').toLowerCase());
+// On the marketing domain the root serves the landing page instead of the app shell.
+app.get('/', (req, res, next) => (isLandingHost(req) ? res.sendFile(path.join(LANDING_DIR, 'index.html')) : next()));
+
 // Never cache the app shell (index.html / app.js / styles.css) so UI updates always load.
 app.use(express.static(PUBLIC_DIR, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-store') }));
 // Public A.I-Duo landing page (marketing + portfolio) — served at /landing, no login.
@@ -983,7 +993,7 @@ app.delete('/api/projects/:pid/images/:imgId', async (req, res) => {
 });
 
 // ── SPA fallback ───────────────────────────────────────────────────────────────
-app.get('*', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+app.get('*', (req, res) => res.sendFile(path.join(isLandingHost(req) ? LANDING_DIR : PUBLIC_DIR, 'index.html')));
 
 app.listen(PORT, () => {
   console.log(`\n  AI Video Studio running →  http://localhost:${PORT}\n`);
