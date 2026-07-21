@@ -9,7 +9,7 @@ services:
   - type: web
     name: ai-video-studio
     runtime: node
-    plan: free                 # upgrade to "starter" ($7/mo) for always-on (no sleep)
+    plan: starter                 # Starter: always-on, no sleep (~$7/mo). Must match the dashboard instance type.
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
