@@ -359,18 +359,31 @@ app.get('/api/showcase', async (req, res) => {
   try { res.json(await showcase.list({ publishedOnly: true })); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.post('/api/showcase', uploadVideo.single('video'), async (req, res) => {
+app.post('/api/showcase', uploadVideo.fields([{ name: 'video', maxCount: 1 }, { name: 'poster', maxCount: 1 }]), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No video file uploaded.' });
+    const vid = req.files?.video?.[0];
+    if (!vid) return res.status(400).json({ error: 'No video file uploaded.' });
+    const poster = req.files?.poster?.[0];   // small JPEG captured in the browser (optional)
     const sid = `${slug(req.body?.title || 'video')}-${id().slice(0, 6)}`;
     const item = await showcase.add({
       id: sid,
       title: req.body?.title || '',
       caption: req.body?.caption || '',
-      buffer: req.file.buffer,
-      mimeType: req.file.mimetype,
+      buffer: vid.buffer,
+      mimeType: vid.mimetype,
+      posterBuffer: poster?.buffer || null,
+      posterMime: poster?.mimetype || null,
       createdAt: Date.now(),
     });
+    res.json(item);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Backfill a CDN poster for an existing showcase video (captured client-side, since the
+// server can't extract a video frame). Gated like the other admin writes.
+app.post('/api/showcase/:sid/poster', upload.single('poster'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No poster uploaded.' });
+    const item = await showcase.setPoster(req.params.sid, req.file.buffer, req.file.mimetype);
     res.json(item);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

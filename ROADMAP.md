@@ -154,6 +154,18 @@ nobody can burn your API credits). Google login is natural since the storage is 
   this volume. Storage sits behind a `storage` interface, so if Drive ever feels clunky we can swap
   to Cloudflare R2 / S3 with no app rewrite.
 
+> **Update (2026-07-18) — public portfolio video moved to a CDN.** The Drive tradeoff bit
+> exactly where predicted: the public landing page proxied every showcase video out of Drive
+> through Render (no CDN, and the proxy had no HTTP-range support), so the portfolio was slow to
+> load and videos were slow to start / couldn't scrub. **Showcase videos + poster thumbnails now
+> live in Cloudflare R2** (`server/r2.js`, gated by the `R2_*` env vars) and stream straight from
+> Cloudflare's edge — free egress, range built in. Posters are captured client-side at upload (a
+> canvas frame → JPEG; no server ffmpeg) and the grid is now poster-first + lazy (`preload="none"`,
+> src attached on hover) so it shows instant thumbnails and fetches no video bytes until you play.
+> **Only the public showcase moved; generated images + uploads stay on Drive** (small, cached, and
+> the point of the 2 TB). If `R2_*` is unset the app falls back to the Drive proxy unchanged.
+> One-time move of already-uploaded clips: `scripts/migrate-showcase-to-r2.js`.
+
 **Metadata — Supabase Postgres (free tier).** Project list, image/video records, prompts, favorites,
 gem settings — moved out of `project.json` files into a real DB so two people can use it at once
 without file conflicts. (Supabase also gives us the Google login, so it's one vendor for auth + DB.)

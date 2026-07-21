@@ -599,21 +599,74 @@ async function renderShowcaseList() {
     const card = document.createElement('div');
     card.className = 'sc-card';
     card.innerHTML = `
-      <video src="${it.url}" muted loop playsinline preload="metadata"></video>
+      <video muted loop playsinline preload="none"></video>
       <div class="sc-card-meta"><div class="sc-card-title"></div><div class="sc-card-cap"></div></div>
       <button class="sc-del" title="Remove">✕</button>`;
     card.querySelector('.sc-card-title').textContent = it.title || 'Untitled';
     card.querySelector('.sc-card-cap').textContent = it.caption || '';
     const v = card.querySelector('video');
-    card.addEventListener('mouseenter', () => v.play().catch(() => {}));
-    card.addEventListener('mouseleave', () => { v.pause(); v.currentTime = 0; });
+    v.style.background = '#17151f';               // panel tone until the poster/frame paints
+    if (it.poster) v.poster = it.poster;
+    const ensureSrc = () => { if (!v.getAttribute('src')) v.setAttribute('src', it.url); };
+    card.addEventListener('mouseenter', () => { ensureSrc(); v.play().catch(() => {}); });
+    card.addEventListener('mouseleave', () => { v.pause(); });
     card.querySelector('.sc-del').addEventListener('click', async () => {
       if (!confirm('Remove this video from the showcase?')) return;
       try { await api(`/api/showcase/${it.id}`, { method: 'DELETE' }); await renderShowcaseList(); }
       catch (e) { toast('Delete failed: ' + e.message); }
     });
     list.appendChild(card);
+    // Existing R2 video with no poster → grab one from the CDN in the background (best-effort).
+    if (it.storage === 'r2' && !it.poster) backfillPoster(it);
   }
+}
+
+// Grab a downscaled JPEG poster frame from a video — entirely in the browser (no server
+// ffmpeg). `src` is either a File (a new upload) or a URL string (backfill from the CDN).
+// Resolves to a Blob, or null if a frame can't be captured (e.g. a cross-origin video with
+// no CORS headers taints the canvas) — callers treat the poster as optional.
+function captureVideoPoster(src, { maxW = 1280 } = {}) {
+  return new Promise((resolve) => {
+    let settled = false, objectUrl = null;
+    const finish = (blob) => {
+      if (settled) return; settled = true;
+      if (objectUrl) { try { URL.revokeObjectURL(objectUrl); } catch {} }
+      resolve(blob);
+    };
+    const v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.preload = 'auto';
+    if (typeof src === 'string') { v.crossOrigin = 'anonymous'; v.src = src; }
+    else { try { objectUrl = URL.createObjectURL(src); } catch { return finish(null); } v.src = objectUrl; }
+    v.onloadeddata = () => {
+      const t = Math.min(1, Math.max(0, (v.duration || 2) * 0.25));  // a touch in — skips black lead-in
+      v.onseeked = () => {
+        try {
+          const scale = Math.min(1, maxW / (v.videoWidth || maxW));
+          const c = document.createElement('canvas');
+          c.width = Math.max(2, Math.round((v.videoWidth || maxW) * scale));
+          c.height = Math.max(2, Math.round((v.videoHeight || Math.round(maxW * 9 / 16)) * scale));
+          c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+          c.toBlob((b) => finish(b), 'image/jpeg', 0.82);   // null on a CORS-tainted canvas
+        } catch { finish(null); }
+      };
+      try { v.currentTime = t; } catch { v.onseeked(); }
+    };
+    v.onerror = () => finish(null);
+    setTimeout(() => finish(null), 8000);   // never hang the upload on a stubborn file
+  });
+}
+
+// Best-effort: an existing R2 video with no poster — capture a frame from the CDN video and
+// upload it. Needs the R2 bucket to send CORS headers; if the canvas is tainted this quietly
+// no-ops (the video still plays, just without a still preview until it's re-uploaded).
+async function backfillPoster(it) {
+  try {
+    const blob = await captureVideoPoster(it.url);
+    if (!blob) return;
+    const fd = new FormData();
+    fd.append('poster', blob, 'poster.jpg');
+    await fetch(`/api/showcase/${it.id}/poster`, { method: 'POST', headers: await authHeader(), body: fd });
+  } catch { /* best-effort */ }
 }
 
 async function uploadShowcase(e) {
@@ -621,10 +674,13 @@ async function uploadShowcase(e) {
   const file = $('#scFile').files[0];
   if (!file) return;
   const status = $('#scStatus'), btn = $('#scUpload');
-  status.textContent = 'Uploading…'; btn.disabled = true;
+  status.textContent = 'Preparing…'; btn.disabled = true;
   try {
+    const poster = await captureVideoPoster(file).catch(() => null);   // a thumbnail from the first second
+    status.textContent = 'Uploading…';
     const fd = new FormData();
     fd.append('video', file);
+    if (poster) fd.append('poster', poster, 'poster.jpg');
     fd.append('title', $('#scTitle').value || '');
     fd.append('caption', $('#scCaption').value || '');
     const r = await fetch('/api/showcase', { method: 'POST', headers: await authHeader(), body: fd });
