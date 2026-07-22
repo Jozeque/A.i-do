@@ -24,6 +24,12 @@ const LANDING_DIR = path.join(ROOT, 'landing');
 
 const PORT = process.env.PORT || 4505;
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5';
+// The reference look-analysis is a rare, high-value, judgment-heavy call (subtle camera body /
+// lens series / grade reads a weaker model can whiff on). Run it on a stronger DOP-grade model —
+// once per project tune, so the extra cost is negligible. Verified: on a warm Cooke look, Sonnet 5
+// reads "ARRI Alexa + Cooke" reliably where Haiku occasionally slips and Opus over-writes past the
+// token cap. Override with ANALYZE_MODEL if needed.
+const ANALYZE_MODEL = process.env.ANALYZE_MODEL || 'claude-sonnet-5';
 const NB2_MODEL = process.env.NB2_MODEL || 'gemini-3.1-flash-image';
 const NB2_IMAGE_SIZE = process.env.NB2_IMAGE_SIZE || '1K';
 
@@ -508,8 +514,8 @@ Describe only what you can actually see; do not invent. Keep values concise.`;
     userContent.push({ type: 'text', text: 'Identify the medium, then analyze the visual style of the attached reference image(s), and return only the JSON object.' });
 
     const resp = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 1024,
+      model: ANALYZE_MODEL,
+      max_tokens: 2048,
       system,
       messages: [{ role: 'user', content: userContent }],
     });
