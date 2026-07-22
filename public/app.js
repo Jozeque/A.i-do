@@ -1054,6 +1054,7 @@ function renderMessages(gemId) {
   $$('.gen-link', scroll).forEach(b => b.onclick = () => sendPromptToGenerator(b));
   $$('.gen-all', scroll).forEach(b => b.onclick = () => sendAllToGenerator(b));
   $$('.reuse-prompt', scroll).forEach(b => b.onclick = () => reusePromptInComposer(b));
+  $$('.gpt-copy', scroll).forEach(b => b.onclick = () => copyForChatGPT(b));
   $$('.msg-copy', scroll).forEach(b => b.onclick = () => copyUserBlock(b));
   $$('.ref-thumb', scroll).forEach(t => t.onclick = () => openLightbox([{ src: t.dataset.full, caption: 'Reference this output was built from' }], 0));
   scroll.scrollTop = nearBottom ? scroll.scrollHeight : prevTop;
@@ -1084,6 +1085,32 @@ async function reusePromptInComposer(btn) {
   toast(added
     ? `Prompt + ${added} reference image${added > 1 ? 's' : ''} loaded into the composer — ready to edit, copy, or resend.`
     : 'Prompt loaded into the composer — ready to edit, copy, or resend.');
+}
+
+// Copy for ChatGPT (GPT Advisor): put the prompt on the clipboard AND download the turn's
+// reference image(s), so the hand-off is one click — drag the images into ChatGPT, paste the
+// prompt. (The browser clipboard can't carry multiple images for pasting, so images download.)
+async function copyForChatGPT(btn) {
+  const prompt = decodeURIComponent(btn.dataset.text || '');
+  let imgs = [];
+  try { imgs = JSON.parse(decodeURIComponent(btn.dataset.imgs || '%5B%5D')); } catch {}
+  if (prompt) await copyTextToClipboard(prompt);
+  let n = 0;
+  for (const im of imgs) {
+    const url = `/media/${state.current.id}/uploads/${im.file}`;
+    try {
+      const blob = await (await mediaFetch(url)).blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = href; a.download = im.file || `reference-${n + 1}.jpg`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 15000);
+      n++;
+    } catch { /* skip an image that can't be fetched */ }
+  }
+  toast(n
+    ? `Prompt copied + ${n} reference image${n > 1 ? 's' : ''} downloaded — drag them into ChatGPT, then paste the prompt.`
+    : (prompt ? 'Prompt copied — this turn had no reference image to download.' : 'Nothing to copy.'));
 }
 
 // Copy a SENT (user) message's whole block: text to the clipboard, and the text + its
@@ -1347,6 +1374,7 @@ function renderAssistant(text, refImgs = []) {
       const enc = encodeURIComponent(seg.trimEnd());
       html += `<pre><button class="copy-block" data-text="${enc}">copy</button>${escapeHtml(seg.trimEnd())}</pre>` +
         `<div class="pc-actions"><button class="reuse-prompt" data-text="${enc}" ${imgsAttr}>↻ Reuse prompt</button>` +
+        (state.activeTab === 'gpt-advisor' ? `<button class="gpt-copy" data-text="${enc}" ${imgsAttr} title="Copy the prompt to your clipboard and download the reference image(s) — drag them into ChatGPT, then paste the prompt">⧉ Copy for ChatGPT</button>` : '') +
         (!state.activeTab.startsWith('kling') ? `<button class="gen-link" data-text="${enc}" ${imgsAttr}>⚡ Send to Nano Banana 2</button>` : '') +
         `</div>`;
     } else {
@@ -1373,6 +1401,7 @@ function formatProse(seg, imgsAttr = '') {
       return `<div class="prompt-card"><div class="pc-head">${escapeHtml(headLine.replace(/\*+/g, '').replace(/^PROMPT\s*/i, 'Prompt '))}</div>` +
         `<pre style="margin:8px 14px"><button class="copy-block" data-text="${enc}">copy</button>${escapeHtml(bodyText)}</pre>` +
         `<div class="pc-actions"><button class="reuse-prompt" data-text="${enc}" ${imgsAttr}>↻ Reuse prompt</button>` +
+        (state.activeTab === 'gpt-advisor' ? `<button class="gpt-copy" data-text="${enc}" ${imgsAttr} title="Copy the prompt to your clipboard and download the reference image(s) — drag them into ChatGPT, then paste the prompt">⧉ Copy for ChatGPT</button>` : '') +
         `<button class="gen-link" data-text="${enc}" ${imgsAttr}>⚡ Send to Nano Banana 2</button></div></div>`;
     }).join('');
     // One click → generate ALL prompts at once (each prompt → one image), fired in parallel.

@@ -198,6 +198,13 @@ body {
   border: 1px solid var(--line); border-radius: 7px; padding: 6px 11px;
 }
 .bubble .reuse-prompt:hover { color: var(--accent); border-color: var(--accent); }
+.bubble .gpt-copy {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--body); font-size: 12px; font-weight: 700; cursor: pointer;
+  color: var(--ink-dim); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 7px; padding: 6px 11px;
+}
+.bubble .gpt-copy:hover { color: var(--accent); border-color: var(--accent); }
 
 .chat-images-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .chat-images-strip img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
