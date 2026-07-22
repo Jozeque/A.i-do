@@ -176,6 +176,38 @@ function compileNbFramesDirection(b) {
 }
 
 // ── tiny helpers ─────────────────────────────────────────────────────────────
+// ── Kling multi-shot 512-char cap (OpenArt field limit) ──────────────────────
+// OpenArt's Kling multi-shot field allows 512 characters per shot and silently truncates the rest
+// MID-WORD (which kills the mandatory suffix). The gem is instructed to stay under, but a language
+// model can't count characters reliably (measured: it overran to 600+ on ~1/3 of runs), so enforce
+// a hard cap here: any over-length code-block shot is trimmed at a clean word/clause boundary with
+// the mandatory suffix preserved, so nothing ever ships over 512.
+const KLING_CAP = 512;
+const KLING_SUFFIX = ', 8k, raw footage, high fidelity, cinema grade.';
+function capKlingShot(inner) {
+  const s = inner.trim();
+  if (s.length <= KLING_CAP) return s;
+  let body = s.endsWith(KLING_SUFFIX) ? s.slice(0, -KLING_SUFFIX.length) : s;
+  body = body.replace(/[\s,;.]+$/, '');
+  const budget = KLING_CAP - KLING_SUFFIX.length;
+  if (body.length > budget) {
+    body = body.slice(0, budget);
+    const clause = Math.max(body.lastIndexOf('. '), body.lastIndexOf('; '), body.lastIndexOf(', '));
+    const word = body.lastIndexOf(' ');
+    const cut = clause > budget * 0.72 ? clause : (word > budget * 0.5 ? word : budget);
+    body = body.slice(0, cut);                                // prefer a clause end, else a word — never mid-word
+    body = body.replace(/[\s,;.]+$/, '');
+  }
+  return body + KLING_SUFFIX;
+}
+// Cap every fenced code block (each = one shot's paste-ready prompt) in a Kling multi-shot reply.
+function capKlingShots(reply) {
+  return reply.replace(/(```[a-zA-Z]*\n)([\s\S]*?)(\n```)/g, (full, open, inner, close) => {
+    const capped = capKlingShot(inner);
+    return capped === inner.trim() ? full : `${open}${capped}${close}`;
+  });
+}
+
 const id = () => crypto.randomBytes(8).toString('hex');
 
 // Anthropic + Gemini reject an image whose DECLARED media type doesn't match its bytes.
@@ -616,7 +648,10 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       messages,
     });
-    const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    let text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    // Kling multi-shot: guarantee every shot fits OpenArt's 512-char field (the gem aims for it,
+    // this enforces it) — trim any over-length shot at a clean boundary, mandatory suffix intact.
+    if (gemId === 'kling' && klingMode === 'multi') text = capKlingShots(text);
 
     // persist any attached images to disk so they survive reloads
     const savedImgs = [];
