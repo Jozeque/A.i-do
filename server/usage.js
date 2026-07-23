@@ -58,6 +58,7 @@ const SUBSCRIPTIONS = [
 const ADJUSTMENTS = [
   { label: 'Extra credits', amount: 105, month: '2026-07' }, // 1st July top-up
   { label: 'Extra credits', amount: 105, month: '2026-07' }, // 2nd July top-up
+  { label: 'Extra credits', amount: 190, month: '2026-07' }, // 3rd July top-up
 ];
 const isSwapModel = (model) => /flux|gpt-image/.test(model || '');
 const imageCost = (model, size) => {
