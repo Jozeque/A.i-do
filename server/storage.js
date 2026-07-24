@@ -9,6 +9,7 @@
 //   saveImage(pid, imgId, buffer, mimeType) -> { file, url }
 //   deleteImage(pid, file) -> void
 import fsp from 'fs/promises';
+import { createReadStream } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
@@ -48,11 +49,11 @@ function createLocalStorage(dataDir) {
     async deleteImage(pid, file) {
       await fsp.rm(path.join(imagesDir(pid), file), { force: true });
     },
-    async saveShowcase(id, buffer, mimeType) {
+    async saveShowcase(id, filePath, mimeType) {
       const dir = path.join(dataDir, 'showcase', 'videos');
       await fsp.mkdir(dir, { recursive: true });
       const file = `${id}.${videoExt(mimeType)}`;
-      await fsp.writeFile(path.join(dir, file), buffer);
+      await fsp.copyFile(filePath, path.join(dir, file));
       return { file, url: `/media/showcase/videos/${file}` };
     },
     async deleteShowcase(file) {
@@ -114,14 +115,17 @@ function createDriveStorage() {
     return pending;
   }
 
-  async function upload(pid, bucket, name, buffer, mimeType) {
+  async function upload(pid, bucket, name, source, mimeType) {
     const d = await drive();
     const root = await folder(ROOT, null);
     const proj = await folder(pid, root);
     const parent = await folder(bucket, proj);
+    // source is a Buffer (small images) or a readable stream (large showcase videos streamed from
+    // a temp file, so a big upload never sits fully in memory).
+    const body = Buffer.isBuffer(source) ? _Readable.from(source) : source;
     const res = await d.files.create({
       requestBody: { name, parents: [parent] },
-      media: { mimeType: mimeType || 'application/octet-stream', body: _Readable.from(buffer) },
+      media: { mimeType: mimeType || 'application/octet-stream', body },
       fields: 'id',
     });
     return res.data.id;
@@ -142,8 +146,8 @@ function createDriveStorage() {
     async deleteImage(pid, file) {
       try { await (await drive()).files.delete({ fileId: file }); } catch { /* already gone */ }
     },
-    async saveShowcase(id, buffer, mimeType) {
-      const file = await upload('showcase', 'videos', `${id}.${videoExt(mimeType)}`, buffer, mimeType);
+    async saveShowcase(id, filePath, mimeType) {
+      const file = await upload('showcase', 'videos', `${id}.${videoExt(mimeType)}`, createReadStream(filePath), mimeType);
       return { file, url: `/media/showcase/videos/${file}` };
     },
     async deleteShowcase(file) {

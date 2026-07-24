@@ -3,6 +3,7 @@ import express from 'express';
 import multer from 'multer';
 import fs from 'fs';
 import fsp from 'fs/promises';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
@@ -383,7 +384,9 @@ if (storage.backend === 'drive') {
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 30 * 1024 * 1024 } });
 // Larger limit for showcase video uploads (the in-app portfolio uploader).
-const uploadVideo = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+// Videos go to a TEMP FILE on disk (not RAM) and are streamed to storage — buffering a 100-200 MB
+// video in memory was OOM-ing the instance (Render's auto-restart killed the upload mid-flight).
+const uploadVideo = multer({ dest: os.tmpdir(), limits: { fileSize: 200 * 1024 * 1024 } });
 
 // ── health / config ──────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
@@ -415,19 +418,21 @@ app.get('/api/showcase', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/showcase', uploadVideo.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No video file uploaded.' });
   try {
-    if (!req.file) return res.status(400).json({ error: 'No video file uploaded.' });
     const sid = `${slug(req.body?.title || 'video')}-${id().slice(0, 6)}`;
+    // Pass the temp file PATH so storage streams it to Drive — the video never sits in RAM.
     const item = await showcase.add({
       id: sid,
       title: req.body?.title || '',
       caption: req.body?.caption || '',
-      buffer: req.file.buffer,
+      filePath: req.file.path,
       mimeType: req.file.mimetype,
       createdAt: Date.now(),
     });
     res.json(item);
   } catch (e) { res.status(500).json({ error: e.message }); }
+  finally { fsp.unlink(req.file.path).catch(() => {}); }   // remove the temp upload
 });
 app.delete('/api/showcase/:sid', async (req, res) => {
   try { await showcase.remove(req.params.sid); res.json({ ok: true }); }

@@ -24,8 +24,8 @@ export function createShowcase(storage) {
     return items;
   }
 
-  async function add({ id, title, caption, buffer, mimeType, createdAt }) {
-    const saved = await storage.saveShowcase(id, buffer, mimeType);
+  async function add({ id, title, caption, filePath, mimeType, createdAt }) {
+    const saved = await storage.saveShowcase(id, filePath, mimeType);
     const item = {
       id, title: title || '', caption: caption || '',
       file: saved.file, url: saved.url, mimeType: mimeType || 'video/mp4',
