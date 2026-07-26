@@ -90,7 +90,7 @@ function createLocalDataStore(dataDir) {
 // getProject reassembles the full blob the routes already expect, so route code is
 // unchanged. Writes go through a per-pid queue (single-instance lock, like the local
 // backend); saveProject diffs the image docs so only new/changed ones are written.
-const GEM_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor'];
+const GEM_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor', 'storyboard'];
 
 function createFirestoreDataStore() {
   let _db = null, _col = null;

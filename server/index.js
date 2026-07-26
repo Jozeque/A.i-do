@@ -81,6 +81,7 @@ const GEM_FILES = {
   'kling-advisor': 'kling-advisor.txt',
   'nb-advisor': 'nb-advisor.txt',
   'gpt-advisor': 'gpt-advisor.txt',
+  'storyboard': 'storyboard.txt',
 };
 async function readGem(gemId) {
   const file = GEM_FILES[gemId];
@@ -457,10 +458,10 @@ app.post('/api/projects', async (req, res) => {
       createdAt: now,
       updatedAt: now,
       // per-project gem overrides (start from defaults; editable in UI)
-      gemOverrides: { 'nb-frames': '', 'kling': '', 'kling-advisor': '', 'nb-advisor': '' },
-      // structured builder inputs (NB Frames) that compile into gemOverrides
-      gemBuilders: { 'nb-frames': {} },
-      chats: { 'nb-frames': [], 'kling': [], 'kling-advisor': [], 'nb-advisor': [] },
+      gemOverrides: { 'nb-frames': '', 'kling': '', 'kling-advisor': '', 'nb-advisor': '', 'storyboard': '' },
+      // structured builder inputs (NB Frames + Storyboard) that compile into / accompany gemOverrides
+      gemBuilders: { 'nb-frames': {}, 'storyboard': {} },
+      chats: { 'nb-frames': [], 'kling': [], 'kling-advisor': [], 'nb-advisor': [], 'storyboard': [] },
       images: [], // {id, prompt, file, createdAt, favorite, note}
     };
     await saveProject(project);
@@ -508,6 +509,44 @@ app.get('/api/projects/:pid/gems/:gemId', async (req, res) => {
     const override = p.gemOverrides?.[req.params.gemId] || '';
     const builder = p.gemBuilders?.[req.params.gemId] || null;
     res.json({ base, override, builder });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Analyze a storyboard STYLE reference → a reusable storyboard-style profile ──
+// Storyboard tab: capture the reference's DRAWING style (medium, linework, shading, colour) as one
+// text profile saved to gemOverrides['storyboard'] and applied to every panel the gem draws.
+app.post('/api/projects/:pid/gems/storyboard/analyze', async (req, res) => {
+  if (!anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
+  try {
+    const { images = [] } = req.body;
+    if (!images.length) return res.status(400).json({ error: 'Attach at least one storyboard-style reference to analyze.' });
+    const p = await loadProject(req.params.pid);
+
+    const system = `You are a storyboard-style analyst. Look at the attached reference image(s) and describe their STORYBOARD DRAWING STYLE as a reusable profile an AI image model can apply to MANY future panels. Describe ONLY the style / craft — never the specific scene, subject, or story in the reference.
+
+This is a hand-drawn / illustrated STORYBOARD, not a photograph, so NEVER mention a camera, lens, focal length, aperture, Kelvin, or photographic film grain. Capture what makes the DRAWING look the way it does:
+- MEDIUM & technique: pencil / graphite, ink / pen, marker, charcoal, digital brush, wash, or mixed — and how it is applied (rough sketch, clean lineart, tight ink, gestural).
+- LINEWORK: line weight (fine to bold), confidence (loose gestural to precise), variation, outlines vs open forms, hatching / cross-hatching.
+- SHADING & tone: flat, cel blocks, grey-marker tones, ink wash, pencil shading, hatched shadows — how volume and depth are drawn.
+- COLOUR: monochrome / greyscale, one or two marker tones, a limited palette, or full colour — and its saturation and mood.
+- SURFACE & finish: paper tooth, toned / newsprint paper, marker bleed, clean vector edges, digital-brush texture.
+- PANEL character: any consistent panel border or framing, "director's board" feel, and the overall level of finish (rough thumbnail to polished presentation board).
+
+Return ONE tight paragraph (roughly 3-6 sentences) as concrete DRAWING direction the model can follow — not a style label. Describe only what you can actually see, and keep it transferable to any new shot.`;
+
+    const userContent = images.map((img) => ({
+      type: 'image',
+      source: { type: 'base64', media_type: sniffImageMime(img.data, img.mimeType), data: img.data },
+    }));
+    userContent.push({ type: 'text', text: 'Describe this storyboard drawing style as a reusable profile paragraph.' });
+
+    const resp = await anthropic.messages.create({ model: ANALYZE_MODEL, max_tokens: 1024, system, messages: [{ role: 'user', content: userContent }] });
+    const style = resp.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+
+    let styleRef = null;
+    if (images[0]) { const s = await storage.saveUpload(p.id, images[0].data, images[0].mimeType); styleRef = { ...s, url: `/media/${p.id}/uploads/${s.file}` }; }
+
+    res.json({ style, styleRef });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

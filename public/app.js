@@ -92,6 +92,7 @@ const GEM_META = {
   'kling-advisor': { name: 'Kling Advisor', blurb: 'Describe your source clip + the change you want. Returns the best Kling 3.0 Omni <b>video-to-video</b> prompt (restyle / relight / transform) with why &amp; what to watch.' },
   'nb-advisor': { name: 'NB Advisor', blurb: 'Attach image(s) + say what to change. Returns the best Nano Banana 2 edit prompt with a quick rationale.' },
   'gpt-advisor': { name: 'GPT Advisor', blurb: 'Say what you want — a swap, an edit, or a new image — and attach reference(s). Returns the best <b>GPT Image 2 (ChatGPT)</b> prompt, tuned to keep your frame\'s look &amp; color.' },
+  'storyboard': { name: 'Storyboard', blurb: 'Set a storyboard style once (attach a style reference in Tune gem), then describe any frame. Returns a Nano Banana prompt that draws that exact shot as a <b>storyboard panel</b> in your style. Attach a character reference to keep them recognizable.' },
 };
 
 // Suggestion lists for the NB Frames per-project cinematography builder (datalists; free text still allowed).
@@ -159,6 +160,20 @@ function gemEditorBody(gemId, meta) {
       </details>
       ${baseView}
       ${dl('dl_look', BUILDER_OPTS.look)}${dl('dl_lighting', BUILDER_OPTS.lighting)}${dl('dl_lens', BUILDER_OPTS.lens)}${dl('dl_palette', BUILDER_OPTS.palette)}${dl('dl_grain', BUILDER_OPTS.grain)}${dl('dl_wardrobe', BUILDER_OPTS.wardrobe)}`;
+  }
+
+  if (gemId === 'storyboard') {
+    return `
+      <div class="bf-analyze">
+        <span class="field-label">Build from a storyboard-style reference — attach or paste a frame drawn in the storyboard style you want (any medium: pencil, ink, marker, digital). The model reads its drawing style into a reusable profile every panel follows. It captures the STYLE only, never the reference's scene.</span>
+        <div class="bf-analyze-row">
+          <div class="ref-row" id="bfRefRow"><button class="ref-add" id="bfRefAdd" type="button">＋</button><input type="file" id="bfRefInput" accept="image/*" multiple hidden /></div>
+          <button class="mini-btn primary" id="bfAnalyze" type="button">✨ Analyze style</button>
+        </div>
+      </div>
+      <label class="bf bf-wide">Storyboard style profile — the drawing style layered on the base Storyboard gem for this project only. Analyze fills it; edit any of it by hand. Describe the medium, linework, shading, and palette — not any specific scene.<textarea id="sb_style" placeholder="e.g. Loose black-ink storyboard panels with confident, varied line weight; light grey-marker shading for volume; sparse background detail; on warm toned paper…"></textarea></label>
+      ${saveRow}
+      ${baseView}`;
   }
 
   return `
@@ -263,6 +278,89 @@ async function loadGemEditor(gemId) {
       const cp3 = $('#gemCompiled'); if (cp3) cp3.textContent = '— (analyze a reference or fill the fields, then Save) —';
       flashSaved();
     };
+  } else if (gemId === 'storyboard') {
+    const b = builder || {};
+    const styleEl = $('#sb_style'); if (styleEl) styleEl.value = override || '';
+
+    let styleRef = b.styleRef || null;   // {file, mimeType, url} — persisted storyboard-style reference
+    let pending = [];                    // newly attached {mimeType, data, url} awaiting analysis
+
+    const renderBfRefs = () => {
+      const row = $('#bfRefRow'); if (!row) return;
+      $$('.thumb', row).forEach(t => t.remove());
+      const add = $('#bfRefAdd');
+      const items = [];
+      if (styleRef) items.push({ url: styleRef.url, saved: true });
+      pending.forEach((pp, i) => items.push({ url: pp.url, i }));
+      items.forEach(it => {
+        const t = document.createElement('div');
+        t.className = 'thumb' + (it.saved ? ' saved' : '');
+        t.innerHTML = `<img src="${it.url}" />` + (it.saved ? '' : `<button class="rm" type="button" data-i="${it.i}">✕</button>`);
+        if (!it.saved) t.querySelector('.rm').onclick = () => { pending.splice(it.i, 1); renderBfRefs(); };
+        row.insertBefore(t, add);
+      });
+    };
+    renderBfRefs();
+
+    $('#bfRefAdd').onclick = () => $('#bfRefInput').click();
+    $('#bfRefInput').onchange = async (e) => {
+      for (const f of e.target.files) {
+        const data = await fileToB64(f);
+        pending.push({ mimeType: f.type, data, url: URL.createObjectURL(f) });
+      }
+      renderBfRefs(); e.target.value = '';
+    };
+
+    $('#bfAnalyze').onclick = async () => {
+      if (!pending.length) { toast('Attach a storyboard-style reference first.', true); return; }
+      if (!state.config.hasAnthropic) { toast('Add your ANTHROPIC_API_KEY to .env first.', true); return; }
+      const btn = $('#bfAnalyze'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Analyzing…';
+      try {
+        const images = pending.map(pp => ({ mimeType: pp.mimeType, data: pp.data }));
+        const { style, styleRef: sref } = await api(`/api/projects/${state.current.id}/gems/storyboard/analyze`, {
+          method: 'POST', body: JSON.stringify({ images }),
+        });
+        if (styleEl && typeof style === 'string') styleEl.value = style;
+        if (sref) { styleRef = sref; pending = []; renderBfRefs(); }
+        toast('Style profile filled from the reference — review & Save.');
+      } catch (err) {
+        toast(err.message, true);
+      } finally {
+        btn.disabled = false; btn.innerHTML = '✨ Analyze style';
+      }
+    };
+
+    // Paste an image into the style box to queue it for analysis (text still lands in the box).
+    if (styleEl) styleEl.addEventListener('paste', async (e) => {
+      const files = filesFromPaste(e);
+      if (!files.length) return;
+      e.preventDefault();
+      const text = e.clipboardData.getData('text');
+      if (text) insertAtCursor(styleEl, text);
+      for (const f of files) {
+        const data = await fileToB64(f);
+        pending.push({ mimeType: f.type, data, url: URL.createObjectURL(f) });
+      }
+      renderBfRefs();
+      toast('Reference pasted — click "Analyze style".');
+    });
+
+    $('#saveGem').onclick = async () => {
+      const val = ($('#sb_style')?.value || '').trim();
+      const body = { gemOverrides: { 'storyboard': val }, gemBuilders: { 'storyboard': styleRef ? { styleRef } : {} } };
+      const p = await api(`/api/projects/${state.current.id}`, { method: 'PATCH', body: JSON.stringify(body) });
+      state.current.gemOverrides = p.gemOverrides; state.current.gemBuilders = p.gemBuilders;
+      flashSaved();
+    };
+
+    $('#resetGem').onclick = async () => {
+      if (!confirm(`Reset the ${GEM_META[gemId].name} setup for this project? This clears the storyboard style profile and the saved style reference.`)) return;
+      const p = await api(`/api/projects/${state.current.id}`, { method: 'PATCH', body: JSON.stringify({ gemOverrides: { 'storyboard': '' }, gemBuilders: { 'storyboard': {} } }) });
+      state.current.gemOverrides = p.gemOverrides; state.current.gemBuilders = p.gemBuilders;
+      if (styleEl) styleEl.value = '';
+      styleRef = null; pending = []; renderBfRefs();
+      flashSaved();
+    };
   } else {
     const ov = $('#gemOverride'); if (ov) ov.value = override || '';
     $('#saveGem').onclick = async () => {
@@ -289,7 +387,7 @@ const state = {
   config: null,
   projects: [],
   current: null,        // full project object
-  activeTab: (['nb-frames','characters','kling','kling-advisor','nb-advisor','gpt-advisor','swap','generate','library'].includes(localStorage.getItem('avs:lastTab')) ? localStorage.getItem('avs:lastTab') : 'nb-frames'),
+  activeTab: (['nb-frames','characters','kling','kling-advisor','nb-advisor','gpt-advisor','storyboard','swap','generate','library'].includes(localStorage.getItem('avs:lastTab')) ? localStorage.getItem('avs:lastTab') : 'nb-frames'),
   attachments: {},      // per-gem: array of {name, mimeType, data, url}
   refImages: [],        // for generate panel
   klingMode: localStorage.getItem('avs:klingMode') || 'single',  // 'single' (3 variations) | 'multi' (multi-shot)
@@ -925,6 +1023,7 @@ function chatPlaceholder(gemId) {
     'kling-advisor': 'Describe your source clip + how to restyle / transform it…',
     'nb-advisor': 'What do you want to change in the attached image?',
     'gpt-advisor': 'Describe the swap / edit / image you want (attach the frame + any reference)…',
+    'storyboard': 'Describe the frame / shot to draw as a storyboard panel (attach a character reference to keep them recognizable)…',
   }[gemId];
 }
 
@@ -966,7 +1065,7 @@ async function favoriteToAttachment(im) {
 }
 
 // Drag an image card (from NB2 results / Library) onto a tab button to attach it there.
-const DROP_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor', 'gpt-advisor', 'generate', 'swap'];
+const DROP_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor', 'gpt-advisor', 'storyboard', 'generate', 'swap'];
 async function urlToAttachment(url) {
   const blob = await (await mediaFetch(url)).blob();
   const data = await fileToB64(blob);
