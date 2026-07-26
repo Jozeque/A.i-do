@@ -168,7 +168,7 @@
   }
   .work:hover .work-frame .poster, .work:hover .work-frame video { transform: scale(1.04); }
   .work-play {
-    position: absolute; left: 18px; bottom: 18px; z-index: 2; width: 42px; height: 42px;
+    position: absolute; left: 18px; bottom: 18px; z-index: 2; width: 42px; height: 42px; pointer-events: none;
     display: grid; place-items: center; background: rgba(10,10,11,.5); border: 1px solid var(--line);
     backdrop-filter: blur(4px); opacity: 0; transform: translateY(6px);
     transition: opacity .3s ease, transform .3s ease, background .2s ease;
@@ -581,6 +581,11 @@
       Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none' });
       if (it.poster) v.poster = it.poster;
       const ensureSrc = () => { if (!v.getAttribute('src')) v.setAttribute('src', it.url); };
+      // Touch devices have no hover, and iOS Safari can't fullscreen a <video> via requestFullscreen —
+      // so on mobile give the player its NATIVE controls (play / pause / scrub / fullscreen / volume),
+      // unmuted, with the source attached and metadata preloaded so the controls appear right away.
+      const isTouch = matchMedia('(hover: none)').matches;
+      if (isTouch) { Object.assign(v, { controls: true, muted: false, preload: 'metadata' }); ensureSrc(); }
       const play = document.createElement('span');
       play.className = 'work-play';
       play.setAttribute('aria-hidden', 'true');
@@ -605,14 +610,19 @@
 
       card.append(frame, info);
 
-      frame.addEventListener('mouseenter', () => { ensureSrc(); v.play().catch(() => {}); });
-      frame.addEventListener('mouseleave', () => { v.pause(); });
-      frame.addEventListener('click', () => {
-        ensureSrc();
-        v.muted = false;
-        (v.requestFullscreen || v.webkitRequestFullscreen || (() => {})).call(v);
-        v.play().catch(() => {});
-      });
+      if (!isTouch) {
+        // Desktop: muted preview on hover, click to unmute + go fullscreen.
+        frame.addEventListener('mouseenter', () => { ensureSrc(); v.play().catch(() => {}); });
+        frame.addEventListener('mouseleave', () => { v.pause(); });
+        frame.addEventListener('click', () => {
+          ensureSrc();
+          v.muted = false;
+          v.play().catch(() => {});
+          if (v.requestFullscreen) v.requestFullscreen().catch(() => {});
+          else if (v.webkitRequestFullscreen) v.webkitRequestFullscreen();
+          else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+        });
+      }
 
       grid.appendChild(card);
     });
