@@ -11,3 +11,6 @@ Thumbs.db
 # Firebase service-account key (SECRET — never commit)
 *service-account*.json
 firebase-service-account.json
+
+# Client presentation media — stays local, never pushed
+presentations/*/assets/

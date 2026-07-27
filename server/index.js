@@ -22,6 +22,7 @@ const DATA_DIR = path.join(ROOT, 'projects-data');
 const GEMS_DIR = path.join(ROOT, 'gems');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const LANDING_DIR = path.join(ROOT, 'landing');
+const PRESENT_DIR = path.join(ROOT, 'presentations');
 
 const PORT = process.env.PORT || 4505;
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5';
@@ -332,6 +333,8 @@ app.get('/', (req, res, next) => (isLandingHost(req) ? res.sendFile(path.join(LA
 app.use(express.static(PUBLIC_DIR, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-store') }));
 // Public A.I-Duo landing page (marketing + portfolio) — served at /landing, no login.
 app.use('/landing', express.static(LANDING_DIR));
+// Client presentation decks (static, no login) — /present/<client>, e.g. /present/yochananof.
+app.use('/present', express.static(PRESENT_DIR));
 // serve saved media. Local backend: static from disk. Drive backend: proxy the file's
 // bytes from Drive by id (so <img>/<video src> just works, no token needed in the URL).
 if (storage.backend === 'drive') {
