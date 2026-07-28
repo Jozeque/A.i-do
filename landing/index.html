@@ -112,11 +112,12 @@
   /* subtle legibility scrim only - footage stays visible */
   .hero-scrim {
     position: absolute; inset: 0; z-index: 1; pointer-events: none;
-    background: linear-gradient(180deg, rgba(10,10,11,.60) 0%, rgba(10,10,11,.26) 34%, rgba(10,10,11,.40) 68%, rgba(10,10,11,.88) 100%);
+    background: linear-gradient(180deg, rgba(10,10,11,.64) 0%, rgba(10,10,11,.46) 42%, rgba(10,10,11,.5) 62%, rgba(10,10,11,.9) 100%);
   }
   .hero > .wrap { position: relative; z-index: 2; width: 100%; }
   @media (prefers-reduced-motion: reduce) { .hero-bg { display: none; } }
   .hero-inner { max-width: 960px; }
+  .hero h1, .hero .lead { text-shadow: 0 2px 22px rgba(6,6,9,.5); }
   .hero h1 {
     font-family: var(--serif); font-size: clamp(2.7rem, 7.6vw, 6rem); line-height: .98;
     letter-spacing: -.025em; margin: 26px 0 0; max-width: 16ch; overflow-wrap: break-word;
