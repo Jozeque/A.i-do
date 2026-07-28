@@ -308,9 +308,19 @@
 <main id="top">
   <!-- ── hero ── -->
   <section class="hero">
-    <video class="hero-bg" autoplay muted loop playsinline preload="auto" aria-hidden="true">
-      <source src="/landing/media/hero-bg.mp4" type="video/mp4" />
-    </video>
+    <video class="hero-bg" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video>
+    <script>
+      /* Hero video: portrait cut on phones, landscape cut otherwise. Only the chosen file
+         downloads; reduced-motion loads neither (matches the CSS that hides .hero-bg). */
+      (function () {
+        var v = document.querySelector('.hero-bg'); if (!v) return;
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        var s = document.createElement('source'); s.type = 'video/mp4';
+        s.src = matchMedia('(max-width: 640px)').matches ? '/landing/media/hero-bg-mobile.mp4' : '/landing/media/hero-bg.mp4';
+        v.appendChild(s); v.load();
+        try { var pr = v.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
+      })();
+    </script>
     <div class="hero-scrim" aria-hidden="true"></div>
     <div class="wrap">
       <div class="hero-inner">
