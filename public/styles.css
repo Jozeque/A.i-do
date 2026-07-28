@@ -513,6 +513,10 @@ textarea.char-text { resize: vertical; min-height: 46px; line-height: 1.5; }
 .exp-sub { display: block; font-size: 10px; color: var(--ink-faint); margin-top: 2px; }
 .exp-tot { color: var(--accent); font-weight: 700; }
 .exp-empty { color: var(--ink-faint); text-align: center !important; padding: 18px; }
+.exp-settled td { opacity: .5; }
+.exp-tag { display: inline-block; font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; margin-left: 8px; vertical-align: middle; }
+.exp-settled-card { background: var(--panel); }
+.exp-settled-card .exp-card-num { color: var(--ink-dim); font-size: 26px; }
 .exp-note { margin-top: 22px; font-size: 12px; line-height: 1.65; color: var(--ink-faint); max-width: 720px; }
 .exp-note b { color: var(--ink-dim); }
 @media (max-width: 1040px) { .exp-cards { grid-template-columns: 1fr 1fr; } }

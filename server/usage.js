@@ -60,6 +60,12 @@ const ADJUSTMENTS = [
   { label: 'Extra credits', amount: 105, month: '2026-07' }, // 2nd July top-up
   { label: 'Extra credits', amount: 190, month: '2026-07' }, // 3rd July top-up
 ];
+// ── Settlement boundary ───────────────────────────────────────────────────────
+// Everything up to & including CLOSED_THROUGH (YYYY-MM) is settled/paid up with the
+// partners — it stays in the record (marked "settled") but the live "current" count
+// starts the FOLLOWING month and runs fresh, per month. Bump this each time you square
+// up (e.g. set to '2026-08' once August is settled).
+const CLOSED_THROUGH = '2026-07';
 const isSwapModel = (model) => /flux|gpt-image/.test(model || '');
 const imageCost = (model, size) => {
   const m = model || '';
@@ -134,9 +140,24 @@ export async function computeUsage(data, claudeModel) {
     addM(new Date(y, m - 1, 15).getTime(), b => { b.credits += a.amount; });
     total.credits += a.amount;
   }
-  const round = (b) => ({ key: b.key, label: b.label, claude: +b.claude.toFixed(4), nb: +b.nb.toFixed(4), swap: +b.swap.toFixed(4), sub: +b.sub.toFixed(4), credits: +(b.credits || 0).toFixed(4), total: +(b.claude + b.nb + b.swap + b.sub + (b.credits || 0)).toFixed(4), claudeCalls: b.claudeCalls, nbImages: b.nbImages, swapImages: b.swapImages });
+  const round = (b) => ({ key: b.key, label: b.label, closed: !!b.closed, claude: +b.claude.toFixed(4), nb: +b.nb.toFixed(4), swap: +b.swap.toFixed(4), sub: +b.sub.toFixed(4), credits: +(b.credits || 0).toFixed(4), total: +(b.claude + b.nb + b.swap + b.sub + (b.credits || 0)).toFixed(4), claudeCalls: b.claudeCalls, nbImages: b.nbImages, swapImages: b.swapImages });
+  // Settlement: partition into settled (≤ CLOSED_THROUGH) vs current/open (after it), keeping the record.
+  const numKeys = ['claude', 'nb', 'swap', 'sub', 'credits', 'claudeCalls', 'nbImages', 'swapImages'];
+  const [cy2, cm2] = CLOSED_THROUGH.split('-').map(Number);
+  const openFromTs = new Date(cy2, cm2, 1).getTime();          // 1st of the month AFTER CLOSED_THROUGH
+  let om = cm2 + 1, oy = cy2; if (om > 12) { om = 1; oy++; }
+  const openKey = `${oy}-${String(om).padStart(2, '0')}`;
+  const settled = mk(), open = mk();
+  for (const b of months.values()) { b.closed = b.key <= CLOSED_THROUGH; const dst = b.closed ? settled : open; for (const k of numKeys) dst[k] += b[k]; }
+  for (const b of weeks.values()) { b.closed = Number(b.key) < openFromTs; }
   return {
     total: round({ ...total, key: 'all', label: 'All-time' }),
+    settled: round({ ...settled, key: 'settled', label: mLabel(CLOSED_THROUGH) }),
+    open: round({ ...open, key: 'open', label: mLabel(openKey) }),
+    closedThrough: CLOSED_THROUGH,
+    closedThroughLabel: mLabel(CLOSED_THROUGH),
+    openFrom: openKey,
+    openFromLabel: mLabel(openKey),
     months: [...months.values()].sort((a, b) => (a.sort < b.sort ? 1 : -1)).map(round),
     weeks: [...weeks.values()].sort((a, b) => b.sort - a.sort).slice(0, 10).map(round),
     model: claudeModel,
