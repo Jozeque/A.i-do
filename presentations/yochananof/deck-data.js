@@ -90,12 +90,12 @@ const DECK = {
       imgs: ['assets/cast/miluim-1.jpg', 'assets/cast/miluim-2.jpg', 'assets/cast/miluim-3.jpg'],
     },
     {
-      name: 'האמא', role: 'ראשי', picked: true, scenes: [4],
+      name: 'האמא', role: 'ראשי', picked: false, scenes: [4],
       note: 'עם מנשא ותינוק. היעד הנכון של חבילת החיתולים — הנחיתה שסוגרת את הגאג.',
-      imgs: ['assets/cast/mom-1.jpg', 'assets/cast/mom-2.jpg', 'assets/cast/mom-3.jpg'],
+      imgs: ['assets/cast/mom-1.jpg', 'assets/cast/mom-2.jpg', 'assets/cast/mom-4.jpg'],
     },
     {
-      name: 'הארגנטינאי', role: 'ראשי', picked: true, scenes: [6],
+      name: 'הארגנטינאי', role: 'ראשי', picked: false, scenes: [6],
       note: 'במדי כדורגל של ארגנטינה. חבילת הסטייקים נוחתת על ידיו העמוסות בשרים, על הכותרת השנייה.',
       imgs: ['assets/cast/argentina-1.jpg', 'assets/cast/argentina-2.jpg', 'assets/cast/argentina-3.jpg'],
     },
@@ -107,9 +107,9 @@ const DECK = {
     {
       name: 'הניצב המתכופף', role: 'קומי', picked: false, scenes: [1],
       note: 'מתכופף כדי שהחבילה לא תפגע בו. הגאג הראשון של הסרט, בשנייה השנייה.',
-      /* extra-2 / extra-4 / extra-5 הם אותו שחקן של extra-3 (עם כיפה, בלי זקן) —
-         נשארו ב-assets/cast להחלפה מהירה אם רוצים גרסה אחרת שלו. */
-      imgs: ['assets/cast/extra-1.jpg', 'assets/cast/extra-3.jpg'],
+      /* extra-2 עד extra-5 הם כולם אותו שחקן (עם כיפה / בלי זקן) — נשארו ב-assets/cast
+         כאלטרנטיבות. mom-3.jpg הישן נשאר שם גם הוא. */
+      imgs: ['assets/cast/extra-1.jpg', 'assets/cast/extra-6.jpg'],
     },
   ],
 
@@ -125,15 +125,30 @@ const DECK = {
   ],
 
   /* ── סטוריבורד ─────────────────────────────────────────────────────────── */
-  /* scene = מספר הסצנה בתסריט · shot = גודל פריים · move = תנועת מצלמה */
+  /* scene = מספר הסצנה בתסריט · shot = גודל פריים · move = תנועת מצלמה
+     vo = הקריינות שנשמעת מעל הפריים. ריק = אין קריינות בפריים הזה (מוזיקה/סאונד בלבד). */
   storyboard: [
-    { img: 'assets/storyboard/01.jpg', scene: 1, shot: 'POV / OTS', move: 'טראק קדימה', dur: 3, desc: 'חבילת לבבות החסה טסה במעבר, מעל מדפי הסניף.' },
-    { img: 'assets/storyboard/02.jpg', scene: 1, shot: 'בינוני',    move: 'סטטי',       dur: 2, desc: 'הניצב מתכופף כדי שהחבילה לא תפגע בו.' },
-    { img: 'assets/storyboard/03.jpg', scene: 2, shot: 'בינוני',    move: 'עוקב',       dur: 4, desc: 'החבילה נוחתת בידיה של הרוחניקית — היא מבסוטית.' },
-    { img: 'assets/storyboard/04.jpg', scene: 3, shot: 'בינוני',    move: 'סטטי',       dur: 4, desc: 'הקפה של המותג הפרטי נוחת בידיו של המילואימניק.' },
-    { img: 'assets/storyboard/05.jpg', scene: 4, shot: 'בינוני',    move: 'סטטי',       dur: 3, desc: 'הצעיר הרווק תופס את חבילת החיתולים — מבט של WTF.' },
-    { img: 'assets/storyboard/06.jpg', scene: 4, shot: 'רחב',       move: 'טראק',       dur: 4, desc: 'החבילה יוצאת מידיו וממשיכה לעגלה של האמא עם המנשא.' },
-    { img: 'assets/storyboard/07.jpg', scene: 6, shot: 'בינוני',    move: 'סטטי',       dur: 4, desc: 'חבילת הסטייקים נוחתת על ידיו העמוסות של האוהד במדי ארגנטינה.' },
+    { img: 'assets/storyboard/01.jpg', scene: 1, shot: 'POV / OTS', move: 'טראק קדימה', dur: 3,
+      desc: 'חבילת לבבות החסה טסה במעבר, מעל מדפי הסניף.',
+      vo:   '' },
+    { img: 'assets/storyboard/02.jpg', scene: 1, shot: 'בינוני',    move: 'סטטי',       dur: 2,
+      desc: 'הניצב מתכופף כדי שהחבילה לא תפגע בו.',
+      vo:   '' },
+    { img: 'assets/storyboard/03.jpg', scene: 2, shot: 'בינוני',    move: 'עוקב',       dur: 4,
+      desc: 'החבילה נוחתת בידיה של הרוחניקית — היא מבסוטית.',
+      vo:   'ככה זה במועדון הנאמנות של יוחננוף' },
+    { img: 'assets/storyboard/04.jpg', scene: 3, shot: 'בינוני',    move: 'סטטי',       dur: 4,
+      desc: 'הקפה של המותג הפרטי נוחת בידיו של המילואימניק.',
+      vo:   'ההטבה שמתאימה לך' },
+    { img: 'assets/storyboard/05.jpg', scene: 4, shot: 'בינוני',    move: 'סטטי',       dur: 3,
+      desc: 'הצעיר הרווק תופס את חבילת החיתולים — מבט של WTF.',
+      vo:   'לא בהכרח מתאימה למישהו אחר...' },
+    { img: 'assets/storyboard/06.jpg', scene: 4, shot: 'רחב',       move: 'טראק',       dur: 4,
+      desc: 'החבילה יוצאת מידיו וממשיכה לעגלה של האמא עם המנשא.',
+      vo:   '' },
+    { img: 'assets/storyboard/07.jpg', scene: 6, shot: 'בינוני',    move: 'סטטי',       dur: 4,
+      desc: 'חבילת הסטייקים נוחתת על ידיו העמוסות של האוהד במדי ארגנטינה.',
+      vo:   'והטבות מותאמות אליכם אישית!' },
   ],
 
   /* ── סגירה ─────────────────────────────────────────────────────────────── */
