@@ -91,7 +91,7 @@
   .nav-right { display: flex; align-items: center; gap: 38px; }
   .nav-links { display: flex; align-items: center; gap: 34px; }
   .nav-links a.link {
-    font-family: var(--mono); font-size: .74rem; text-transform: uppercase; letter-spacing: .16em;
+    font-family: var(--mono); font-size: .74rem; letter-spacing: .16em;
     color: var(--silver); transition: color .2s ease; position: relative; padding: 6px 0;
   }
   .nav-links a.link::after {
@@ -108,7 +108,7 @@
     position: relative; min-height: 100vh; min-height: 100svh; display: flex; align-items: center;
     padding: clamp(100px, 13vh, 140px) 0; overflow: hidden;
   }
-  .hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; pointer-events: none; }
+  .hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; pointer-events: none; opacity: .8; }
   /* subtle legibility scrim only - footage stays visible */
   .hero-scrim {
     position: absolute; inset: 0; z-index: 1; pointer-events: none;
@@ -223,7 +223,7 @@
   footer { border-top: 1px solid var(--line); padding: clamp(48px, 7vh, 76px) 0; }
   .foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
   .foot-tag { margin-top: 14px; font-family: var(--serif); font-style: italic; font-size: 1.08rem; color: var(--silver); }
-  .foot-links { display: flex; gap: 26px; font-family: var(--mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .14em; }
+  .foot-links { display: flex; gap: 26px; font-family: var(--mono); font-size: .72rem; letter-spacing: .14em; }
   .foot-links a { color: var(--silver); transition: color .2s ease; }
   .foot-links a:hover { color: var(--bone); }
   .foot-cr { margin-top: 30px; width: 100%; font-family: var(--mono); font-size: .7rem; letter-spacing: .06em; color: var(--faint); }
@@ -293,7 +293,7 @@
         <a class="link" href="#clients">Clients</a>
         <a class="link" href="#team">Team</a>
         <a class="link" href="#contact">Contact</a>
-        <a class="btn btn-line" href="#contact">Let&rsquo;s Talk</a>
+        <a class="btn btn-line" data-wa href="#">Let&rsquo;s Talk</a>
       </nav>
       <button class="menu-btn" id="menuBtn" aria-label="Menu" aria-expanded="false" aria-controls="navlinks">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
@@ -329,7 +329,7 @@
             ShyowReel
             <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
           </a>
-          <a class="btn btn-line btn-lg" href="#contact">Let&rsquo;s Talk</a>
+          <a class="btn btn-line btn-lg" data-wa href="#">Let&rsquo;s Talk</a>
         </div>
         <div class="hero-credit">
           <span>Creative to final master</span><i class="sep" aria-hidden="true"></i>
@@ -423,17 +423,17 @@
       </div>
       <div class="team-grid">
         <article class="member reveal">
-          <div class="member-photo"><img src="/landing/team/liran-segal.jpg" alt="Liran Segal" loading="lazy" /></div>
-          <div class="member-info">
-            <h3 class="member-name">Liran Segal</h3>
-            <span class="member-role">Creative Director</span>
-          </div>
-        </article>
-        <article class="member reveal">
           <div class="member-photo"><img src="/landing/team/yossi-bozo.jpg" alt="Yossi Bozo" loading="lazy" /></div>
           <div class="member-info">
             <h3 class="member-name">Yossi Bozo</h3>
             <span class="member-role">Head of AI</span>
+          </div>
+        </article>
+        <article class="member reveal">
+          <div class="member-photo"><img src="/landing/team/liran-segal.jpg" alt="Liran Segal" loading="lazy" /></div>
+          <div class="member-info">
+            <h3 class="member-name">Liran Segal</h3>
+            <span class="member-role">Creative Director</span>
           </div>
         </article>
         <article class="member reveal">
