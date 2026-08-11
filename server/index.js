@@ -830,7 +830,7 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
     userContent.push({ type: 'text', text: turnText });
     messages.push({ role: 'user', content: userContent });
 
-    const resp = await anthropic.messages.create({
+    const callArgs = {
       // Images attached → the stronger vision model (see VISION_MODEL); text-only stays on the default.
       model: images.length > 0 ? VISION_MODEL : CLAUDE_MODEL,
       // NB Frames returns 3 prompts × 4 dense DOP-grade paragraphs; 2048 truncated the
@@ -840,8 +840,21 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
       // on every message in a session (5-min TTL) — cuts time-to-first-token and cost.
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       messages,
-    });
-    let text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    };
+    const extractText = (r) => r.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    // An odd number of ``` fences means a code block never closed — a reply that stopped mid-
+    // sentence well under max_tokens (an occasional Anthropic API hiccup, not a token-limit
+    // truncation). Deterministically detectable, so retry once rather than saving a broken
+    // "Medium shot\n```\nMedium shot" fragment the user has no way to notice before pasting it
+    // into OpenArt/Kling. Keep whichever attempt is longer if both come back malformed.
+    const unclosedFence = (t) => ((t.match(/```/g) || []).length % 2) === 1;
+    let resp = await anthropic.messages.create(callArgs);
+    let text = extractText(resp);
+    if (unclosedFence(text)) {
+      const retry = await anthropic.messages.create(callArgs);
+      const retryText = extractText(retry);
+      if (!unclosedFence(retryText) || retryText.length > text.length) { resp = retry; text = retryText; }
+    }
     // Restore any Hebrew dialogue the model re-typed in reversed character order.
     text = fixReversedHebrew(text, userText || '');
     // Kling multi-shot: guarantee every shot fits OpenArt's 512-char field (the gem aims for it,
