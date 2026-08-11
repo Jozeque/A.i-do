@@ -2070,7 +2070,10 @@ async function doCreateCharacter() {
     state.current.characters.unshift(character);
     state.charUploads = [];
     state.charWardrobe = [];
-    state.assetForm = { name: '', tag: '', tagTouched: false, notes: '' };
+    // Mutate the form object in place — the input handlers hold a closure over THIS object,
+    // so replacing it would leave them writing into an orphan (name typed after a create
+    // was invisible to the next create until a refresh).
+    Object.assign(f, { name: '', tag: '', tagTouched: false, notes: '', asIs: false });
     if ($('#charName')) $('#charName').value = '';
     if ($('#assetTag')) $('#assetTag').value = '';
     if ($('#charNotes')) $('#charNotes').value = '';
