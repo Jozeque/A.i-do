@@ -32,6 +32,13 @@ const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5';
 // reads "ARRI Alexa + Cooke" reliably where Haiku occasionally slips and Opus over-writes past the
 // token cap. Override with ANALYZE_MODEL if needed.
 const ANALYZE_MODEL = process.env.ANALYZE_MODEL || 'claude-sonnet-5';
+// Any chat turn that carries ATTACHED IMAGES runs on a stronger vision model; text-only turns stay
+// on the cheap default. Haiku reads images at up to 1568px on the long edge, Sonnet 5 at 2576px —
+// and on a real advisor request (swap this product on a shelf) Haiku hallucinated scene elements
+// that weren't in the frame ("keep the same hand" on a shot with no hand) and misread the product.
+// Vision turns are the rare, high-value calls here, so pay for sight only where sight is needed.
+// Also used for the character builder, which is always a vision call. Override with VISION_MODEL.
+const VISION_MODEL = process.env.VISION_MODEL || 'claude-sonnet-5';
 const NB2_MODEL = process.env.NB2_MODEL || 'gemini-3.1-flash-image';
 const NB2_IMAGE_SIZE = process.env.NB2_IMAGE_SIZE || '1K';
 
@@ -83,6 +90,7 @@ const GEM_FILES = {
   'nb-advisor': 'nb-advisor.txt',
   'gpt-advisor': 'gpt-advisor.txt',
   'storyboard': 'storyboard.txt',
+  'seedance': 'seedance.txt',
 };
 async function readGem(gemId) {
   const file = GEM_FILES[gemId];
@@ -397,6 +405,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     claudeModel: CLAUDE_MODEL,
+    visionModel: VISION_MODEL,
     nb2Model: NB2_MODEL,
     nb2Size: NB2_IMAGE_SIZE,
     hasAnthropic: !!anthropic,
@@ -634,7 +643,7 @@ app.get('/api/usage', async (req, res) => {
     // reads), so a short TTL burns the free-tier daily read quota fast. Expenses move slowly;
     // add ?fresh=1 to force a recompute.
     if (!req.query.fresh && _usageCache.data && now - _usageCache.at < 30 * 60 * 1000) return res.json({ ..._usageCache.data, cached: true });
-    const out = await computeUsage(data, CLAUDE_MODEL);
+    const out = await computeUsage(data, CLAUDE_MODEL, VISION_MODEL);
     _usageCache = { at: now, data: out };
     res.json(out);
   } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
@@ -645,7 +654,7 @@ app.get('/api/usage', async (req, res) => {
 app.post('/api/projects/:pid/chat', async (req, res) => {
   if (!anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
   try {
-    const { gemId, userText, images = [], history = [], klingMode } = req.body;
+    const { gemId, userText, images = [], history = [], klingMode, seedanceVersion } = req.body;
     const base = await readGemWithKit(gemId);
     const p = await loadProject(req.params.pid);
     const override = (p.gemOverrides?.[gemId] || '').trim();
@@ -657,6 +666,13 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
       system += klingMode === 'multi'
         ? '\n\n--- ACTIVE MODE: MULTI-SHOT (set by the app toggle — this OVERRIDES the user\'s wording) ---\nProduce MODE B (a multi-shot sequence) for this message no matter how it is phrased. Take the number of shots from the user\'s message; if the user states no number, default to a 3-shot sequence. Do not produce the three single-shot archetype variations.'
         : '\n\n--- ACTIVE MODE: SINGLE SHOT (set by the app toggle — this OVERRIDES the user\'s wording) ---\nProduce MODE A (exactly three archetype variations of ONE single shot) for this message. Even if the user mentions multiple shots, a sequence, a storyboard, or a specific number of shots, IGNORE that and still return the three single-shot archetype variations. Never output a numbered "Shot 1 / Shot 2" sequence in this mode.';
+    }
+
+    // Seedance: the app's version toggle pins which platform budget/grammar to write for.
+    if (gemId === 'seedance') {
+      system += seedanceVersion === '2.0'
+        ? '\n\n--- ACTIVE VERSION: SEEDANCE 2.0 (set by the app toggle — this OVERRIDES the user\'s wording) ---\nWrite for Seedance 2.0: max 15s per clip; at most 12 reference files (9 images, 3 videos ≤15s combined, 3 audio ≤15s combined); NO bracket audio grammar — direct sound in prose plus a trailing "SFX only:" list; no staged [Stage N] structure (a 2.0 clip is one continuous choreography). State "Seedance 2.0" in the settings line.'
+        : '\n\n--- ACTIVE VERSION: SEEDANCE 2.5 (set by the app toggle — this OVERRIDES the user\'s wording) ---\nWrite for Seedance 2.5: up to 30s per clip; up to 50 reference files (30 images, 10 videos ≤30s combined, 10 audio ≤30s combined); the bracket audio grammar applies — ( ) music, < > SFX, { } dialogue, 【 】 subtitles; use the staged [Generation Goal]/[Stage N]/[Maintain Consistency] structure for clips over 15s or with 3+ distinct beats. State "Seedance 2.5" in the settings line.';
     }
 
     // Build the Anthropic message array from prior history + the new user turn.
@@ -686,7 +702,8 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
     messages.push({ role: 'user', content: userContent });
 
     const resp = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
+      // Images attached → the stronger vision model (see VISION_MODEL); text-only stays on the default.
+      model: images.length > 0 ? VISION_MODEL : CLAUDE_MODEL,
       // NB Frames returns 3 prompts × 4 dense DOP-grade paragraphs; 2048 truncated the
       // later prompts down to fewer paragraphs. Give it room for the full structure.
       max_tokens: 4096,
@@ -951,52 +968,97 @@ app.post('/api/projects/:pid/swap', async (req, res) => {
   }
 });
 
-// ── CHARACTERS — build a reusable, identity-locked reference sheet from actor photos ──
-// The character-builder gem (Claude, vision) writes ONE Nano Banana prompt; Nano Banana Pro
-// renders a single clean multi-view reference sheet (2K, landscape) with the uploaded photos
-// as the identity source. Stored in its OWN `characters` collection — never mixed into the
-// Library / Nano Banana outputs. Optional wardrobeImages are a CLOTHING-only role (face &
-// look from `images`, garments from these). body: { name, notes?, images:[…], wardrobeImages?:[…] }
+// ── ASSETS — build reusable, tagged reference sheets for the Seedance/Kling pipeline ──
+// One collection, several types. type 'character' (the default — every legacy record) keeps the
+// original identity-locked flow: character-builder gem → NB Pro multi-view sheet from actor
+// photos. Other types (vehicle / product / prop / location / look) run the asset-builder gem:
+// a 3-panel design sheet (or single plate for location, single graded frame for look) from
+// optional design refs + notes. A LOOK asset with an uploaded image is stored AS-IS — a look
+// frame must stay pixel-exact; re-generating it would drift the grade. Stored in the
+// `characters` collection (kept for back-compat) — never mixed into Library / NB outputs.
+// body: { name, notes?, images:[…], wardrobeImages?:[…], type?, tag? }
+const ASSET_TYPES = ['character', 'vehicle', 'product', 'prop', 'location', 'look'];
+const tagSlug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32);
 app.post('/api/projects/:pid/characters', async (req, res) => {
   if (!anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
   if (!genai) return res.status(400).json({ error: 'GEMINI_API_KEY is not set. Add it to your .env file.' });
   try {
-    const { name, notes = '', images = [], wardrobeImages = [] } = req.body;
-    if (!name || !name.trim()) return res.status(400).json({ error: 'Give the character a name.' });
-    if (!images.length) return res.status(400).json({ error: 'Attach at least one clear photo of the person.' });
+    const { name, notes = '', images = [], wardrobeImages = [], type = 'character', tag = '' } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Give the asset a name.' });
+    if (!ASSET_TYPES.includes(type)) return res.status(400).json({ error: `Unknown asset type: ${type}` });
+    if (type === 'character' && !images.length) return res.status(400).json({ error: 'Attach at least one clear photo of the person.' });
+    const assetTag = tagSlug(tag) || tagSlug(name) || 'asset';
     const p = await loadProject(req.params.pid);
 
-    // 1) The character-builder gem (Claude, vision) writes ONE Nano Banana prompt for the sheet.
-    const gem = await fsp.readFile(path.join(GEMS_DIR, 'character-builder.txt'), 'utf8');
-    const toImg = (img) => ({ type: 'image', source: { type: 'base64', media_type: sniffImageMime(img.data, img.mimeType), data: img.data } });
-    const content = [{ type: 'text', text: `Photos of the person "${name.trim()}" — the identity source:` }, ...images.map(toImg)];
-    if (wardrobeImages.length) {
-      content.push({ type: 'text', text: 'Wardrobe / outfit reference(s) — the CLOTHING source only; take only the garments from these, never their body, face, or pose:' });
-      content.push(...wardrobeImages.map(toImg));
+    // LOOK asset with an uploaded frame → store the frame itself as the reference, untouched.
+    if (type === 'look' && images.length) {
+      const charId = id(), refId = id();
+      const mime = sniffImageMime(images[0].data, images[0].mimeType);
+      const { file: refFile } = await storage.saveImage(p.id, refId, Buffer.from(images[0].data, 'base64'), mime);
+      const character = {
+        id: charId, name: name.trim(), notes: notes.trim(), type, tag: assetTag, prompt: '',
+        reference: { id: refId, file: refFile, mimeType: mime, aspectRatio: null },
+        sourceImages: [], wardrobeImages: [], createdAt: Date.now(),
+      };
+      await updateProject(req.params.pid, (proj) => {
+        proj.characters = proj.characters || [];
+        proj.characters.unshift(character);
+        proj.updatedAt = Date.now();
+      });
+      return res.json({ character });
     }
-    content.push({ type: 'text', text: `Build a character reference sheet for "${name.trim()}".`
-      + (wardrobeImages.length ? ' Dress them in the wardrobe shown in the wardrobe reference(s).' : '')
-      + (notes.trim() ? `\nNotes / adjustments: ${notes.trim()}` : '') });
+
+    // 1) The builder gem (Claude) writes ONE Nano Banana prompt for the reference.
+    //    Characters keep their dedicated identity gem; all other types share the asset gem.
+    const gem = await fsp.readFile(path.join(GEMS_DIR, type === 'character' ? 'character-builder.txt' : 'asset-builder.txt'), 'utf8');
+    const toImg = (img) => ({ type: 'image', source: { type: 'base64', media_type: sniffImageMime(img.data, img.mimeType), data: img.data } });
+    let content;
+    if (type === 'character') {
+      content = [{ type: 'text', text: `Photos of the person "${name.trim()}" — the identity source:` }, ...images.map(toImg)];
+      if (wardrobeImages.length) {
+        content.push({ type: 'text', text: 'Wardrobe / outfit reference(s) — the CLOTHING source only; take only the garments from these, never their body, face, or pose:' });
+        content.push(...wardrobeImages.map(toImg));
+      }
+      content.push({ type: 'text', text: `Build a character reference sheet for "${name.trim()}".`
+        + (wardrobeImages.length ? ' Dress them in the wardrobe shown in the wardrobe reference(s).' : '')
+        + (notes.trim() ? `\nNotes / adjustments: ${notes.trim()}` : '') });
+    } else {
+      content = [];
+      if (images.length) {
+        content.push({ type: 'text', text: `Design reference photos of the ${type} — the design source (take the exact design, never their backgrounds or lighting):` });
+        content.push(...images.map(toImg));
+      }
+      content.push({ type: 'text', text: `Asset type: ${type.toUpperCase()}. Build the reference for the ${type} asset named "${name.trim()}".`
+        + (images.length ? ' Match the exact design shown in the attached reference photos.' : ' No design photos are attached — invent the design cleanly from the name and notes.')
+        + (notes.trim() ? `\nNotes: ${notes.trim()}` : '') });
+    }
     const brief = await anthropic.messages.create({
-      model: CLAUDE_MODEL, max_tokens: 1024, system: gem,
+      model: images.length ? VISION_MODEL : CLAUDE_MODEL,   // vision only when there are photos to read
+      max_tokens: 1024, system: gem,
       messages: [{ role: 'user', content }],
     });
     const nbPrompt = brief.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
-    if (!nbPrompt) return res.status(502).json({ error: 'The character builder returned no prompt — try clearer photos.' });
+    if (!nbPrompt) return res.status(502).json({ error: 'The asset builder returned no prompt — try clearer photos.' });
 
     // 2) Nano Banana Pro renders the reference sheet at 2K, landscape, with the source photos
     //    as the identity reference. 2K matters — a multi-view sheet spreads resolution across
     //    several figures, so 1K left each face too small to capture the likeness.
     const AR = '16:9';
     const toInline = (img) => ({ inlineData: { mimeType: sniffImageMime(img.data, img.mimeType), data: img.data } });
-    // Label the two image roles so Nano Banana Pro binds identity vs wardrobe correctly —
-    // unlabelled, it guesses from order and wardrobe faces/bodies can leak into the identity.
-    const contents = [{ text: 'Identity reference photos (the person — copy face, bone structure, skin, hair, and build from these):' }, ...images.map(toInline)];
-    if (wardrobeImages.length) {
-      contents.push({ text: 'Wardrobe reference(s) (CLOTHING ONLY — take just the garments, never the body, face, or pose):' });
-      contents.push(...wardrobeImages.map(toInline));
+    // Label the image roles so Nano Banana Pro binds them correctly — unlabelled, it guesses
+    // from order and (for characters) wardrobe faces/bodies can leak into the identity.
+    const contents = [];
+    if (type === 'character') {
+      contents.push({ text: 'Identity reference photos (the person — copy face, bone structure, skin, hair, and build from these):' }, ...images.map(toInline));
+      if (wardrobeImages.length) {
+        contents.push({ text: 'Wardrobe reference(s) (CLOTHING ONLY — take just the garments, never the body, face, or pose):' });
+        contents.push(...wardrobeImages.map(toInline));
+      }
+    } else if (images.length) {
+      contents.push({ text: `Design reference photos (the ${type} — copy its exact shape, colors, materials, and details from these; never their backgrounds, scenes, or lighting):` }, ...images.map(toInline));
     }
-    contents.push({ text: `${nbPrompt}\n\nCompose the sheet as a ${AR_WORDS[AR]} (${AR}) landscape image; recompose to fill the full frame rather than copying any reference photo's shape.` });
+    const single = type === 'location' || type === 'look';   // one full frame, not a paneled sheet
+    contents.push({ text: `${nbPrompt}\n\n${single ? 'Render the frame' : 'Compose the sheet'} as a ${AR_WORDS[AR]} (${AR}) landscape image; recompose to fill the full frame rather than copying any reference photo's shape.` });
     let result;
     try {
       result = await genai.models.generateContent({
@@ -1025,7 +1087,7 @@ app.post('/api/projects/:pid/characters', async (req, res) => {
     const sourceImages = await saveAll(images);
     const wardrobeSaved = await saveAll(wardrobeImages);
     const character = {
-      id: charId, name: name.trim(), notes: notes.trim(), prompt: nbPrompt,
+      id: charId, name: name.trim(), notes: notes.trim(), type, tag: assetTag, prompt: nbPrompt,
       reference: { id: refId, file: refFile, mimeType: imgPart.inlineData.mimeType || 'image/png', aspectRatio: AR },
       sourceImages, wardrobeImages: wardrobeSaved, createdAt: Date.now(),
     };
@@ -1104,7 +1166,7 @@ app.listen(PORT, () => {
   console.log(`\n  AI Video Studio running →  http://localhost:${PORT}\n`);
   if (!anthropic) console.log('  ⚠  ANTHROPIC_API_KEY missing — text gems disabled until set in .env');
   if (!genai) console.log('  ⚠  GEMINI_API_KEY missing — Nano Banana 2 disabled until set in .env');
-  console.log(`  Claude model: ${CLAUDE_MODEL}   |   NB2 model: ${NB2_MODEL} @ ${NB2_IMAGE_SIZE}`);
+  console.log(`  Claude model: ${CLAUDE_MODEL}  (vision turns: ${VISION_MODEL})   |   NB2 model: ${NB2_MODEL} @ ${NB2_IMAGE_SIZE}`);
   console.log(`  Data: ${data.backend}   |   Media storage: ${storage.backend}\n`);
   storage.warmUp?.(); // pre-warm the Drive client so the first media request isn't cold
 });

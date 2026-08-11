@@ -93,6 +93,7 @@ const GEM_META = {
   'nb-advisor': { name: 'NB Advisor', blurb: 'Attach image(s) + say what to change. Returns the best Nano Banana 2 edit prompt with a quick rationale.' },
   'gpt-advisor': { name: 'GPT Advisor', blurb: 'Say what you want — a swap, an edit, or a new image — and attach reference(s). Returns the best <b>GPT Image 2 (ChatGPT)</b> prompt, tuned to keep your frame\'s look &amp; color.' },
   'storyboard': { name: 'Storyboard', blurb: 'Set a storyboard style once (attach a style reference in Tune gem), then describe any frame. Returns a Nano Banana prompt that draws that exact shot as a <b>storyboard panel</b> in your style. Attach a character reference to keep them recognizable.' },
+  'seedance': { name: 'Seedance Prompter', blurb: 'Attach asset sheets (⚡ from the Assets tab) + describe the scene. Returns <b>one</b> paste-ready Seedance prompt — reference definitions, technical block, choreography — with @-tags matched to a stated upload order for OpenArt.' },
 };
 
 // Suggestion lists for the NB Frames per-project cinematography builder (datalists; free text still allowed).
@@ -387,10 +388,12 @@ const state = {
   config: null,
   projects: [],
   current: null,        // full project object
-  activeTab: (['nb-frames','characters','kling','kling-advisor','nb-advisor','gpt-advisor','storyboard','swap','generate','library'].includes(localStorage.getItem('avs:lastTab')) ? localStorage.getItem('avs:lastTab') : 'nb-frames'),
-  attachments: {},      // per-gem: array of {name, mimeType, data, url}
+  activeTab: (['nb-frames','characters','seedance','kling','kling-advisor','nb-advisor','gpt-advisor','storyboard','swap','generate','library'].includes(localStorage.getItem('avs:lastTab')) ? localStorage.getItem('avs:lastTab') : 'nb-frames'),
+  attachments: {},      // per-gem: array of {name, mimeType, data, url, asset?:{tag,type,name}}
   refImages: [],        // for generate panel
   klingMode: localStorage.getItem('avs:klingMode') || 'single',  // 'single' (3 variations) | 'multi' (multi-shot)
+  seedanceVersion: localStorage.getItem('avs:seedanceVersion') || '2.5',  // '2.5' (30s, 50 refs) | '2.0' (15s, 12 refs)
+  assetType: 'character',  // Assets tab: which asset type the builder form is set to
   nbModel: localStorage.getItem('avs:nbModel') || 'nb2',         // 'nb2' (flash) | 'pro' (Nano Banana Pro)
   genAR: localStorage.getItem('avs:genAR') ?? '16:9',            // generator aspect ratio — defaults to 16:9, remembers last pick
   expSplit: localStorage.getItem('avs:expSplit') || 3,           // expense split — defaults to 3 ways, remembers last pick
@@ -912,13 +915,19 @@ function renderChat(body, gemId) {
           <button class="seg ${km === 'single' ? 'active' : ''}" data-mode="single" type="button">Single · 3</button>
           <button class="seg ${km === 'multi' ? 'active' : ''}" data-mode="multi" type="button">Multi-shot</button>
         </div>` : '';
+  const sv = state.seedanceVersion || '2.5';
+  const seedanceToggle = gemId === 'seedance' ? `
+        <div class="mode-toggle" id="seedanceVersionToggle" title="2.5 = up to 30s, 50 reference files, bracket sound grammar · 2.0 = up to 15s, 12 files">
+          <button class="seg ${sv === '2.5' ? 'active' : ''}" data-version="2.5" type="button">2.5 · 30s</button>
+          <button class="seg ${sv === '2.0' ? 'active' : ''}" data-version="2.0" type="button">2.0 · 15s</button>
+        </div>` : '';
   const panel = document.createElement('div');
   panel.className = 'chat-panel';
   panel.innerHTML = `
     <div class="chat-intro">
       <div class="ci-text"><b>${meta.name}.</b> ${meta.blurb}</div>
       <div class="chat-actions">
-        ${klingToggle}
+        ${klingToggle}${seedanceToggle}
         <button class="mini-btn" id="gemEditToggle">⚙ Tune gem</button>
         <button class="mini-btn" id="clearChat">Clear</button>
       </div>
@@ -950,6 +959,14 @@ function renderChat(body, gemId) {
       state.klingMode = b.dataset.mode;
       try { localStorage.setItem('avs:klingMode', state.klingMode); } catch {}
       $$('#klingModeToggle .seg').forEach(s => s.classList.toggle('active', s.dataset.mode === state.klingMode));
+    });
+  }
+  // Seedance version toggle: 2.5 (30s, 50 refs, bracket grammar) vs 2.0 (15s, 12 files)
+  if (gemId === 'seedance') {
+    $$('#seedanceVersionToggle .seg').forEach(b => b.onclick = () => {
+      state.seedanceVersion = b.dataset.version;
+      try { localStorage.setItem('avs:seedanceVersion', state.seedanceVersion); } catch {}
+      $$('#seedanceVersionToggle .seg').forEach(s => s.classList.toggle('active', s.dataset.version === state.seedanceVersion));
     });
   }
   $('#clearChat').onclick = async () => {
@@ -1028,6 +1045,7 @@ function chatPlaceholder(gemId) {
     'nb-advisor': 'What do you want to change in the attached image?',
     'gpt-advisor': 'Describe the swap / edit / image you want (attach the frame + any reference)…',
     'storyboard': 'Describe the frame / shot to draw as a storyboard panel (attach a character reference to keep them recognizable)…',
+    'seedance': 'Describe the scene, shots, and action — attach asset sheets with ⚡ from the Assets tab (duration & ratio if you know them)…',
   }[gemId];
 }
 
@@ -1069,7 +1087,7 @@ async function favoriteToAttachment(im) {
 }
 
 // Drag an image card (from NB2 results / Library) onto a tab button to attach it there.
-const DROP_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor', 'gpt-advisor', 'storyboard', 'generate', 'swap'];
+const DROP_TABS = ['nb-frames', 'seedance', 'kling', 'kling-advisor', 'nb-advisor', 'gpt-advisor', 'storyboard', 'generate', 'swap'];
 async function urlToAttachment(url) {
   const blob = await (await mediaFetch(url)).blob();
   const data = await fileToB64(blob);
@@ -1478,7 +1496,7 @@ function renderAssistant(text, refImgs = []) {
       html += `<pre><button class="copy-block" data-text="${enc}">copy</button>${escapeHtml(seg.trimEnd())}</pre>` +
         `<div class="pc-actions"><button class="reuse-prompt" data-text="${enc}" ${imgsAttr}>↻ Reuse prompt</button>` +
         (state.activeTab === 'gpt-advisor' ? `<button class="gpt-copy" data-text="${enc}" ${imgsAttr} title="Copy the prompt to your clipboard and download the reference image(s) — drag them into ChatGPT, then paste the prompt">⧉ Copy for ChatGPT</button>` : '') +
-        (!state.activeTab.startsWith('kling') ? `<button class="gen-link" data-text="${enc}" ${imgsAttr}>⚡ Send to Nano Banana 2</button>` : '') +
+        (!state.activeTab.startsWith('kling') && state.activeTab !== 'seedance' ? `<button class="gen-link" data-text="${enc}" ${imgsAttr}>⚡ Send to Nano Banana 2</button>` : '') +
         `</div>`;
     } else {
       html += formatProse(seg, imgsAttr);
@@ -1530,11 +1548,21 @@ async function sendChat(gemId) {
   if (!text && atts.length === 0) return;
   if (!state.config.hasAnthropic) { toast('Add your ANTHROPIC_API_KEY to .env first.', true); return; }
 
+  // Seedance: prefix the turn with an upload-order manifest so the gem binds @image tags to the
+  // exact files (assets carry their tag/type from the Assets tab; plain images list by filename).
+  let sendText = text;
+  if (gemId === 'seedance' && atts.length) {
+    const lines = atts.map((a, i) => a.asset
+      ? `Image ${i + 1} = @${a.asset.tag} — ${(a.asset.type || 'character').toUpperCase()} asset "${a.asset.name}" (reference sheet)`
+      : `Image ${i + 1} = attached image "${a.name || 'untitled'}"`);
+    sendText = `ATTACHED REFERENCE FILES — upload to OpenArt in this exact order:\n${lines.join('\n')}\n\n${text}`;
+  }
+
   const sendBtn = $('#sendBtn');
   sendBtn.disabled = true; sendBtn.innerHTML = '<span class="spinner"></span>';
 
   // optimistic user msg (keep a reference so we can fill in saved image refs from the response)
-  const userMsg = { role: 'user', content: text || '(image)', hadImages: atts.length > 0, at: Date.now() };
+  const userMsg = { role: 'user', content: sendText || '(image)', hadImages: atts.length > 0, at: Date.now() };
   state.current.chats = state.current.chats || {};
   state.current.chats[gemId] = state.current.chats[gemId] || [];   // guard: new gem (no Firestore doc yet)
   state.current.chats[gemId].push(userMsg);
@@ -1562,7 +1590,7 @@ async function sendChat(gemId) {
   try {
     const { text: reply, images: savedImgs } = await api(`/api/projects/${state.current.id}/chat`, {
       method: 'POST',
-      body: JSON.stringify({ gemId, userText: text, images, history: prior, klingMode: state.klingMode }),
+      body: JSON.stringify({ gemId, userText: sendText, images, history: prior, klingMode: state.klingMode, seedanceVersion: state.seedanceVersion }),
     });
     if (savedImgs && savedImgs.length) userMsg.images = savedImgs;  // so "Send to Nano Banana" can carry them
     state.current.chats[gemId].push({ role: 'assistant', content: reply, at: Date.now() });
@@ -1709,46 +1737,95 @@ function renderRefImages() {
 // ── CHARACTERS tab ─────────────────────────────────────────────────────────────
 // Build a reusable, identity-locked reference sheet from a few actor photos, then attach
 // it to NB Frames. Kept in its own `characters` collection — never in the Library.
+// ── Assets tab (internal id stays 'characters' for back-compat) ───────────────
+// Per-type form copy. An asset record without a `type` is a legacy character.
+const ASSET_UI = {
+  character: { label: '👤 Character', btn: 'Generate reference sheet', ing: 'Building reference…', namePh: 'Maya, Detective Cole',
+    hint: 'Upload a few clear photos of the person. We generate one clean multi-view reference sheet — a close-up plus front, three-quarter, and rear views — so NB&nbsp;Frames and Seedance keep the same person in every shot. <b>A single close-up drifts; the sheet holds.</b>',
+    photos: 'Photos of the person — identity · a few angles / expressions work best', notesPh: 'Optional — wardrobe in words, age, a beard, glasses… (blank = keep them exactly as the photos)' },
+  vehicle: { label: '🚗 Vehicle', btn: 'Generate vehicle sheet', ing: 'Building sheet…', namePh: 'Hero Car',
+    hint: 'Three-panel turnaround on a clean studio canvas — front three-quarter, side profile, rear three-quarter — so the exact same car holds in every shot. Attach design photos to lock a real design, or leave them empty and describe the car to invent one (fictional branding, de-badged).',
+    photos: 'Design photos of the vehicle — optional · the exact design source', notesPh: 'e.g. matte black electric coupe, white side panels, racing-red accent stripe, black 5-spoke wheels…' },
+  product: { label: '📦 Product', btn: 'Generate product sheet', ing: 'Building sheet…', namePh: 'Charm Bracelet',
+    hint: 'Three panels — front hero, back, and a macro of the signature detail — the identical product in each, true materials and colors. Attach photos of the real product to lock it exactly.',
+    photos: 'Photos of the product — optional · the exact design source', notesPh: 'e.g. the sterling-silver charm bracelet — heart clasp, pavé details, worn patina…' },
+  prop: { label: '🎬 Prop', btn: 'Generate prop sheet', ing: 'Building sheet…', namePh: 'Framed Champion Photo',
+    hint: 'Three panels — front, back, defining detail — so the prop stays identical across shots.',
+    photos: 'Photos of the prop — optional', notesPh: 'e.g. a framed vintage champion-driver photo in a worn brass frame…' },
+  location: { label: '🏙 Location', btn: 'Generate location plate', ing: 'Building plate…', namePh: 'Showroom',
+    hint: 'One wide establishing plate that locks the geography — every later shot matches this master. Attach photos of a real place to match it, or describe the place to invent it.',
+    photos: 'Photos of the place — optional', notesPh: 'e.g. a premium glass-walled car showroom at dusk, polished concrete, warm interior glow…' },
+  look: { label: '🎨 Look', btn: 'Save look frame', ing: 'Saving…', namePh: 'Film Look',
+    hint: 'The project look frame — the color-science reference you attach to EVERY Seedance generation so the whole film grades identically. Attach your graded frame and it is stored <b>exactly as-is</b> (no generation, free). No frame yet? Describe the grade and we generate one.',
+    photos: 'The look frame — attached image is stored untouched', notesPh: 'e.g. Kodak 500T film grain, organic color, soft contrast, warm tungsten interiors, cool dusk exteriors…' },
+};
+const tagSlug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32);
+
 function renderCharacters(body) {
   state.charUploads = state.charUploads || [];
   state.charWardrobe = state.charWardrobe || [];
+  state.assetForm = state.assetForm || { name: '', tag: '', tagTouched: false, notes: '' };
+  const type = state.assetType || 'character';
+  const ui = ASSET_UI[type];
+  const f = state.assetForm;
   const panel = document.createElement('div');
   panel.className = 'chars-panel';
   panel.innerHTML = `
     <div class="chars-new">
-      <div class="section-head"><h3>New character</h3></div>
-      <p class="chars-hint">Upload a few clear photos of the person. We generate one clean multi-view reference sheet — a close-up plus front, three-quarter, and profile views — so NB&nbsp;Frames can place them in any scene with the same face. <b>A single close-up drifts; the sheet holds.</b></p>
-      <input class="char-text" id="charName" data-draft placeholder="Name (e.g. Maya, Detective Cole)" />
-      <textarea class="char-text" id="charNotes" data-draft rows="2" placeholder="Optional — wardrobe in words, age, a beard, glasses… (blank = keep them exactly as the photos)"></textarea>
-      <span class="field-label">Photos of the person — identity · a few angles / expressions work best</span>
+      <div class="section-head"><h3>New asset</h3></div>
+      <div class="mode-toggle asset-types" id="assetTypes">${Object.entries(ASSET_UI).map(([k, v]) =>
+        `<button class="seg ${k === type ? 'active' : ''}" data-type="${k}" type="button">${v.label}</button>`).join('')}</div>
+      <p class="chars-hint">${ui.hint}</p>
+      <div class="asset-name-row">
+        <input class="char-text" id="charName" placeholder="Name (e.g. ${escapeHtml(ui.namePh)})" value="${escapeHtml(f.name)}" />
+        <input class="char-text asset-tag" id="assetTag" placeholder="@tag_for_prompts" value="${escapeHtml(f.tag ? '@' + f.tag : '')}" title="The @tag Seedance prompts use for this asset — auto-built from the name, edit to override" />
+      </div>
+      <textarea class="char-text" id="charNotes" rows="2" placeholder="${escapeHtml(ui.notesPh)}">${escapeHtml(f.notes)}</textarea>
+      <span class="field-label">${ui.photos}</span>
       <div class="ref-row" id="charRefRow">
-        <button class="ref-add" id="charAdd" title="Add photos of the person">＋</button>
+        <button class="ref-add" id="charAdd" title="Add photos">＋</button>
         <input type="file" id="charInput" accept="image/*" multiple hidden />
       </div>
+      ${type === 'character' ? `
       <span class="field-label">Wardrobe / outfit references — optional · face &amp; look come from the photos above, only the clothes come from these</span>
       <div class="ref-row" id="charWardrobeRow">
         <button class="ref-add" id="charWardrobeAdd" title="Add wardrobe / outfit photos">＋</button>
         <input type="file" id="charWardrobeInput" accept="image/*" multiple hidden />
-      </div>
-      <button class="generate-btn" id="charGenBtn">Generate reference sheet</button>
-      <div class="gen-hint">Rendered on Nano Banana Pro at 2K. Stored with this project — separate from your Library and Nano Banana outputs.</div>
+      </div>` : ''}
+      <button class="generate-btn" id="charGenBtn">${ui.btn}</button>
+      <div class="gen-hint">${type === 'look' ? 'An attached frame is stored untouched (free); generated frames render on Nano Banana Pro at 2K.' : 'Rendered on Nano Banana Pro at 2K. Stored with this project — separate from your Library and Nano Banana outputs.'}</div>
     </div>
     <div class="chars-gallery" id="charsGallery"></div>`;
   body.appendChild(panel);
+  // Type switch — keep typed fields and uploads, swap the form copy.
+  $$('#assetTypes .seg', panel).forEach(b => b.onclick = () => {
+    if (b.dataset.type === state.assetType) return;
+    state.assetType = b.dataset.type;
+    body.innerHTML = '';
+    renderCharacters(body);
+  });
+  // Field state — name auto-builds the @tag until the tag is edited by hand.
+  const nameEl = $('#charName'), tagEl = $('#assetTag'), notesEl = $('#charNotes');
+  nameEl.oninput = () => { f.name = nameEl.value; if (!f.tagTouched) { f.tag = tagSlug(f.name); tagEl.value = f.tag ? '@' + f.tag : ''; } };
+  tagEl.oninput = () => { f.tagTouched = true; f.tag = tagSlug(tagEl.value); };
+  tagEl.onblur = () => { tagEl.value = f.tag ? '@' + f.tag : ''; if (!f.tag) f.tagTouched = false; };
+  notesEl.oninput = () => { f.notes = notesEl.value; };
   $('#charAdd').onclick = () => $('#charInput').click();
   $('#charInput').onchange = async (e) => {
-    for (const f of e.target.files) {
-      try { const data = await fileToB64(f); state.charUploads.push({ name: f.name, mimeType: f.type, data, url: URL.createObjectURL(f) }); } catch {}
+    for (const file of e.target.files) {
+      try { const data = await fileToB64(file); state.charUploads.push({ name: file.name, mimeType: file.type, data, url: URL.createObjectURL(file) }); } catch {}
     }
     renderCharUploads(); e.target.value = '';
   };
-  $('#charWardrobeAdd').onclick = () => $('#charWardrobeInput').click();
-  $('#charWardrobeInput').onchange = async (e) => {
-    for (const f of e.target.files) {
-      try { const data = await fileToB64(f); state.charWardrobe.push({ name: f.name, mimeType: f.type, data, url: URL.createObjectURL(f) }); } catch {}
-    }
-    renderCharWardrobe(); e.target.value = '';
-  };
+  if (type === 'character') {
+    $('#charWardrobeAdd').onclick = () => $('#charWardrobeInput').click();
+    $('#charWardrobeInput').onchange = async (e) => {
+      for (const file of e.target.files) {
+        try { const data = await fileToB64(file); state.charWardrobe.push({ name: file.name, mimeType: file.type, data, url: URL.createObjectURL(file) }); } catch {}
+      }
+      renderCharWardrobe(); e.target.value = '';
+    };
+  }
   $('#charGenBtn').onclick = doCreateCharacter;
   renderCharUploads();
   renderCharWardrobe();
@@ -1788,62 +1865,98 @@ function renderCharsGallery() {
   if (!gallery) return;
   const chars = state.current.characters || [];
   if (!chars.length) {
-    gallery.innerHTML = `<div class="gen-empty">No characters yet. Build one above, then attach it to NB Frames to keep the same face across every scene.</div>`;
+    gallery.innerHTML = `<div class="gen-empty">No assets yet. Build characters, vehicles, products, locations, and a look frame above — then ⚡ attach them to Seedance so every shot uses the same locked references.</div>`;
     return;
   }
   gallery.innerHTML = chars.map(c => {
+    const type = c.type || 'character';
+    const tag = c.tag || tagSlug(c.name);
     const refUrl = `/media/${state.current.id}/images/${c.reference.file}`;
     const srcs = [...(c.sourceImages || []), ...(c.wardrobeImages || [])].map(s => `<img class="char-src" src="/media/${state.current.id}/uploads/${s.file}" loading="lazy" />`).join('');
     return `<div class="char-card" data-id="${c.id}">
       <a class="char-ref" href="${refUrl}" target="_blank" rel="noopener"><img src="${refUrl}" loading="lazy" /></a>
       <div class="char-meta">
-        <div class="char-name">${escapeHtml(c.name)}</div>
+        <div class="char-name">${escapeHtml(c.name)} <span class="asset-chip">@${escapeHtml(tag)}</span><span class="asset-chip type">${escapeHtml(ASSET_UI[type] ? ASSET_UI[type].label : type)}</span></div>
         ${c.notes ? `<div class="char-notes">${escapeHtml(c.notes)}</div>` : ''}
         ${srcs ? `<div class="char-srcs" title="Source photos">${srcs}</div>` : ''}
         <div class="char-actions">
-          <button class="mini-btn char-use" data-id="${c.id}">＋ Use in NB Frames</button>
-          <a class="mini-btn" href="${refUrl}" download="${escapeHtml(c.name)}-reference.png">⬇</a>
+          <button class="mini-btn char-seed" data-id="${c.id}">⚡ Use in Seedance</button>
+          <button class="mini-btn char-use" data-id="${c.id}">＋ NB Frames</button>
+          <a class="mini-btn" href="${refUrl}" download="${escapeHtml(tag)}-sheet.png">⬇</a>
           <button class="mini-btn char-del" data-id="${c.id}">Delete</button>
         </div>
       </div>
     </div>`;
   }).join('');
+  $$('.char-seed', gallery).forEach(b => b.onclick = () => useAssetInSeedance(chars.find(c => c.id === b.dataset.id)));
   $$('.char-use', gallery).forEach(b => b.onclick = () => useCharacterInFrames(chars.find(c => c.id === b.dataset.id)));
   $$('.char-del', gallery).forEach(b => b.onclick = () => deleteCharacter(b.dataset.id));
 }
 
 async function doCreateCharacter() {
-  const name = ($('#charName')?.value || '').trim();
-  const notes = ($('#charNotes')?.value || '').trim();
-  if (!name) { toast('Give the character a name first.', true); return; }
-  if (!(state.charUploads || []).length) { toast('Add at least one photo of the person.', true); return; }
+  const type = state.assetType || 'character';
+  const ui = ASSET_UI[type];
+  const f = state.assetForm || {};
+  const name = (f.name || '').trim();
+  const notes = (f.notes || '').trim();
+  const tag = tagSlug(f.tag) || tagSlug(name);
+  if (!name) { toast('Give the asset a name first.', true); return; }
+  if (type === 'character' && !(state.charUploads || []).length) { toast('Add at least one photo of the person.', true); return; }
+  if (type === 'look' && !(state.charUploads || []).length && !notes) { toast('Attach the look frame — or describe the grade so one can be generated.', true); return; }
   const btn = $('#charGenBtn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Building reference…'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>${ui.ing}`; }
   const gallery = $('#charsGallery');
   if (gallery && !gallery.querySelector('.char-card')) gallery.innerHTML = '';
   if (gallery) gallery.insertAdjacentHTML('afterbegin', '<div class="char-card char-skel"><div class="skeleton"></div></div>');
   try {
     const images = state.charUploads.map(u => ({ mimeType: u.mimeType, data: u.data }));
-    const wardrobeImages = (state.charWardrobe || []).map(u => ({ mimeType: u.mimeType, data: u.data }));
+    const wardrobeImages = type === 'character' ? (state.charWardrobe || []).map(u => ({ mimeType: u.mimeType, data: u.data })) : [];
     const { character } = await api(`/api/projects/${state.current.id}/characters`, {
-      method: 'POST', body: JSON.stringify({ name, notes, images, wardrobeImages }),
+      method: 'POST', body: JSON.stringify({ name, notes, images, wardrobeImages, type, tag }),
     });
     state.current.characters = state.current.characters || [];
     state.current.characters.unshift(character);
     state.charUploads = [];
     state.charWardrobe = [];
+    state.assetForm = { name: '', tag: '', tagTouched: false, notes: '' };
     if ($('#charName')) $('#charName').value = '';
+    if ($('#assetTag')) $('#assetTag').value = '';
     if ($('#charNotes')) $('#charNotes').value = '';
     renderCharUploads();
     renderCharWardrobe();
-    toast(`${character.name} is ready — attach the reference to NB Frames from the card.`);
+    toast(type === 'look' && images.length
+      ? `${character.name} stored as the project look — ⚡ attach it to every Seedance generation.`
+      : `${character.name} is ready — ⚡ attach it to Seedance (or NB Frames) from the card.`);
   } catch (e) {
-    toast(e.message || 'Could not build the character.', true);
+    toast(e.message || 'Could not build the asset.', true);
   } finally {
     const b = $('#charGenBtn');
-    if (b) { b.disabled = false; b.innerHTML = 'Generate reference sheet'; }
+    if (b) { b.disabled = false; b.innerHTML = ui.btn; }
     renderCharsGallery();
   }
+}
+
+// Attach an asset's reference sheet to the Seedance composer, carrying its @tag + type so the
+// sent message can state the upload-order manifest.
+async function useAssetInSeedance(char) {
+  if (!char) return;
+  try {
+    const tag = char.tag || tagSlug(char.name);
+    const url = `/media/${state.current.id}/images/${char.reference.file}`;
+    const blob = await (await mediaFetch(url)).blob();
+    const data = await fileToB64(blob);
+    switchTab('seedance');
+    state.attachments = state.attachments || {};
+    state.attachments['seedance'] = state.attachments['seedance'] || [];
+    if (!state.attachments['seedance'].some(r => r.url === url)) {
+      state.attachments['seedance'].push({
+        name: `${char.name} (@${tag})`, mimeType: blob.type || 'image/png', data, url,
+        asset: { tag, type: char.type || 'character', name: char.name },
+      });
+    }
+    renderAttachments('seedance');
+    toast(`@${tag} attached to Seedance — add more assets, then describe the scene.`);
+  } catch { toast('Could not attach the asset.', true); }
 }
 
 async function useCharacterInFrames(char) {
