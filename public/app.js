@@ -1930,14 +1930,15 @@ function renderCharacters(body) {
         <button class="ref-add" id="charAdd" title="Add photos">＋</button>
         <input type="file" id="charInput" accept="image/*" multiple hidden />
       </div>
+      ${type !== 'look' ? `<label class="asset-asis"><input type="checkbox" id="assetAsIs"${f.asIs ? ' checked' : ''} /> <span>Use my image <b>exactly as-is</b> — no generation (free); the uploaded image becomes the reference, pixel-identical (first image if several)</span></label>` : ''}
       ${type === 'character' ? `
       <span class="field-label">Wardrobe / outfit references — optional · face &amp; look come from the photos above, only the clothes come from these</span>
       <div class="ref-row" id="charWardrobeRow">
         <button class="ref-add" id="charWardrobeAdd" title="Add wardrobe / outfit photos">＋</button>
         <input type="file" id="charWardrobeInput" accept="image/*" multiple hidden />
       </div>` : ''}
-      <button class="generate-btn" id="charGenBtn">${ui.btn}</button>
-      <div class="gen-hint">${type === 'look' ? 'An attached frame is stored untouched (free); generated frames render on Nano Banana Pro at 2K.' : 'Rendered on Nano Banana Pro at 2K. Stored with this project — separate from your Library and Nano Banana outputs.'}</div>
+      <button class="generate-btn" id="charGenBtn">${f.asIs && type !== 'look' ? 'Save image as asset' : ui.btn}</button>
+      <div class="gen-hint">${type === 'look' ? 'An attached frame is stored untouched (free); generated frames render on Nano Banana Pro at 2K.' : 'Generated sheets render on Nano Banana Pro at 2K; "as-is" stores your upload untouched (free). Stored with this project — separate from your Library and Nano Banana outputs.'}</div>
     </div>
     <div class="chars-gallery" id="charsGallery"></div>`;
   body.appendChild(panel);
@@ -1954,6 +1955,11 @@ function renderCharacters(body) {
   tagEl.oninput = () => { f.tagTouched = true; f.tag = tagSlug(tagEl.value); };
   tagEl.onblur = () => { tagEl.value = f.tag ? '@' + f.tag : ''; if (!f.tag) f.tagTouched = false; };
   notesEl.oninput = () => { f.notes = notesEl.value; };
+  const asIsEl = $('#assetAsIs');
+  if (asIsEl) asIsEl.onchange = () => {
+    f.asIs = asIsEl.checked;
+    const gb = $('#charGenBtn'); if (gb) gb.textContent = f.asIs ? 'Save image as asset' : ui.btn;
+  };
   $('#charAdd').onclick = () => $('#charInput').click();
   $('#charInput').onchange = async (e) => {
     for (const file of e.target.files) {
@@ -2044,11 +2050,13 @@ async function doCreateCharacter() {
   const name = (f.name || '').trim();
   const notes = (f.notes || '').trim();
   const tag = tagSlug(f.tag) || tagSlug(name);
+  const asIs = type !== 'look' && !!f.asIs;
   if (!name) { toast('Give the asset a name first.', true); return; }
-  if (type === 'character' && !(state.charUploads || []).length) { toast('Add at least one photo of the person.', true); return; }
+  if (asIs && !(state.charUploads || []).length) { toast('Attach the image to store as the reference.', true); return; }
+  if (type === 'character' && !asIs && !(state.charUploads || []).length) { toast('Add at least one photo of the person.', true); return; }
   if (type === 'look' && !(state.charUploads || []).length && !notes) { toast('Attach the look frame — or describe the grade so one can be generated.', true); return; }
   const btn = $('#charGenBtn');
-  if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>${ui.ing}`; }
+  if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>${asIs ? 'Saving…' : ui.ing}`; }
   const gallery = $('#charsGallery');
   if (gallery && !gallery.querySelector('.char-card')) gallery.innerHTML = '';
   if (gallery) gallery.insertAdjacentHTML('afterbegin', '<div class="char-card char-skel"><div class="skeleton"></div></div>');
@@ -2056,7 +2064,7 @@ async function doCreateCharacter() {
     const images = state.charUploads.map(u => ({ mimeType: u.mimeType, data: u.data }));
     const wardrobeImages = type === 'character' ? (state.charWardrobe || []).map(u => ({ mimeType: u.mimeType, data: u.data })) : [];
     const { character } = await api(`/api/projects/${state.current.id}/characters`, {
-      method: 'POST', body: JSON.stringify({ name, notes, images, wardrobeImages, type, tag }),
+      method: 'POST', body: JSON.stringify({ name, notes, images, wardrobeImages, type, tag, asIs }),
     });
     state.current.characters = state.current.characters || [];
     state.current.characters.unshift(character);
@@ -2066,11 +2074,14 @@ async function doCreateCharacter() {
     if ($('#charName')) $('#charName').value = '';
     if ($('#assetTag')) $('#assetTag').value = '';
     if ($('#charNotes')) $('#charNotes').value = '';
+    if ($('#assetAsIs')) $('#assetAsIs').checked = false;
     renderCharUploads();
     renderCharWardrobe();
-    toast(type === 'look' && images.length
-      ? `${character.name} stored as the project look — ⚡ attach it to every Seedance generation.`
-      : `${character.name} is ready — ⚡ attach it to Seedance (or NB Frames) from the card.`);
+    toast(asIs
+      ? `${character.name} stored untouched — ⚡ attach it to Seedance from the card.`
+      : type === 'look' && images.length
+        ? `${character.name} stored as the project look — ⚡ attach it to every Seedance generation.`
+        : `${character.name} is ready — ⚡ attach it to Seedance (or NB Frames) from the card.`);
   } catch (e) {
     toast(e.message || 'Could not build the asset.', true);
   } finally {

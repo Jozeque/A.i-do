@@ -1092,15 +1092,17 @@ app.post('/api/projects/:pid/characters', async (req, res) => {
   if (!anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
   if (!genai) return res.status(400).json({ error: 'GEMINI_API_KEY is not set. Add it to your .env file.' });
   try {
-    const { name, notes = '', images = [], wardrobeImages = [], type = 'character', tag = '' } = req.body;
+    const { name, notes = '', images = [], wardrobeImages = [], type = 'character', tag = '', asIs = false } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'Give the asset a name.' });
     if (!ASSET_TYPES.includes(type)) return res.status(400).json({ error: `Unknown asset type: ${type}` });
-    if (type === 'character' && !images.length) return res.status(400).json({ error: 'Attach at least one clear photo of the person.' });
+    if (asIs && !images.length) return res.status(400).json({ error: 'Attach the image to store as the reference.' });
+    if (type === 'character' && !asIs && !images.length) return res.status(400).json({ error: 'Attach at least one clear photo of the person.' });
     const assetTag = tagSlug(tag) || tagSlug(name) || 'asset';
     const p = await loadProject(req.params.pid);
 
-    // LOOK asset with an uploaded frame → store the frame itself as the reference, untouched.
-    if (type === 'look' && images.length) {
+    // As-is storage (any type, opt-in) and LOOK-with-image (always): the uploaded image
+    // itself becomes the reference, pixel-untouched — no builder gem, no generation, no cost.
+    if ((asIs || type === 'look') && images.length) {
       const charId = id(), refId = id();
       const mime = sniffImageMime(images[0].data, images[0].mimeType);
       const { file: refFile } = await storage.saveImage(p.id, refId, Buffer.from(images[0].data, 'base64'), mime);

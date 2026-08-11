@@ -131,9 +131,9 @@ export async function computeUsage(data, claudeModel, visionModel = claudeModel)
       spend(ts, isSwapModel(img.model) ? { swap: cost, swapImages: 1 } : { nb: cost, nbImages: 1 });
     }
     // Characters / assets — one NB Pro (2K) image + one builder Claude call each.
-    // A look asset stored from an uploaded frame (prompt === '') cost nothing — skip it.
+    // An asset stored as-is from an uploaded image (prompt === '') cost nothing — skip it.
     for (const ch of p.characters || []) {
-      if (ch.type === 'look' && !ch.prompt) continue;
+      if (!ch.prompt) continue;
       const cIn = (sysTok['character-builder'] ?? 800) + 2 * IMG_IN_TOK + tok(ch.notes || '');
       spend(ch.createdAt || p.createdAt || Date.now(), { claude: (cIn * rate.in + 400 * rate.out) / 1e6, claudeCalls: 1, nb: imageCost('gemini-3-pro-image', ch.size || '2K'), nbImages: 1 });
     }
