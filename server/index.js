@@ -1086,7 +1086,7 @@ app.post('/api/projects/:pid/swap', async (req, res) => {
 // frame must stay pixel-exact; re-generating it would drift the grade. Stored in the
 // `characters` collection (kept for back-compat) — never mixed into Library / NB outputs.
 // body: { name, notes?, images:[…], wardrobeImages?:[…], type?, tag? }
-const ASSET_TYPES = ['character', 'vehicle', 'product', 'prop', 'location', 'look'];
+const ASSET_TYPES = ['character', 'mascot', 'vehicle', 'product', 'prop', 'location', 'look'];
 const tagSlug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32);
 app.post('/api/projects/:pid/characters', async (req, res) => {
   if (!anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
