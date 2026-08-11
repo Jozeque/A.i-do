@@ -105,6 +105,9 @@ rest of the video; she never moves from it"), and give reflective surfaces expli
   location plates, look frames — each with an `@tag` name.
 - **Seedance tab** (Claude gem → paste into OpenArt) writes the full three-block prompt —
   REFERENCE DEFINITIONS / TECHNICAL / PROMPT — with `@imageN` tags matching a stated upload order.
+- **Seedance ⚙ Tune gem** works like NB Frames' tune: attach a graded look frame → Analyze reads it
+  into structured VIDEO look fields (locked film/style line, grade, lighting, lens family, movement
+  energy) → compiled into the project direction the gem folds into every TECHNICAL block.
 - OpenArt field limits: no per-shot character cap seen so far (unlike Kling multi-shot's 512).
   If OpenArt ever truncates, measure and enforce in code like `capKlingShots()` — not in the gem.
 

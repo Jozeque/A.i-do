@@ -186,6 +186,40 @@ function compileNbFramesDirection(b) {
   return out.join('\n');
 }
 
+// ── Per-project look builder for Seedance ────────────────────────────────────
+// Structured fields (filled by hand or by the look analyzer) compiled into the
+// PROJECT-SPECIFIC DIRECTION the seedance gem receives. The gem folds the film/style
+// line verbatim into every TECHNICAL block — that repetition is what holds one look
+// across a whole film, alongside the attached Look asset.
+function compileSeedanceDirection(b) {
+  if (!b || typeof b !== 'object') return '';
+  const v = (x) => (x && String(x).trim()) ? String(x).trim() : '';
+  const project = v(b.project), film = v(b.film), palette = v(b.palette), lighting = v(b.lighting),
+        lens = v(b.lens), camera = v(b.camera), world = v(b.world), aspectRatio = v(b.aspectRatio),
+        sound = v(b.sound), extra = v(b.extra);
+  if (!(project || film || palette || lighting || lens || camera || world || aspectRatio || sound || extra)) return '';
+
+  const out = [];
+  out.push('PROJECT LOOK & TECHNICAL DNA — apply this to EVERY Seedance prompt written for this project.');
+  out.push('');
+  out.push('This is the project\'s look SYSTEM: a family of ranges and constants, never the locked values of one reference frame. The film/style line below is the LOCKED look language — repeat it consistently across generations; everything else adapts per shot inside its stated family.');
+  out.push('');
+  if (project) out.push(`Project / campaign: ${project}.`);
+  if (film || palette) {
+    const line = [film, palette].filter(Boolean).join('; ');
+    out.push(`FILM/STYLE LINE — fold this wording into every TECHNICAL block, word for word, never re-improvised per shot: "${line}."`);
+  }
+  if (lighting) out.push(`Lighting character: ${lighting}. Keep this CHARACTER in every scene while motivating the actual source from the scene itself (sun, windows, practicals, neon, night) — the character is constant, the source adapts.`);
+  if (lens)     out.push(`Lens & framing feel: ${lens}. This is the framing DNA — choose each shot's specific focal length and framing inside this family; never weld one focal length onto every shot.`);
+  if (camera)   out.push(`Camera movement energy: ${camera}. Choreograph every shot's moves inside this energy unless the user's brief explicitly asks for something else.`);
+  if (world)    out.push(`World & atmosphere bias: ${world}.`);
+  if (aspectRatio) out.push(`Default aspect ratio: ${aspectRatio} — state it in the TECHNICAL block and the settings line on every prompt unless the user overrides it for a specific generation.`);
+  if (sound)    out.push(`Default sound policy: ${sound} — state it in the TECHNICAL block unless the user's brief overrides it.`);
+  if (extra)    out.push(`Additional direction: ${extra}`);
+  if (b.styleRef) out.push('A project look frame is saved with this tune — when the user attaches it (or any Look asset), define it as a style/color-grade reference ONLY, and note in the manifest that it should ride along on every generation.');
+  return out.join('\n');
+}
+
 // ── tiny helpers ─────────────────────────────────────────────────────────────
 // ── Kling multi-shot 512-char cap (OpenArt field limit) ──────────────────────
 // OpenArt's Kling multi-shot field allows 512 characters per shot and silently truncates the rest
@@ -494,10 +528,14 @@ app.patch('/api/projects/:pid', async (req, res) => {
       if (req.body.gemOverrides) p.gemOverrides = { ...p.gemOverrides, ...req.body.gemOverrides };
       if (req.body.gemBuilders) {
         p.gemBuilders = { ...(p.gemBuilders || {}), ...req.body.gemBuilders };
-        // NB Frames direction is derived from its structured builder
+        // NB Frames / Seedance directions are derived from their structured builders
         if (req.body.gemBuilders['nb-frames']) {
           p.gemOverrides = p.gemOverrides || {};
           p.gemOverrides['nb-frames'] = compileNbFramesDirection(p.gemBuilders['nb-frames']);
+        }
+        if (req.body.gemBuilders['seedance']) {
+          p.gemOverrides = p.gemOverrides || {};
+          p.gemOverrides['seedance'] = compileSeedanceDirection(p.gemBuilders['seedance']);
         }
       }
       p.updatedAt = Date.now();
@@ -622,6 +660,77 @@ Describe only what you can actually see; do not invent. Keep values concise.`;
     if (images[0]) styleRef = await storage.saveUpload(p.id, images[0].data, images[0].mimeType);
 
     const FIELDS = ['medium', 'look', 'lighting', 'lens', 'palette', 'grain', 'environment', 'aspectRatio', 'wardrobe', 'extra'];
+    const builder = {};
+    for (const k of FIELDS) builder[k] = typeof parsed[k] === 'string' ? parsed[k].trim() : '';
+    if (styleRef) builder.styleRef = { ...styleRef, url: `/media/${p.id}/uploads/${styleRef.file}` };
+
+    res.json({ builder });
+  } catch (e) {
+    res.status(500).json({ error: e?.message || String(e) });
+  }
+});
+
+// ── Analyze reference image(s) → fill the Seedance look builder ────────────────
+// Same idea as the NB Frames analyzer, but extracts VIDEO look DNA: the locked
+// film/style line for every TECHNICAL block + adaptive lighting/lens/camera families.
+// body: { images: [{ mimeType, data(base64) }] }
+app.post('/api/projects/:pid/gems/seedance/analyze', async (req, res) => {
+  if (!anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
+  try {
+    const { images = [] } = req.body;
+    if (!images.length) return res.status(400).json({ error: 'Attach at least one reference image to analyze.' });
+    const p = await loadProject(req.params.pid);
+
+    const kit = await readCineKit();
+    const system = `${kit ? kit + '\n\n' : ''}You are a film-look analyst for an AI VIDEO generator (Seedance). Examine the attached reference frame(s) and extract their look as a REUSABLE VIDEO LOOK SYSTEM — the grade, light, lens, and movement DNA that every video prompt of this project will carry. Focus on style and craft, NOT the identity of any person or the specific scene content.
+
+MOST IMPORTANT — capture the transferable CINEMATOGRAPHY, not this one frame's scene. The user reuses this look across many different shots, scenes, TIMES OF DAY, and subjects. Extract what makes the frame beautiful as CRAFT — color science, contrast and grade, how light shapes the subject, lens character, texture, finish — each described as a FAMILY or RANGE (its DNA), never the single locked value of this frame. Do NOT bake in circumstantial facts: its time of day, light source, location, or the subject's outfit. If the reference is daylight, that does not make this a daylight project — describe the lighting's CHARACTER so it re-creates at night, golden hour, or indoors.
+
+THE FILM FIELD IS THE MOST IMPORTANT. It becomes the locked line repeated verbatim in every video prompt's technical block, so write it as that exact line: film stock or capture feel + grain + color treatment + contrast + finish, in the compact style video models respond to (e.g. "Kodak 500T film grain, organic color, soft contrast, filmic look" or "Clean digital cinema, neutral color, high dynamic range, crisp finish"). Match what you SEE — never default to one stock reflexively, and match the grain exactly (clean ↔ fine 35mm ↔ heavy 16mm), neither cleaner nor grainier than the reference.
+
+For a PHOTOGRAPHIC/cinematic reference, name in the lens field the real CAMERA BODY and LENS SERIES whose optical character best matches (e.g. "ARRI Alexa Mini LF with Cooke S4/i primes", "Sony Venice 2 with Zeiss Supremes") plus a focal-length RANGE and depth-of-field feel — the rig is the constant, the focal length the per-shot variable. For a NON-photographic (illustrated/animated) reference, never name a camera; describe the rendering style instead and reflect it in the film field (e.g. "hand-painted cel animation look, flat color fields, clean line finish").
+
+CAMERA MOVEMENT cannot be read from a still — PROPOSE a movement energy that genuinely fits this look's genre feel (locked-off contemplative / smooth dolly-crane cinema / handheld documentary / kinetic action), phrased as a family of moves, and keep it a proposal the user can edit.
+
+Return STRICT JSON only — no markdown, no commentary — with exactly these string keys:
+{"film":"","palette":"","lighting":"","lens":"","camera":"","world":"","extra":""}
+Guidance per key (RANGE/FAMILY, not one locked value):
+- film: the locked technical-block line described above — stock/capture feel, grain, color treatment, contrast, finish. Compact, paste-ready.
+- palette: the grade as transferable color RELATIONSHIPS — warm/cool balance, scheme, saturation, highlight roll-off — never this frame's specific object colors.
+- lighting: the lighting CRAFT as a scene-adaptive approach — quality (soft↔hard), contrast character, how it shapes and separates subjects, catchlight character — usable under any scene or time of day.
+- lens: camera body + lens series + focal-length range + DoF/bokeh/distortion character (photographic), or "n/a — [rendering technique]" (illustrated).
+- camera: the proposed movement-energy family (e.g. "slow deliberate dollies and holds, no handheld shake" / "organic handheld drift, quick reframes").
+- world: default environment/atmosphere bias ONLY as a rendering approach (haze, practical density, depth handling) — say environments follow each brief unless the look is genuinely tied to one world.
+- extra: 1-3 sentences of extra craft notes (composition tendencies, texture, motion-feel cues like halation or shutter feel) as transferable guidance.
+Describe only what you can actually see; do not invent. Keep values concise.`;
+
+    const userContent = images.map(img => ({
+      type: 'image',
+      source: { type: 'base64', media_type: sniffImageMime(img.data, img.mimeType), data: img.data },
+    }));
+    userContent.push({ type: 'text', text: 'Analyze the video look of the attached reference frame(s) and return only the JSON object.' });
+
+    const resp = await anthropic.messages.create({
+      model: ANALYZE_MODEL,
+      max_tokens: 2048,
+      system,
+      messages: [{ role: 'user', content: userContent }],
+    });
+    const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+
+    let parsed;
+    try {
+      const m = text.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(m ? m[0] : text);
+    } catch {
+      return res.status(502).json({ error: 'Could not parse the analysis as JSON. Raw output: ' + text.slice(0, 300) });
+    }
+
+    // Persist the first reference as the project's saved look frame for this tune.
+    let styleRef = null;
+    if (images[0]) styleRef = await storage.saveUpload(p.id, images[0].data, images[0].mimeType);
+
+    const FIELDS = ['film', 'palette', 'lighting', 'lens', 'camera', 'world', 'extra'];
     const builder = {};
     for (const k of FIELDS) builder[k] = typeof parsed[k] === 'string' ? parsed[k].trim() : '';
     if (styleRef) builder.styleRef = { ...styleRef, url: `/media/${p.id}/uploads/${styleRef.file}` };

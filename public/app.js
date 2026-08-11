@@ -177,6 +177,57 @@ function gemEditorBody(gemId, meta) {
       ${baseView}`;
   }
 
+  if (gemId === 'seedance') {
+    return `
+      <div class="bf-analyze">
+        <span class="field-label">Build from a look reference — attach or paste a graded frame (your film look) and the model reads its cinematography into the fields below as the project's VIDEO look system: a locked film/style line for every technical block + adaptive lighting, lens, and camera families.</span>
+        <div class="bf-analyze-row">
+          <div class="ref-row" id="bfRefRow"><button class="ref-add" id="bfRefAdd" type="button">＋</button><input type="file" id="bfRefInput" accept="image/*" multiple hidden /></div>
+          <button class="mini-btn primary" id="bfAnalyze" type="button">✨ Analyze &amp; build</button>
+        </div>
+      </div>
+      <span class="field-label">Video look fields — compiled into the direction every Seedance prompt follows (this project only). The film/style line is repeated VERBATIM in every prompt's technical block — that repetition + the attached Look asset is what holds one look across the whole film. Describe families/ranges, not one frame's locked values.</span>
+      <div class="builder-grid">
+        <label class="bf">Project / campaign<input id="sd_project" placeholder="e.g. Hero car launch film" /></label>
+        <label class="bf">Film / style line (locked, verbatim)<input id="sd_film" list="dl_sd_film" placeholder="e.g. Kodak 500T film grain, organic color, soft contrast, filmic look" /></label>
+        <label class="bf">Color &amp; grade<input id="sd_palette" list="dl_palette" placeholder="e.g. warm subject vs cool dusk surroundings, filmic roll-off" /></label>
+        <label class="bf">Lighting character<input id="sd_lighting" list="dl_lighting" placeholder="e.g. soft directional key, punchy contrast, clean shadows" /></label>
+        <label class="bf">Lens &amp; framing feel<input id="sd_lens" list="dl_lens" placeholder="e.g. ARRI Alexa Mini LF + Cooke S4/i, ~35–85mm, creamy falloff" /></label>
+        <label class="bf">Camera movement energy<input id="sd_camera" list="dl_sd_camera" placeholder="e.g. smooth deliberate dollies and holds, no handheld shake" /></label>
+        <label class="bf">World / atmosphere bias<input id="sd_world" placeholder="e.g. light haze, dense practicals, deep backgrounds" /></label>
+        <label class="bf">Default aspect ratio
+          <select id="sd_aspectRatio">
+            <option value="">(per generation)</option>
+            <option value="16:9">16:9 wide</option>
+            <option value="21:9">21:9 cinema</option>
+            <option value="9:16">9:16 vertical</option>
+            <option value="1:1">1:1 square</option>
+            <option value="4:3">4:3</option>
+            <option value="3:4">3:4 portrait</option>
+          </select>
+        </label>
+        <label class="bf">Default sound policy
+          <select id="sd_sound">
+            <option value="">(per generation)</option>
+            <option value="SFX only, no music">SFX only, no music</option>
+            <option value="SFX + score">SFX + score</option>
+            <option value="Dialogue + SFX, no music">Dialogue + SFX, no music</option>
+            <option value="Dialogue + SFX + score">Dialogue + SFX + score</option>
+          </select>
+        </label>
+      </div>
+      <label class="bf bf-wide">Additional direction (freetext)<textarea id="sd_extra" placeholder="Anything else: recurring motifs, pacing, do's &amp; don'ts, brand rules…"></textarea></label>
+      ${saveRow}
+      <details class="gem-base" open>
+        <summary>Compiled direction the gem receives (read-only preview)</summary>
+        <pre id="gemCompiled" class="compiled">—</pre>
+      </details>
+      ${baseView}
+      ${dl('dl_sd_film', ['Kodak 500T film grain, organic color, soft contrast, filmic look', 'Kodak 250D — sunlit warmth, fine natural grain, gentle contrast', 'Clean digital cinema — neutral color, high dynamic range, crisp finish', 'Heavy 16mm grain — vintage, handmade, textured', 'Neon noir — deep blacks, glowing highlights, high contrast'])}
+      ${dl('dl_sd_camera', ['Locked-off and composed — tripod holds, slow deliberate moves', 'Smooth cinematic — dollies, cranes, gimbal glides', 'Handheld documentary — organic drift, quick reframes', 'Kinetic action — whip pans, speed ramps, chasing moves'])}
+      ${dl('dl_palette', BUILDER_OPTS.palette)}${dl('dl_lighting', BUILDER_OPTS.lighting)}${dl('dl_lens', BUILDER_OPTS.lens)}`;
+  }
+
   return `
     <span class="field-label">Project-specific direction — extends the base ${meta.name} gem for this project only (vibe, constraints, style).</span>
     <textarea id="gemOverride" placeholder="e.g. moody neon-noir motion, heavy rain physics, slow deliberate camera moves…"></textarea>
@@ -360,6 +411,96 @@ async function loadGemEditor(gemId) {
       state.current.gemOverrides = p.gemOverrides; state.current.gemBuilders = p.gemBuilders;
       if (styleEl) styleEl.value = '';
       styleRef = null; pending = []; renderBfRefs();
+      flashSaved();
+    };
+  } else if (gemId === 'seedance') {
+    const b = builder || {};
+    const fieldIds = ['project', 'film', 'palette', 'lighting', 'lens', 'camera', 'world', 'aspectRatio', 'sound', 'extra'];
+    const styleIds = ['film', 'palette', 'lighting', 'lens', 'camera', 'world', 'extra'];   // what the analyzer fills
+    fieldIds.forEach(k => { const el = $('#sd_' + k); if (el) el.value = b[k] || ''; });
+    const cp = $('#gemCompiled'); if (cp) cp.textContent = override || '— (analyze a look frame or fill the fields, then Save) —';
+
+    let styleRef = b.styleRef || null;   // {file, mimeType, url} — persisted look frame
+    let pending = [];                    // newly attached {mimeType, data, url} awaiting analysis
+
+    const renderBfRefs = () => {
+      const row = $('#bfRefRow'); if (!row) return;
+      $$('.thumb', row).forEach(t => t.remove());
+      const add = $('#bfRefAdd');
+      const items = [];
+      if (styleRef) items.push({ url: styleRef.url, saved: true });
+      pending.forEach((pp, i) => items.push({ url: pp.url, i }));
+      items.forEach(it => {
+        const t = document.createElement('div');
+        t.className = 'thumb' + (it.saved ? ' saved' : '');
+        t.innerHTML = `<img src="${it.url}" />` + (it.saved ? '' : `<button class="rm" type="button" data-i="${it.i}">✕</button>`);
+        if (!it.saved) t.querySelector('.rm').onclick = () => { pending.splice(it.i, 1); renderBfRefs(); };
+        row.insertBefore(t, add);
+      });
+    };
+    renderBfRefs();
+
+    $('#bfRefAdd').onclick = () => $('#bfRefInput').click();
+    $('#bfRefInput').onchange = async (e) => {
+      for (const f of e.target.files) {
+        const data = await fileToB64(f);
+        pending.push({ mimeType: f.type, data, url: URL.createObjectURL(f) });
+      }
+      renderBfRefs(); e.target.value = '';
+    };
+
+    $('#bfAnalyze').onclick = async () => {
+      if (!pending.length) { toast('Attach a look frame first.', true); return; }
+      if (!state.config.hasAnthropic) { toast('Add your ANTHROPIC_API_KEY to .env first.', true); return; }
+      const btn = $('#bfAnalyze'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Analyzing…';
+      try {
+        const images = pending.map(pp => ({ mimeType: pp.mimeType, data: pp.data }));
+        const { builder: filled } = await api(`/api/projects/${state.current.id}/gems/seedance/analyze`, {
+          method: 'POST', body: JSON.stringify({ images }),
+        });
+        styleIds.forEach(k => { const el = $('#sd_' + k); if (el && typeof filled[k] === 'string') el.value = filled[k]; });
+        if (filled.styleRef) { styleRef = filled.styleRef; pending = []; renderBfRefs(); }
+        toast('Video look read from the reference — review & Save.');
+      } catch (err) {
+        toast(err.message, true);
+      } finally {
+        btn.disabled = false; btn.innerHTML = '✨ Analyze & build';
+      }
+    };
+
+    // Paste an image into the freetext box to queue it for analysis.
+    const sdExtra = $('#sd_extra');
+    if (sdExtra) sdExtra.addEventListener('paste', async (e) => {
+      const files = filesFromPaste(e);
+      if (!files.length) return;
+      e.preventDefault();
+      const text = e.clipboardData.getData('text');
+      if (text) insertAtCursor(sdExtra, text);
+      for (const f of files) {
+        const data = await fileToB64(f);
+        pending.push({ mimeType: f.type, data, url: URL.createObjectURL(f) });
+      }
+      renderBfRefs();
+      toast('Reference pasted — click "Analyze & build".');
+    });
+
+    $('#saveGem').onclick = async () => {
+      const vals = {};
+      fieldIds.forEach(k => { vals[k] = ($('#sd_' + k)?.value || '').trim(); });
+      if (styleRef) vals.styleRef = styleRef;
+      const p = await api(`/api/projects/${state.current.id}`, { method: 'PATCH', body: JSON.stringify({ gemBuilders: { 'seedance': vals } }) });
+      state.current.gemOverrides = p.gemOverrides; state.current.gemBuilders = p.gemBuilders;
+      const cp2 = $('#gemCompiled'); if (cp2) cp2.textContent = (p.gemOverrides && p.gemOverrides['seedance']) || '— (empty) —';
+      flashSaved();
+    };
+
+    $('#resetGem').onclick = async () => {
+      if (!confirm(`Reset the ${GEM_META[gemId].name} setup for this project? This clears all video look fields, the saved look frame, and the project direction.`)) return;
+      const p = await api(`/api/projects/${state.current.id}`, { method: 'PATCH', body: JSON.stringify({ gemBuilders: { 'seedance': {} } }) });
+      state.current.gemOverrides = p.gemOverrides; state.current.gemBuilders = p.gemBuilders;
+      fieldIds.forEach(k => { const el = $('#sd_' + k); if (el) el.value = ''; });
+      styleRef = null; pending = []; renderBfRefs();
+      const cp3 = $('#gemCompiled'); if (cp3) cp3.textContent = '— (analyze a look frame or fill the fields, then Save) —';
       flashSaved();
     };
   } else {
