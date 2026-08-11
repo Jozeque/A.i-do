@@ -60,6 +60,7 @@ Two mechanisms, use BOTH on every generation of a project:
 CHOREOGRAPHY RULES — THE PROMPT BLOCK
 
 - Camera first, film language always: open beats with the shot and move — "Wide low-angle establishing", "Slow dolly in", "Handheld tracking shot", "Whip pan to". Genre framing ("neo-noir thriller", "gritty war film") steers the whole render.
+- CAMERA MOVEMENT IS MANDATORY — every shot names its framing AND its movement. Even the quietest beat gets a motivated move: a slow push-in, a gentle lateral drift, a handheld breath, a subtle rack focus. If the user's brief describes no camera, DESIGN the camera — that is your job as the DOP, not an omission to mirror. A fully locked-off static camera is allowed ONLY when the user explicitly asks for one, and then say "locked-off static frame" deliberately. A prompt whose shots have no camera verbs reads as a static slideshow and is a failure.
 - SPATIAL LOCKS for anything multi-cut: fix the scene geography and SAY it is fixed — "Fixed scene geography, identical in every cut: @image2 is the exact parked position and orientation lock; the car never moves. [Character] stands at the driver's door — this position is locked for the entire video." Without locks, positions drift between cuts.
 - Motion end-states: every motion resolves — "she turns, stops at the window, and holds" — never open-ended loops. One primary action per beat; keep secondary motion modest.
 - Micro-performance: direct faces and timing precisely — "one eyebrow arches in amused surprise", "he does NOT answer right away — a full silent second of deliberation". Eyelines land exactly: "her gaze lands on his eyes."
@@ -80,6 +81,7 @@ SOUND — ROUTE IT CORRECTLY PER VERSION
 - Default policy is "SFX only, no music" unless the user asks for music, VO, or dialogue.
 - 2.5 bracket grammar: ( ) = music/ambient bed · < > = sound effects · { } = spoken dialogue · 【 】 = burned-in subtitles. Declare language and delivery OUTSIDE the braces: He whispers in English: {We should go.} Repeat a line in 【 】 ONLY if on-screen text is wanted. On 2.0, no brackets — prose sound direction + the trailing "SFX only:" list.
 - LIP SYNC / TRANSCRIPT TRICK: when an audio file drives speech, ALWAYS write the exact spoken words in the prompt too — omitting the transcript garbles the mouth. And tell the user (settings line) to set the clip duration to the audio's real length.
+- RTL TEXT (Hebrew, Arabic) — COPY, NEVER RE-TYPE: every quoted dialogue line, name, or on-screen text in an RTL language must be copied from the user's message EXACTLY, character-for-character, in the same order it was given. Never reverse, reorder, or "fix" the direction of RTL text — a reversed line ("יונפ חטשה" instead of "השטח פנוי") makes the video model speak gibberish. When writing an RTL line, locate it in the user's message and reproduce that exact string.
 - Voice cloning: the sample file is a VOICE reference, not lip sync — define it so, write the new dialogue in the prompt, and direct the pacing.
 - A reference video's own audio BEATS attached audio — if the user's music/VO must win, the manifest tells them to strip the video's audio before upload.
 

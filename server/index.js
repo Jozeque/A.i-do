@@ -253,6 +253,26 @@ function capKlingShots(reply) {
   });
 }
 
+// ── RTL dialogue reversal guard ──────────────────────────────────────────────
+// LLMs sometimes re-type Hebrew text with its characters in reverse order (visual
+// instead of logical order) — "השטח פנוי" comes out "יונפ חטשה" and the video model
+// renders gibberish speech. The intended strings always come from the user's own
+// message, so enforce deterministically: for every Hebrew phrase in the user text,
+// find its reversed form (whole-phrase or per-word) in the reply and restore the
+// original. The gems are also instructed to copy RTL verbatim; this is the backstop.
+const HEB_PHRASE = /[֐-׿][֐-׿׳״'".,!?…:;\s-]*[֐-׿]/g;
+function fixReversedHebrew(reply, userText) {
+  if (!reply || !userText || !/[֐-׿]/.test(reply)) return reply;
+  for (const phrase of userText.match(HEB_PHRASE) || []) {
+    if (phrase.length < 3) continue;
+    const rev = [...phrase].reverse().join('');                       // whole phrase flipped
+    if (rev !== phrase && reply.includes(rev)) reply = reply.split(rev).join(phrase);
+    const wordRev = phrase.split(/(\s+)/).map(w => /\s/.test(w) ? w : [...w].reverse().join('')).join('');
+    if (wordRev !== phrase && wordRev !== rev && reply.includes(wordRev)) reply = reply.split(wordRev).join(phrase);
+  }
+  return reply;
+}
+
 const id = () => crypto.randomBytes(8).toString('hex');
 
 // Anthropic + Gemini reject an image whose DECLARED media type doesn't match its bytes.
@@ -822,6 +842,8 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
       messages,
     });
     let text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    // Restore any Hebrew dialogue the model re-typed in reversed character order.
+    text = fixReversedHebrew(text, userText || '');
     // Kling multi-shot: guarantee every shot fits OpenArt's 512-char field (the gem aims for it,
     // this enforces it) — trim any over-length shot at a clean boundary, mandatory suffix intact.
     if (gemId === 'kling' && klingMode === 'multi') text = capKlingShots(text);
