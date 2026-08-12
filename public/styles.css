@@ -47,7 +47,7 @@ body {
   padding: 22px 16px;
   gap: 18px;
 }
-.brand { display: flex; align-items: center; gap: 12px; padding: 0 4px; }
+.brand { display: flex; align-items: center; gap: 12px; padding: 0 4px; flex-shrink: 0; }
 .brand-mark {
   font-size: 30px; line-height: 1; color: var(--accent);
   filter: drop-shadow(0 0 14px rgba(232,176,75,.4));
@@ -62,11 +62,14 @@ body {
   padding: 11px 14px; cursor: pointer; letter-spacing: .01em;
   transition: transform .12s ease, box-shadow .18s ease;
   box-shadow: 0 8px 22px -10px rgba(232,176,75,.7);
+  flex-shrink: 0;
 }
 .new-project-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 28px -10px rgba(232,176,75,.85); }
 .new-project-btn.big { font-size: 14px; padding: 14px 22px; margin-top: 8px; }
 
-.project-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin: 0 -4px; padding: 0 4px; }
+/* min-height:0 is load-bearing: a flex item defaults to min-height:auto, so a long list
+   would grow past the sidebar (pushing the footer off-screen) instead of scrolling. */
+.project-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin: 0 -4px; padding: 0 4px; }
 .project-item {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer;
@@ -80,7 +83,7 @@ body {
 .project-item:hover .pdel { opacity: 1; }
 .project-item .pdel:hover { color: var(--danger); background: rgba(226,104,95,.12); }
 
-.sidebar-foot { border-top: 1px solid var(--line-soft); padding-top: 12px; }
+.sidebar-foot { border-top: 1px solid var(--line-soft); padding-top: 12px; flex-shrink: 0; }
 .key-status { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); line-height: 1.7; display: block; }
 .key-status b { color: var(--teal); }
 .key-status .bad { color: var(--danger); }
