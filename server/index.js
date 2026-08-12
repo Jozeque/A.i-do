@@ -186,6 +186,18 @@ function compileNbFramesDirection(b) {
   return out.join('\n');
 }
 
+// ── Output language (applies to every gem) ───────────────────────────────────
+// Claude mirrors the user's language by default, so a Hebrew brief came back with a
+// Hebrew reply. Every gem's output is a prompt destined for an image/video model plus
+// notes for the studio, and both must be English — the generators are trained
+// predominantly on English. The carve-out is quoted dialogue the user supplied: that
+// must survive verbatim, or the video model would speak a translated line.
+const OUTPUT_LANGUAGE_RULE = `--- OUTPUT LANGUAGE (absolute — overrides anything above) ---
+
+ALWAYS write your entire reply in ENGLISH, whatever language the user writes in. Every prompt, label, note, question, and explanation is in English. A message written in Hebrew, Russian, or Arabic still gets a fully English reply — never mirror the user's language.
+
+THE ONE EXCEPTION — quoted dialogue and on-screen text: any line the user supplied to be SPOKEN or DISPLAYED stays in its original language, copied verbatim, character-for-character, exactly as the user typed it. Never translate, transliterate, reorder, or reverse it. Introduce it in English and leave the line itself untouched — e.g. she whispers in Hebrew: "השטח פנוי". Translating such a line would make the generator speak the wrong words.`;
+
 // ── Per-project look builder for Seedance ────────────────────────────────────
 // Structured fields (filled by hand or by the look analyzer) compiled into the
 // PROJECT-SPECIFIC DIRECTION the seedance gem receives. The gem folds the film/style
@@ -804,6 +816,10 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
         : '\n\n--- ACTIVE VERSION: SEEDANCE 2.5 (set by the app toggle — this OVERRIDES the user\'s wording) ---\nWrite for Seedance 2.5: up to 30s per clip; up to 50 reference files (30 images, 10 videos ≤30s combined, 10 audio ≤30s combined); the bracket audio grammar applies — ( ) music, < > SFX, { } dialogue, 【 】 subtitles; use the staged [Generation Goal]/[Stage N]/[Maintain Consistency] structure for clips over 15s or with 3+ distinct beats. State "Seedance 2.5" in the settings line.';
     }
 
+    // Last in the system prompt so it wins over any gem's own wording — English replies
+    // always, with the user's quoted dialogue preserved verbatim.
+    system += `\n\n${OUTPUT_LANGUAGE_RULE}`;
+
     // Build the Anthropic message array from prior history + the new user turn.
     // If this turn includes image(s), treat it as a fresh brief and IGNORE prior history —
     // an earlier scene/reference must never bleed into prompts for a newly attached image.
@@ -1180,7 +1196,8 @@ app.post('/api/projects/:pid/characters', async (req, res) => {
     }
     const brief = await anthropic.messages.create({
       model: images.length ? VISION_MODEL : CLAUDE_MODEL,   // vision only when there are photos to read
-      max_tokens: 1024, system: gem,
+      // Notes written in Hebrew would otherwise come back as a Hebrew Nano Banana prompt.
+      max_tokens: 1024, system: `${gem}\n\n${OUTPUT_LANGUAGE_RULE}`,
       messages: [{ role: 'user', content }],
     });
     const nbPrompt = brief.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
