@@ -823,7 +823,12 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
     // Build the Anthropic message array from prior history + the new user turn.
     // If this turn includes image(s), treat it as a fresh brief and IGNORE prior history —
     // an earlier scene/reference must never bleed into prompts for a newly attached image.
-    const messages = (images.length > 0 ? [] : history).map(m => ({ role: m.role, content: m.content }));
+    // Blank turns are dropped: a truncated reply used to be persisted as empty content, and the
+    // API rejects an empty content block — so one bad reply would 400 every text-only follow-up
+    // on that tab until the chat was cleared.
+    const messages = (images.length > 0 ? [] : history)
+      .filter(m => String(m.content || '').trim())
+      .map(m => ({ role: m.role, content: m.content }));
     const userContent = [];
     // Label each attached image ("Image 1:", "Image 2:", …) so the gem knows which one the
     // user means by "image 1" / "image 2" — essential for swaps/composites where direction
@@ -850,27 +855,39 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
       // Images attached → the stronger vision model (see VISION_MODEL); text-only stays on the default.
       model: images.length > 0 ? VISION_MODEL : CLAUDE_MODEL,
       // NB Frames returns 3 prompts × 4 dense DOP-grade paragraphs; 2048 truncated the
-      // later prompts down to fewer paragraphs. Give it room for the full structure.
-      max_tokens: 4096,
+      // later prompts down to fewer paragraphs. On Sonnet 5 adaptive thinking is on by
+      // default and thinking + visible text SHARE this cap — at 4096, a hard multi-image
+      // brief could burn the whole budget on thinking and return an EMPTY reply.
+      max_tokens: 16000,
       // Cache the large (~8k-token) gem system prompt so it isn't re-processed and re-billed
       // on every message in a session (5-min TTL) — cuts time-to-first-token and cost.
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       messages,
     };
     const extractText = (r) => r.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
-    // An odd number of ``` fences means a code block never closed — a reply that stopped mid-
-    // sentence well under max_tokens (an occasional Anthropic API hiccup, not a token-limit
-    // truncation). Deterministically detectable, so retry once rather than saving a broken
-    // "Medium shot\n```\nMedium shot" fragment the user has no way to notice before pasting it
-    // into OpenArt/Kling. Keep whichever attempt is longer if both come back malformed.
+    // Three ways a reply comes back broken, each deterministically detectable and worth one retry
+    // rather than saving something the user only discovers after pasting it into OpenArt/Kling:
+    //   - stop_reason "max_tokens": the reply ran out of budget mid-sentence, so a 3-prompt answer
+    //     arrives with 1.5 prompts. The fence check below never caught this — these replies carry
+    //     no ``` fences at all.
+    //   - empty text: same cause at its worst. Adaptive thinking shares max_tokens with the visible
+    //     answer, so a dense multi-image brief could spend the whole budget thinking and return only
+    //     thinking blocks, which used to be saved as a blank message.
+    //   - an odd number of ``` fences: a code block never closed — a reply that stopped mid-sentence
+    //     well under max_tokens (an occasional Anthropic API hiccup, not a token-limit truncation).
+    // Keep whichever attempt is longer if both come back broken.
     const unclosedFence = (t) => ((t.match(/```/g) || []).length % 2) === 1;
+    const broken = (r, t) => !t.trim() || r.stop_reason === 'max_tokens' || unclosedFence(t);
     let resp = await anthropic.messages.create(callArgs);
     let text = extractText(resp);
-    if (unclosedFence(text)) {
+    if (broken(resp, text)) {
       const retry = await anthropic.messages.create(callArgs);
       const retryText = extractText(retry);
-      if (!unclosedFence(retryText) || retryText.length > text.length) { resp = retry; text = retryText; }
+      if (!broken(retry, retryText) || retryText.length > text.length) { resp = retry; text = retryText; }
     }
+    // Nothing usable even after the retry — fail loudly instead of appending a blank bubble the
+    // user has to re-type the whole brief to recover from.
+    if (!text.trim()) throw new Error(`The gem returned an empty reply (stop reason: ${resp.stop_reason || 'unknown'}). Please send the message again.`);
     // Restore any Hebrew dialogue the model re-typed in reversed character order.
     text = fixReversedHebrew(text, userText || '');
     // Kling multi-shot: guarantee every shot fits OpenArt's 512-char field (the gem aims for it,
