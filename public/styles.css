@@ -222,6 +222,34 @@ body {
 .fav-thumb:hover { border-color: var(--accent); }
 .fav-thumb[disabled] { opacity: .5; cursor: default; }
 .fav-empty { font-size: 12px; color: var(--ink-faint); padding: 6px 4px; }
+/* reference cell = the thumb plus its own save/forget actions, revealed on hover so the
+   grid stays a wall of images rather than a wall of buttons */
+.ref-cell { position: relative; }
+.ref-cell-acts { position: absolute; inset: 3px 3px auto auto; display: flex; gap: 3px; opacity: 0; transition: opacity .15s ease; }
+.ref-cell:hover .ref-cell-acts, .ref-cell:focus-within .ref-cell-acts { opacity: 1; }
+.ref-mini { width: 18px; height: 18px; line-height: 1; padding: 0; border: 0; border-radius: 5px; cursor: pointer;
+  background: rgba(0,0,0,.72); color: #fff; font-size: 11px; display: grid; place-items: center; }
+.ref-mini:hover { background: var(--accent); }
+.ref-mini[disabled] { opacity: .5; cursor: default; }
+/* kept references inside the Assets tab — raw source material, shown denser than the
+   built asset cards so a few hundred of them stay scannable */
+.kept-refs { margin-top: 26px; }
+.kept-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.kept-cell { position: relative; }
+.kept-thumb { display: block; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--bg); aspect-ratio: 1; }
+.kept-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kept-thumb:hover { border-color: var(--accent); }
+.kept-acts { position: absolute; inset: 4px 4px auto auto; display: flex; gap: 3px; opacity: 0; transition: opacity .15s ease; }
+.kept-cell:hover .kept-acts, .kept-cell:focus-within .kept-acts { opacity: 1; }
+/* import-from-another-project picker */
+.assets-built-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 26px; }
+.import-picker { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 14px; max-height: 340px; overflow-y: auto; }
+.import-proj + .import-proj { margin-top: 14px; }
+.import-cell { cursor: pointer; display: block; }
+.import-cell input { position: absolute; top: 5px; left: 5px; z-index: 2; cursor: pointer; }
+.import-cell input:checked ~ .kept-thumb { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.import-name { display: block; font-size: 10.5px; color: var(--ink-faint); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-actions { margin-top: 12px; display: flex; justify-content: flex-end; }
 /* inline variant (used in the generator's reference slot — sits in flow, not as an overlay) */
 .fav-picker.inline { position: static; left: auto; right: auto; bottom: auto; margin: 10px 0 0; box-shadow: none; }
 .composer-attach { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }

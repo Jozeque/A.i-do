@@ -234,6 +234,19 @@ function compileSeedanceDirection(b) {
 
 // ── tiny helpers ─────────────────────────────────────────────────────────────
 // ── Kling multi-shot 512-char cap (OpenArt field limit) ──────────────────────
+// ── Seedance reference tags ───────────────────────────────────────────────────
+// OpenArt binds a reference tag by reading from "@" up to the next whitespace, so ANY
+// character glued to the tag gets swallowed into the name: "@image1," looks for a file
+// called "image1," finds nothing, and the tag silently dies on paste. The gem is told to
+// leave a bare space after every tag, but punctuation is exactly the kind of thing a model
+// slips back into ("the face from @image1, the coat from @image2") — so guarantee it here.
+// The punctuation is kept and simply pushed past a space ("@image1 , the coat from…"):
+// commas and colons carry real grammatical weight in these prompts, so separating is safer
+// than deleting. The digits are matched greedily and the lookahead excludes digits, so a
+// two-digit tag like @image10 is never split after its first digit.
+const spaceAfterTags = (reply) =>
+  reply.replace(/(@(?:image|video|audio)\d+)(?=[^\s\d])/gi, '$1 ');
+
 // OpenArt's Kling multi-shot field allows 512 characters per shot and silently truncates the rest
 // MID-WORD (which kills the mandatory suffix). The gem is instructed to stay under, but a language
 // model can't count characters reliably (measured: it overran to 600+ on ~1/3 of runs), so enforce
@@ -790,6 +803,109 @@ app.get('/api/usage', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
 });
 
+// ── Reference retention ───────────────────────────────────────────────────────
+// Every image attached in a chat is kept as a reusable reference, so a file that took
+// effort to find or make is never lost to a single message. Identity is the sha256 of the
+// bytes, not the filename: attaching the same trophy render in ten different briefs stores
+// it once and re-attaching it later costs nothing. Assets (the `characters` collection)
+// stay a separate, curated thing — a reference is promoted into an asset by hand.
+const sha256 = (b64) => crypto.createHash('sha256').update(Buffer.from(b64, 'base64')).digest('hex');
+
+// Read a stored image's bytes back out, whichever storage backend is configured.
+async function readStoredImage(pid, bucket, file) {
+  if (storage.backend === 'drive') {
+    const { stream } = await storage.readFile(file);
+    const chunks = [];
+    for await (const c of stream) chunks.push(c);
+    return Buffer.concat(chunks);
+  }
+  return fsp.readFile(path.join(DATA_DIR, pid, bucket, file));
+}
+
+async function rememberReferences(pid, images, savedImgs, gemId) {
+  const seen = new Set();   // same file attached twice in ONE message — keep it once
+  for (let i = 0; i < images.length; i++) {
+    const saved = savedImgs[i];
+    if (!saved) continue;
+    try {
+      const sha = sha256(images[i].data);
+      if (seen.has(sha)) continue;
+      seen.add(sha);
+      if (await data.findReferenceBySha(pid, sha)) continue;   // already kept — nothing to do
+      await data.addReference(pid, {
+        id: id(), sha256: sha,
+        file: saved.file, mimeType: saved.mimeType, url: saved.url,
+        gemId: gemId || '', createdAt: Date.now(),
+      });
+    } catch (e) {
+      console.warn('[references] skipped one:', e?.message || e);
+    }
+  }
+}
+
+// ── Assets across projects ────────────────────────────────────────────────────
+// Assets live inside one project, so starting a fresh project silently leaves everything
+// you already built behind — the reason a whole cast of trophies looked like it had
+// vanished. These two routes let any project see and pull assets from every other one,
+// so built work is never stranded in the project that happened to create it.
+app.get('/api/assets/index', async (req, res) => {
+  try {
+    const projects = await data.listProjects();
+    const out = await Promise.all(projects.map(async (p) => {
+      try {
+        const assets = await data.getCharacters(p.id);
+        return { id: p.id, name: p.name, assets: assets.map((a) => ({ id: a.id, name: a.name, type: a.type || 'character', tag: a.tag || '', file: a.reference?.file || '' })) };
+      } catch { return { id: p.id, name: p.name, assets: [] }; }
+    }));
+    res.json({ projects: out.filter((p) => p.assets.length) });
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
+});
+
+// body: { fromPid, ids: [assetId, …] } — copies, never moves: the source keeps its own.
+app.post('/api/projects/:pid/assets/import', async (req, res) => {
+  try {
+    const { fromPid, ids = [] } = req.body || {};
+    if (!fromPid || !ids.length) return res.status(400).json({ error: 'Pick at least one asset to import.' });
+    if (fromPid === req.params.pid) return res.status(400).json({ error: 'That project is already this one.' });
+    const src = await data.getCharacters(fromPid);
+    const imported = [];
+    for (const assetId of ids) {
+      const a = src.find((x) => x.id === assetId);
+      if (!a) continue;
+      // Re-upload the bytes under fresh ids so the two projects never share a file —
+      // deleting the asset in one can then never break the copy in the other.
+      const copy = { ...a, id: id(), createdAt: Date.now() };
+      if (a.reference?.file) {
+        const buf = await readStoredImage(fromPid, 'images', a.reference.file);
+        const refId = id();
+        const { file } = await storage.saveImage(req.params.pid, refId, buf, a.reference.mimeType || 'image/png');
+        copy.reference = { ...a.reference, id: refId, file };
+      }
+      for (const bucket of ['sourceImages', 'wardrobeImages']) {
+        const out = [];
+        for (const s of a[bucket] || []) {
+          try {
+            const buf = await readStoredImage(fromPid, 'uploads', s.file);
+            const saved = await storage.saveUpload(req.params.pid, buf.toString('base64'), s.mimeType);
+            out.push({ ...s, file: saved.file });
+          } catch { /* a missing source photo must not block the asset itself */ }
+        }
+        copy[bucket] = out;
+      }
+      await updateProject(req.params.pid, (p) => { p.characters = p.characters || []; p.characters.unshift(copy); p.updatedAt = Date.now(); });
+      imported.push(copy);
+    }
+    res.json({ imported });
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
+});
+
+app.delete('/api/projects/:pid/references/:refId', async (req, res) => {
+  try {
+    await data.deleteReference(req.params.pid, req.params.refId);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
+});
+
 // ── CHAT with a gem (Claude) ───────────────────────────────────────────────────
 // body: { gemId, messages:[{role, content|parts}], images?: [{mimeType, data(base64)}] }
 app.post('/api/projects/:pid/chat', async (req, res) => {
@@ -893,12 +1009,18 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
     // Kling multi-shot: guarantee every shot fits OpenArt's 512-char field (the gem aims for it,
     // this enforces it) — trim any over-length shot at a clean boundary, mandatory suffix intact.
     if (gemId === 'kling' && klingMode === 'multi') text = capKlingShots(text);
+    // Seedance prompts are pasted straight into OpenArt — every @tag must end on a space.
+    if (gemId === 'seedance') text = spaceAfterTags(text);
 
     // persist any attached images to disk so they survive reloads
     const savedImgs = [];
     for (const img of images) {
       savedImgs.push(await storage.saveUpload(p.id, img.data, img.mimeType));
     }
+    // Keep every attached image as a reusable reference so the same file never has to be
+    // hunted down and re-uploaded. Deduped on the bytes, so re-attaching one you already
+    // used adds nothing. Never blocks the reply — a failure here must not lose the prompt.
+    rememberReferences(p.id, images, savedImgs, gemId).catch((e) => console.warn('[references]', e?.message || e));
 
     // Append via a targeted chat-doc write (reads only THIS gem's chat doc, not the whole
     // project) — the old updateProject re-read every image doc twice per message.

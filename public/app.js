@@ -707,6 +707,15 @@ function syncProject(pid) {
     state.current.characters = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     if (state.activeTab === 'characters') renderCharsGallery();
   }, (e) => console.warn('[sync] characters:', e?.message || e)));
+
+  // references — kept fresh so a reference either of us attaches is immediately
+  // re-attachable by the other, without a reload
+  _projUnsubs.push(onSnapshot(collection(_fs, 'projects', pid, 'references'), (snap) => {
+    if (!mine()) return;
+    state.current.references = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    if (!$('#refPicker')?.classList.contains('hidden')) renderRefPicker(state.activeTab);
+    if (state.activeTab === 'characters') renderKeptRefs();
+  }, (e) => console.warn('[sync] references:', e?.message || e)));
 }
 
 async function newProject() {
@@ -1079,10 +1088,12 @@ function renderChat(body, gemId) {
     <div class="chat-scroll" id="chatScroll"></div>
     <div class="composer">
       <div class="fav-picker hidden" id="favPicker"></div>
+      <div class="fav-picker hidden" id="refPicker"></div>
       <div class="composer-attach" id="composerAttach"></div>
       <div class="composer-row">
         <button class="attach-btn" id="attachBtn" title="Attach or paste an image">📎</button>
         <button class="attach-btn fav-open" id="favBtn" title="Add from this project's favorites">★</button>
+        <button class="attach-btn fav-open" id="refBtn" title="Re-attach a reference you've used before in this project">🕘</button>
         <input type="file" id="fileInput" accept="image/*" multiple hidden />
         <textarea id="chatInput" data-draft rows="1" placeholder="${chatPlaceholder(gemId)}"></textarea>
         <button class="send-btn" id="sendBtn">Send</button>
@@ -1136,7 +1147,19 @@ function renderChat(body, gemId) {
     const picker = $('#favPicker');
     const opening = picker.classList.contains('hidden');
     picker.classList.toggle('hidden');
+    $('#refPicker')?.classList.add('hidden');
     if (opening) renderFavPicker(gemId);
+  };
+
+  // re-attach a reference already used in this project — every image ever attached in a
+  // chat is kept, so a file only ever has to be found on disk once
+  $('#refBtn').onclick = (e) => {
+    e.stopPropagation();
+    const picker = $('#refPicker');
+    const opening = picker.classList.contains('hidden');
+    picker.classList.toggle('hidden');
+    $('#favPicker')?.classList.add('hidden');
+    if (opening) renderRefPicker(gemId);
   };
 
   // drag & drop image files from the OS straight into the chat
@@ -1216,6 +1239,78 @@ function renderFavPickerInto(picker, onPick) {
     b.disabled = true;
     await onPick(im);
     picker.classList.add('hidden');
+  });
+}
+
+// ── Reference picker ─────────────────────────────────────────────────────────
+// Every image attached in a chat is kept server-side (deduped on its bytes), so the same
+// file never has to be hunted down twice. Newest first — the ones in play are at the top.
+// "Save to Assets" promotes one into the curated Assets tab, where it gets a name and @tag.
+function renderRefPicker(gemId) {
+  const picker = $('#refPicker');
+  if (!picker) return;
+  const refs = state.current?.references || [];
+  if (!refs.length) {
+    picker.innerHTML = `<div class="fav-empty">No references yet — every image you attach in a chat is kept here automatically, ready to re-attach.</div>`;
+    return;
+  }
+  picker.innerHTML = `<div class="fav-head">Re-attach a reference · ${refs.length}</div>` +
+    `<div class="fav-grid">${refs.map(r =>
+      `<div class="ref-cell">` +
+        `<button class="fav-thumb" type="button" data-id="${r.id}" title="Attach to this prompt"><img src="${escapeHtml(r.url)}" loading="lazy" /></button>` +
+        `<div class="ref-cell-acts">` +
+          `<button class="ref-mini" type="button" data-save="${r.id}" title="Save to the Assets tab for reuse">＋</button>` +
+          `<button class="ref-mini" type="button" data-del="${r.id}" title="Forget this reference">✕</button>` +
+        `</div>` +
+      `</div>`).join('')}</div>`;
+
+  // attach
+  $$('.fav-thumb', picker).forEach(b => b.onclick = async () => {
+    const r = refs.find(x => x.id === b.dataset.id);
+    if (!r) return;
+    b.disabled = true;
+    state.attachments[gemId] = state.attachments[gemId] || [];
+    if (state.attachments[gemId].some(a => a.url === r.url)) { toast('Already attached.'); picker.classList.add('hidden'); return; }
+    try {
+      const blob = await (await mediaFetch(r.url)).blob();
+      state.attachments[gemId].push({ name: r.file, mimeType: r.mimeType || blob.type || 'image/jpeg', data: await fileToB64(blob), url: r.url });
+      renderAttachments(gemId);
+      picker.classList.add('hidden');
+    } catch { toast("Couldn't load that reference.", true); b.disabled = false; }
+  });
+
+  // promote into the Assets tab
+  $$('[data-save]', picker).forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    const r = refs.find(x => x.id === b.dataset.save);
+    if (!r) return;
+    const name = prompt('Save to Assets as:');
+    if (!name || !name.trim()) return;
+    b.disabled = true;
+    try {
+      const blob = await (await mediaFetch(r.url)).blob();
+      const { character } = await api(`/api/projects/${state.current.id}/characters`, {
+        method: 'POST',
+        body: JSON.stringify({ name: name.trim(), type: 'prop', asIs: true,
+          images: [{ mimeType: r.mimeType || blob.type || 'image/jpeg', data: await fileToB64(blob) }] }),
+      });
+      state.current.characters = state.current.characters || [];
+      state.current.characters.unshift(character);
+      toast(`Saved "${character.name}" to Assets.`);
+    } catch (err) { toast(err.message, true); }
+    b.disabled = false;
+  });
+
+  // forget
+  $$('[data-del]', picker).forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    const rid = b.dataset.del;
+    b.disabled = true;
+    try {
+      await api(`/api/projects/${state.current.id}/references/${rid}`, { method: 'DELETE' });
+      state.current.references = (state.current.references || []).filter(x => x.id !== rid);
+      renderRefPicker(gemId);
+    } catch (err) { toast(err.message, true); b.disabled = false; }
   });
 }
 
@@ -1940,7 +2035,13 @@ function renderCharacters(body) {
       <button class="generate-btn" id="charGenBtn">${f.asIs && type !== 'look' ? 'Save image as asset' : ui.btn}</button>
       <div class="gen-hint">${type === 'look' ? 'An attached frame is stored untouched (free); generated frames render on Nano Banana Pro at 2K.' : 'Generated sheets render on Nano Banana Pro at 2K; "as-is" stores your upload untouched (free). Stored with this project — separate from your Library and Nano Banana outputs.'}</div>
     </div>
-    <div class="chars-gallery" id="charsGallery"></div>`;
+    <div class="section-head assets-built-head">
+      <h3>Built assets</h3>
+      <button class="mini-btn" id="importAssetsBtn" type="button" title="Copy assets you already built in another project">⇄ Import from another project</button>
+    </div>
+    <div class="import-picker hidden" id="importPicker"></div>
+    <div class="chars-gallery" id="charsGallery"></div>
+    <div class="kept-refs" id="keptRefs"></div>`;
   body.appendChild(panel);
   // Type switch — keep typed fields and uploads, swap the form copy.
   $$('#assetTypes .seg', panel).forEach(b => b.onclick = () => {
@@ -1977,9 +2078,63 @@ function renderCharacters(body) {
     };
   }
   $('#charGenBtn').onclick = doCreateCharacter;
+  $('#importAssetsBtn').onclick = () => {
+    const picker = $('#importPicker');
+    const opening = picker.classList.contains('hidden');
+    picker.classList.toggle('hidden');
+    if (opening) renderImportPicker();
+  };
   renderCharUploads();
   renderCharWardrobe();
   renderCharsGallery();
+}
+
+// Assets built in one project used to be stranded there — this lists every OTHER project's
+// assets so they can be copied in instead of rebuilt from scratch.
+async function renderImportPicker() {
+  const picker = $('#importPicker');
+  if (!picker) return;
+  picker.innerHTML = `<div class="fav-head">Loading assets from your other projects…</div>`;
+  let projects = [];
+  try { ({ projects } = await api('/api/assets/index')); }
+  catch (e) { picker.innerHTML = `<div class="fav-empty">Couldn't load: ${escapeHtml(e.message)}</div>`; return; }
+  const others = projects.filter(p => p.id !== state.current.id);
+  if (!others.length) { picker.innerHTML = `<div class="fav-empty">No other project has assets yet.</div>`; return; }
+
+  picker.innerHTML = others.map(p => `
+    <div class="import-proj">
+      <div class="fav-head">${escapeHtml(p.name)} · ${p.assets.length}</div>
+      <div class="kept-grid">${p.assets.map(a => `
+        <label class="kept-cell import-cell" title="${escapeHtml(a.name)}">
+          <input type="checkbox" data-from="${p.id}" value="${a.id}" />
+          <span class="kept-thumb"><img src="/media/${p.id}/images/${escapeHtml(a.file)}" loading="lazy" /></span>
+          <span class="import-name">${escapeHtml(a.name)}</span>
+        </label>`).join('')}</div>
+    </div>`).join('') +
+    `<div class="import-actions"><button class="mini-btn" id="importGo" type="button">Import selected</button></div>`;
+
+  $('#importGo').onclick = async (e) => {
+    const picked = $$('input[type=checkbox]:checked', picker);
+    if (!picked.length) { toast('Tick the assets you want first.', true); return; }
+    // group by source project — one request each
+    const byProj = {};
+    picked.forEach(c => { (byProj[c.dataset.from] = byProj[c.dataset.from] || []).push(c.value); });
+    e.target.disabled = true; e.target.innerHTML = '<span class="spinner"></span>Importing…';
+    let n = 0;
+    try {
+      for (const [fromPid, ids] of Object.entries(byProj)) {
+        const { imported } = await api(`/api/projects/${state.current.id}/assets/import`, {
+          method: 'POST', body: JSON.stringify({ fromPid, ids }),
+        });
+        state.current.characters = [...imported, ...(state.current.characters || [])];
+        n += imported.length;
+      }
+      renderCharsGallery();
+      picker.classList.add('hidden');
+      toast(`Imported ${n} asset${n === 1 ? '' : 's'}.`);
+    } catch (err) { toast(err.message, true); }
+    e.target.disabled = false; e.target.textContent = 'Import selected';
+  };
 }
 
 function renderCharUploads() {
@@ -2010,12 +2165,57 @@ function renderCharWardrobe() {
   });
 }
 
+// Kept references shown beneath the built assets: every image ever attached in a chat,
+// deduped. These are raw source material, not generated reference sheets — so they live in
+// their own section rather than being mixed into the built assets above.
+function renderKeptRefs() {
+  const wrap = $('#keptRefs');
+  if (!wrap) return;
+  const refs = state.current?.references || [];
+  if (!refs.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<div class="section-head"><h3>Kept references · ${refs.length}</h3></div>` +
+    `<p class="chars-hint">Every image attached in a chat is kept here automatically, deduped — re-attach one from any prompt with the 🕘 button, or build it into a named asset above.</p>` +
+    `<div class="kept-grid">${refs.map(r =>
+      `<div class="kept-cell">
+        <a class="kept-thumb" href="${escapeHtml(r.url)}" target="_blank" rel="noopener"><img src="${escapeHtml(r.url)}" loading="lazy" /></a>
+        <div class="kept-acts">
+          <button class="ref-mini" type="button" data-nb="${r.id}" title="Attach to NB Frames">＋</button>
+          <button class="ref-mini" type="button" data-forget="${r.id}" title="Forget this reference">✕</button>
+        </div>
+      </div>`).join('')}</div>`;
+
+  $$('[data-nb]', wrap).forEach(b => b.onclick = async () => {
+    const r = refs.find(x => x.id === b.dataset.nb);
+    if (!r) return;
+    b.disabled = true;
+    try {
+      const blob = await (await mediaFetch(r.url)).blob();
+      state.attachments['nb-frames'] = state.attachments['nb-frames'] || [];
+      if (!state.attachments['nb-frames'].some(a => a.url === r.url)) {
+        state.attachments['nb-frames'].push({ name: r.file, mimeType: r.mimeType || blob.type || 'image/jpeg', data: await fileToB64(blob), url: r.url });
+      }
+      toast('Attached to NB Frames.');
+    } catch { toast("Couldn't load that reference.", true); }
+    b.disabled = false;
+  });
+  $$('[data-forget]', wrap).forEach(b => b.onclick = async () => {
+    const rid = b.dataset.forget;
+    b.disabled = true;
+    try {
+      await api(`/api/projects/${state.current.id}/references/${rid}`, { method: 'DELETE' });
+      state.current.references = (state.current.references || []).filter(x => x.id !== rid);
+      renderKeptRefs();
+    } catch (err) { toast(err.message, true); b.disabled = false; }
+  });
+}
+
 function renderCharsGallery() {
+  renderKeptRefs();
   const gallery = $('#charsGallery');
   if (!gallery) return;
   const chars = state.current.characters || [];
   if (!chars.length) {
-    gallery.innerHTML = `<div class="gen-empty">No assets yet. Build characters, vehicles, products, locations, and a look frame above — then ⚡ attach them to Seedance so every shot uses the same locked references.</div>`;
+    gallery.innerHTML = `<div class="gen-empty">No built assets yet. Build characters, vehicles, products, locations, and a look frame above — then ⚡ attach them to Seedance so every shot uses the same locked references.</div>`;
     return;
   }
   gallery.innerHTML = chars.map(c => {

@@ -23,7 +23,13 @@ function createLocalDataStore(dataDir) {
   // Local reads the whole file anyway; these keep the seam interface consistent with Firestore.
   async function getProjectLight(pid) { const p = await getProject(pid); return { ...p, images: [] }; }
   async function getImages(pid) { const p = await getProject(pid); return p.images || []; }
+  async function getCharacters(pid) { const p = await getProject(pid); return p.characters || []; }
   async function addImage(pid, rec) { return update(pid, (p) => { p.images = p.images || []; p.images.unshift(rec); p.updatedAt = Date.now(); }); }
+  // References = every image attached in a chat, kept so it never has to be re-uploaded.
+  // Deduped on sha256 of the bytes, so the same file attached ten times is stored once.
+  async function addReference(pid, rec) { return update(pid, (p) => { p.references = p.references || []; p.references.unshift(rec); p.updatedAt = Date.now(); }); }
+  async function findReferenceBySha(pid, sha) { const p = await getProject(pid); return (p.references || []).find((r) => r.sha256 === sha) || null; }
+  async function deleteReference(pid, refId) { return update(pid, (p) => { p.references = (p.references || []).filter((r) => r.id !== refId); p.updatedAt = Date.now(); }); }
   async function appendChat(pid, gemId, newMsgs) { return update(pid, (p) => { p.chats = p.chats || {}; p.chats[gemId] = p.chats[gemId] || []; p.chats[gemId].push(...newMsgs); p.updatedAt = Date.now(); }); }
 
   async function saveProject(p) {
@@ -78,7 +84,8 @@ function createLocalDataStore(dataDir) {
     await fsp.rm(projDir(pid), { recursive: true, force: true });
   }
 
-  return { backend: 'local', getProject, getProjectLight, getImages, addImage, appendChat, saveProject, update, listProjects, deleteProject };
+  return { backend: 'local', getProject, getProjectLight, getImages, getCharacters, addImage, appendChat, saveProject, update, listProjects, deleteProject,
+    addReference, findReferenceBySha, deleteReference };
 }
 
 // ── Firestore backend (subcollections) ──────────────────────────────────────
@@ -109,11 +116,12 @@ function createFirestoreDataStore() {
     const ref = _col.doc(pid);
     // Fetch meta + all three subcollections IN PARALLEL — they're independent, and doing them
     // sequentially cost ~4 network round trips per project open (the "switching is slow" lag).
-    const [metaSnap, chatsSnap, imagesSnap, charactersSnap] = await Promise.all([
+    const [metaSnap, chatsSnap, imagesSnap, charactersSnap, referencesSnap] = await Promise.all([
       ref.get(),
       ref.collection('chats').get(),
       ref.collection('images').get(),
       ref.collection('characters').get(),
+      ref.collection('references').get(),
     ]);
     if (!metaSnap.exists) throw new Error(`Project not found: ${pid}`);
     const { imageCount, chatCount, ...meta } = metaSnap.data(); // counts are internal cache
@@ -126,7 +134,10 @@ function createFirestoreDataStore() {
     const characters = charactersSnap.docs
       .map((d) => d.data())
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    return { ...meta, chats, images, characters };
+    const references = referencesSnap.docs
+      .map((d) => d.data())
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return { ...meta, chats, images, characters, references };
   }
 
   // Fast open: everything EXCEPT the (potentially huge) images subcollection. The frontend
@@ -134,8 +145,8 @@ function createFirestoreDataStore() {
   async function getProjectLight(pid) {
     await init();
     const ref = _col.doc(pid);
-    const [metaSnap, chatsSnap, charactersSnap] = await Promise.all([
-      ref.get(), ref.collection('chats').get(), ref.collection('characters').get(),
+    const [metaSnap, chatsSnap, charactersSnap, referencesSnap] = await Promise.all([
+      ref.get(), ref.collection('chats').get(), ref.collection('characters').get(), ref.collection('references').get(),
     ]);
     if (!metaSnap.exists) throw new Error(`Project not found: ${pid}`);
     const { imageCount, chatCount, ...meta } = metaSnap.data();
@@ -143,13 +154,22 @@ function createFirestoreDataStore() {
     for (const g of GEM_TABS) chats[g] = [];
     chatsSnap.forEach((d) => { chats[d.id] = d.data().messages || []; });
     const characters = charactersSnap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    return { ...meta, chats, images: [], characters };
+    const references = referencesSnap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return { ...meta, chats, images: [], characters, references };
   }
 
   // Just the images subcollection (for the lazy Library / Generate load).
   async function getImages(pid) {
     await init();
     const snap = await _col.doc(pid).collection('images').get();
+    return snap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }
+
+  // Just the assets — lets the "import from another project" picker read every project's
+  // assets without dragging each one's images and chat history along with it.
+  async function getCharacters(pid) {
+    await init();
+    const snap = await _col.doc(pid).collection('characters').get();
     return snap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }
 
@@ -163,6 +183,22 @@ function createFirestoreDataStore() {
     const ref = _col.doc(pid);
     await ref.collection('images').doc(String(rec.id)).set(rec);
     await ref.set({ imageCount: FieldValue.increment(1), updatedAt: rec.createdAt || Date.now() }, { merge: true });
+  }
+
+  // References = every image attached in a chat, kept so it never has to be re-uploaded.
+  // One targeted doc write (never a full-project read-modify-write), deduped on sha256.
+  async function addReference(pid, rec) {
+    await init();
+    await _col.doc(pid).collection('references').doc(String(rec.id)).set(rec);
+  }
+  async function findReferenceBySha(pid, sha) {
+    await init();
+    const snap = await _col.doc(pid).collection('references').where('sha256', '==', sha).limit(1).get();
+    return snap.empty ? null : snap.docs[0].data();
+  }
+  async function deleteReference(pid, refId) {
+    await init();
+    await _col.doc(pid).collection('references').doc(String(refId)).delete();
   }
 
   // Append chat message(s) to ONE gem's chat doc via a transaction — reads only that chat doc
@@ -187,7 +223,10 @@ function createFirestoreDataStore() {
   async function saveProject(p) {
     await init();
     const ref = _col.doc(p.id);
-    const { chats = {}, images = [], characters = [], ...meta } = p;
+    // `references` is deliberately NOT defaulted to []: diffSub deletes whatever isn't in the
+    // list it's handed, so defaulting would let any project object that simply doesn't carry
+    // references wipe the whole collection. Absent field => leave the subcollection alone.
+    const { chats = {}, images = [], characters = [], references, ...meta } = p;
     meta.imageCount = images.length;
     meta.characterCount = characters.length;
     meta.chatCount = Object.values(chats).reduce((n, a) => n + (a?.length || 0), 0);
@@ -211,7 +250,8 @@ function createFirestoreDataStore() {
       for (const docId of prevById.keys()) if (!keep.has(docId)) ops.push(['del', ref.collection(sub).doc(docId)]);
       return ops;
     }
-    const ops = [...(await diffSub('images', images)), ...(await diffSub('characters', characters))];
+    const ops = [...(await diffSub('images', images)), ...(await diffSub('characters', characters)),
+      ...(Array.isArray(references) ? await diffSub('references', references) : [])];
     for (let i = 0; i < ops.length; i += 450) {
       const batch = _db.batch();
       for (const [kind, docRef, data] of ops.slice(i, i + 450)) kind === 'set' ? batch.set(docRef, data) : batch.delete(docRef);
@@ -254,7 +294,7 @@ function createFirestoreDataStore() {
   async function deleteProject(pid) {
     await init();
     const ref = _col.doc(pid);
-    for (const sub of ['chats', 'images', 'characters']) {
+    for (const sub of ['chats', 'images', 'characters', 'references']) {
       const docs = (await ref.collection(sub).get()).docs;
       for (let i = 0; i < docs.length; i += 450) {
         const batch = _db.batch();
@@ -265,7 +305,8 @@ function createFirestoreDataStore() {
     await ref.delete();
   }
 
-  return { backend: 'firestore', getProject, getProjectLight, getImages, addImage, appendChat, saveProject, update, listProjects, deleteProject };
+  return { backend: 'firestore', getProject, getProjectLight, getImages, getCharacters, addImage, appendChat, saveProject, update, listProjects, deleteProject,
+    addReference, findReferenceBySha, deleteReference };
 }
 
 export function createDataStore(dataDir, { backend = process.env.DATA_BACKEND || 'local' } = {}) {
