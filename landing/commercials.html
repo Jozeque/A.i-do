@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shyow &middot; AI Commercials for Brands</title>
+<meta name="description" content="Creative direction, controlled AI production and high-end post for commercials and campaigns. Projects from $7,500, ongoing production from $9,000/mo." />
+<meta name="theme-color" content="#F6F2EB" />
+<link rel="canonical" href="https://shyow.io/commercials" />
+<link rel="icon" type="image/png" href="/landing/favicon.png" />
+<link rel="apple-touch-icon" href="/landing/apple-touch-icon.png" />
+<meta property="og:title" content="Shyow &middot; AI Commercials for Brands" />
+<meta property="og:description" content="Creative direction, controlled AI production and high-end post for commercials and campaigns." />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Shyow" />
+<meta property="og:url" content="https://shyow.io/commercials" />
+<meta property="og:image" content="https://shyow.io/landing/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<script>document.documentElement.className += ' js';</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="image" href="/landing/media/hero-poster.jpg" media="(min-width: 861px)">
+<link rel="preload" as="image" href="/landing/media/hero-poster-mobile.jpg" media="(max-width: 860px)">
+<!-- Fraunces on its SOFT + WONK axes: the family the brand already uses, dialled warm and
+     slightly wonky, so the display face carries expression instead of formality. Figtree
+     does all the reading and every label - no mono, no tracked-out caps, nowhere. -->
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..700,100,1&display=swap" rel="stylesheet">
+<style>
+  /* ══════════════════════════════════════════════════════════════════════════
+     SHYOW - /commercials
+
+     Paid-traffic page. Five movements and nothing else:
+        hero + showreel  →  made for  →  pricing  →  contact  →  the full work
+
+     Quality is established in the first screen by the reel sitting beside the
+     headline, which buys the right to put pricing and the form before the
+     portfolio. The portfolio comes last, for anyone who wants to dig, and it
+     runs on a dark ground - a screening room at the end of a warm page - so the
+     films look their strongest without the whole site going near-black again.
+
+     Self-contained, no build step, same as every other page here.
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  :root {
+    --paper:   #F6F2EB;   /* warm bone page */
+    --sand:    #EFE8DD;   /* quiet second surface */
+    --blush:   #FBEBE3;   /* pale coral wash - the ongoing card */
+    --ink:     #1B1610;   /* warm near-black, never #000 */
+    --ink-2:   #6E6357;
+    --ink-3:   #9C9187;
+    --hair:    rgba(27,22,16,.13);
+    --hair-2:  rgba(27,22,16,.07);
+    --coral:   #FF4F2E;   /* the brand signal - the action colour */
+    --coral-2: #D63A17;   /* the same signal, dark enough for small type on paper */
+
+    --night:    #17130E;  /* the screening room */
+    --night-2:  #F1ECE3;
+    --night-3:  #A2988C;
+    --night-hair: rgba(241,236,227,.14);
+
+    --shadow:    0 18px 48px -22px rgba(59,38,18,.34);
+    --shadow-lg: 0 40px 90px -34px rgba(59,38,18,.42);
+
+    --display: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --sans: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+    --maxw: 1360px;
+    --pad: clamp(20px, 5vw, 60px);
+    --r-btn: 18px;
+    --r-card: 26px;
+    --r-media: 24px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 17px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  img, video { display: block; max-width: 100%; }
+  /* the form and the sound button both set `display`, which would otherwise beat the
+     browser's own [hidden] rule and leave them on screen after being hidden in JS */
+  [hidden] { display: none !important; }
+  ::selection { background: var(--coral); color: #fff; }
+  :focus-visible { outline: 2px solid var(--coral-2); outline-offset: 3px; border-radius: 4px; }
+  [id] { scroll-margin-top: 96px; }
+
+  h1, h2, h3 {
+    font-family: var(--display); font-weight: 600; letter-spacing: -.022em;
+    line-height: 1.04; text-wrap: balance;
+    font-variation-settings: 'SOFT' 100, 'WONK' 1;
+  }
+
+  .wrap { max-width: var(--maxw); margin-inline: auto; padding-inline: var(--pad); }
+
+  /* ── buttons - softly rounded, sentence case, no tracking. Not pills. ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    font-family: var(--sans); font-size: 1rem; font-weight: 500; line-height: 1;
+    padding: 15px 24px; border-radius: var(--r-btn); border: 1px solid transparent; cursor: pointer;
+    transition: transform .2s cubic-bezier(.2,.7,.2,1), background .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
+    white-space: nowrap;
+  }
+  .btn svg { width: 17px; height: 17px; flex: none; }
+  .btn-solid { background: var(--ink); color: var(--paper); }
+  .btn-solid:hover { background: #302619; transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn-coral { background: var(--coral); color: #fff; }
+  .btn-coral:hover { background: #F03D1B; transform: translateY(-1px); box-shadow: 0 14px 30px -12px rgba(255,79,46,.55); }
+  .btn-line { background: transparent; color: var(--ink); border-color: var(--hair); }
+  .btn-line:hover { border-color: var(--ink); transform: translateY(-1px); }
+  .btn-sm { padding: 11px 19px; font-size: .94rem; border-radius: 14px; }
+  .btn-lg { padding: 17px 30px; font-size: 1.06rem; }
+  .btn .arr { transition: transform .2s ease; }
+  .btn:hover .arr { transform: translateX(3px); }
+
+  /* ── nav ── */
+  header {
+    position: fixed; inset: 0 0 auto 0; z-index: 60;
+    transition: background .3s ease, box-shadow .3s ease, backdrop-filter .3s ease;
+  }
+  header.scrolled {
+    background: rgba(246,242,235,.84); backdrop-filter: blur(14px) saturate(120%);
+    box-shadow: 0 1px 0 var(--hair-2);
+  }
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; height: 80px; }
+  .brand { display: inline-flex; align-items: center; color: var(--ink); }
+  .brand .wordmark { height: 29px; width: auto; }
+  .nav-mid { display: flex; align-items: center; gap: 30px; }
+  .nav-mid a {
+    font-size: 1rem; color: var(--ink-2); position: relative; padding: 4px 0;
+    transition: color .2s ease;
+  }
+  .nav-mid a::after {
+    content: ""; position: absolute; left: 0; right: 100%; bottom: 0; height: 1.5px;
+    background: var(--coral); border-radius: 2px; transition: right .25s ease;
+  }
+  .nav-mid a:hover { color: var(--ink); }
+  .nav-mid a:hover::after { right: 0; }
+
+  /* ── hero: copy and the reel share the first screen ── */
+  .hero { padding: clamp(112px, 15vh, 150px) 0 clamp(30px, 4vw, 46px); }
+  .hero-grid {
+    display: grid; grid-template-columns: minmax(0, .72fr) minmax(0, 1fr);
+    gap: clamp(30px, 4vw, 62px); align-items: center;
+  }
+  .hero h1 { font-size: clamp(2.35rem, 3.5vw, 3.5rem); }
+  .hero .sub {
+    margin-top: 20px; font-size: clamp(1.05rem, 1.3vw, 1.2rem);
+    color: var(--ink-2); line-height: 1.5; max-width: 38ch; text-wrap: pretty;
+  }
+  .hero-cta { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .anchors {
+    margin-top: 24px; display: flex; align-items: center; gap: 11px; flex-wrap: wrap;
+    font-size: .93rem; color: var(--ink-3);
+  }
+  .anchors b { font-weight: 500; color: var(--ink-2); }
+  .anchors i { width: 4px; height: 4px; border-radius: 50%; background: var(--coral); flex: none; }
+
+  /* the showreel - the one autoplaying video on the page */
+  .reel-frame {
+    position: relative; overflow: hidden; border-radius: clamp(18px, 2.2vw, 30px);
+    background: var(--night); aspect-ratio: 16 / 10; box-shadow: var(--shadow-lg);
+  }
+  .reel-frame video, .reel-frame img { width: 100%; height: 100%; object-fit: cover; }
+  .reel-sound {
+    position: absolute; right: 15px; bottom: 15px; z-index: 2;
+    display: inline-flex; align-items: center; gap: 8px; padding: 9px 15px 9px 12px;
+    border-radius: 14px; border: 0; cursor: pointer;
+    background: rgba(23,19,14,.52); backdrop-filter: blur(10px); color: #fff;
+    font-family: var(--sans); font-size: .86rem; font-weight: 500;
+    transition: background .2s ease, transform .2s ease;
+  }
+  .reel-sound:hover { background: rgba(23,19,14,.8); transform: translateY(-1px); }
+  .reel-sound svg { width: 15px; height: 15px; }
+
+  /* ── made for - one quiet row, no section of its own ── */
+  .clients {
+    display: flex; align-items: center; gap: clamp(20px, 3.2vw, 46px); flex-wrap: wrap;
+    padding-bottom: clamp(26px, 4vw, 44px);
+  }
+  .clients span { font-size: .93rem; color: var(--ink-3); flex: none; }
+  .clients img { filter: brightness(0); opacity: .46; transition: opacity .25s ease; }
+  .clients img:hover { opacity: .78; }
+  .clients .l-pandora { height: 27px; }
+  .clients .l-clalit  { height: 26px; }
+  .clients .l-tomix   { height: 21px; }
+  .clients .l-opel    { height: 38px; }
+
+  /* ── section rhythm ── */
+  .section { padding: clamp(52px, 7.5vw, 92px) 0; }
+  .lede { font-size: clamp(1.9rem, 3.9vw, 2.8rem); }
+
+  /* ── pricing ── */
+  .plans {
+    margin-top: clamp(28px, 4vw, 46px);
+    display: grid; grid-template-columns: 1fr 1fr; gap: clamp(18px, 2.2vw, 26px); align-items: stretch;
+  }
+  .plan { border-radius: var(--r-card); padding: clamp(26px, 3.2vw, 42px); display: flex; flex-direction: column; }
+  .plan--single { background: var(--sand); }
+  .plan--ongoing { background: var(--blush); box-shadow: var(--shadow); }
+  .plan-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .plan-kind { font-size: 1.02rem; font-weight: 600; }
+  .plan-flag { font-size: .84rem; font-weight: 500; color: var(--coral-2); }
+  .plan-price {
+    margin-top: 18px; font-family: var(--display); font-weight: 600;
+    font-size: clamp(2.3rem, 4.6vw, 3.4rem); line-height: 1; letter-spacing: -.03em;
+    font-variation-settings: 'SOFT' 100, 'WONK' 1;
+  }
+  .plan-price small { font-family: var(--sans); font-size: 1rem; font-weight: 500; letter-spacing: 0; color: var(--ink-2); }
+  .plan-rate { margin-top: 12px; font-size: 1rem; color: var(--ink-2); }
+  .plan-body { margin-top: 18px; font-size: 1.03rem; color: var(--ink-2); max-width: 36ch; text-wrap: pretty; }
+  .plan-body + .plan-body { margin-top: 12px; }
+  .plan .btn { align-self: flex-start; }
+  .plan-cta-wrap { margin-top: auto; padding-top: clamp(24px, 3vw, 34px); }
+  .plans-note { margin-top: 20px; font-size: .95rem; color: var(--ink-3); }
+
+  /* ── contact - closes the pricing block, not a section of its own ── */
+  .contact {
+    margin-top: clamp(56px, 8vw, 104px);
+    display: grid; grid-template-columns: .88fr 1.12fr; gap: clamp(32px, 5vw, 72px); align-items: center;
+  }
+  .contact-copy p { margin-top: 16px; color: var(--ink-2); font-size: 1.06rem; max-width: 34ch; text-wrap: pretty; }
+  .wa {
+    margin-top: 26px; display: inline-flex; align-items: center; gap: 10px;
+    font-size: 1rem; font-weight: 500; color: var(--ink-2); transition: color .2s ease;
+  }
+  .wa:hover { color: var(--coral-2); }
+  .wa svg { width: 19px; height: 19px; }
+
+  form { display: grid; gap: 16px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  label, .lab { display: block; margin-bottom: 8px; font-size: .93rem; font-weight: 500; color: var(--ink-2); }
+  .lab-opt { color: var(--ink-3); font-weight: 400; }
+  input, textarea {
+    width: 100%; font-family: var(--sans); font-size: 1rem; color: var(--ink);
+    background: #FCFAF6; border: 1px solid var(--hair); border-radius: var(--r-btn);
+    padding: 14px 16px; transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  }
+  textarea { resize: vertical; min-height: 100px; line-height: 1.55; }
+  input::placeholder, textarea::placeholder { color: var(--ink-3); }
+  input:focus, textarea:focus {
+    outline: none; border-color: var(--ink); background: #fff;
+    box-shadow: 0 0 0 3px rgba(27,22,16,.06);
+  }
+  .pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .pick input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .pick label {
+    margin: 0; text-align: center; cursor: pointer; font-weight: 500; color: var(--ink-2);
+    background: #FCFAF6; border: 1px solid var(--hair); border-radius: var(--r-btn); padding: 13px 10px;
+    transition: background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+  }
+  .pick label:hover { border-color: var(--ink-3); transform: translateY(-1px); }
+  .pick input:checked + label { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .pick input:focus-visible + label { outline: 2px solid var(--coral-2); outline-offset: 2px; }
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .send { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 4px; }
+  /* the three faces sit with the line they illustrate - the only humanising note on the page */
+  .by { display: flex; align-items: center; gap: 12px; }
+  .faces { display: flex; }
+  .faces img {
+    width: 38px; height: 38px; border-radius: 50%; object-fit: cover; object-position: 50% 22%;
+    border: 2.5px solid var(--paper);
+  }
+  .faces img + img { margin-left: -12px; }
+  .by span { font-size: .9rem; color: var(--ink-3); max-width: 22ch; line-height: 1.4; }
+  .msg { font-size: .95rem; color: var(--coral-2); }
+  .thanks { background: var(--sand); border-radius: var(--r-card); padding: clamp(26px, 3.2vw, 40px); }
+  .thanks h3 { font-size: clamp(1.5rem, 2.8vw, 2rem); }
+  .thanks p { margin-top: 14px; color: var(--ink-2); max-width: 40ch; }
+  .thanks .wa { margin-top: 22px; }
+
+  /* ── the full work, on a dark ground: a screening room at the end ── */
+  .screen {
+    background: var(--night); color: var(--night-2);
+    border-radius: clamp(24px, 3vw, 44px) clamp(24px, 3vw, 44px) 0 0;
+    margin-top: clamp(56px, 8vw, 104px);
+  }
+  .screen .lede { color: var(--night-2); }
+  .screen-note { margin-top: 14px; color: var(--night-3); font-size: 1.02rem; max-width: 44ch; }
+
+  .films {
+    margin-top: clamp(34px, 5vw, 58px);
+    display: grid; grid-template-columns: repeat(12, 1fr);
+    gap: clamp(30px, 3.6vw, 56px) clamp(20px, 2.6vw, 38px); align-items: start;
+  }
+  /* an editorial rhythm that repeats every six films, so any number composes */
+  .film { grid-column: 1 / -1; }
+  .film:nth-child(6n+2) { grid-column: 1 / 8; }
+  .film:nth-child(6n+3) { grid-column: 8 / -1; margin-top: clamp(0px, 6.5vw, 88px); }
+  .film:nth-child(6n+4) { grid-column: 4 / -1; }
+  .film:nth-child(6n+5) { grid-column: 1 / 7; }
+  .film:nth-child(6n+6) { grid-column: 7 / -1; margin-top: clamp(0px, 4vw, 54px); }
+
+  .film-frame {
+    position: relative; overflow: hidden; border-radius: var(--r-media); cursor: pointer;
+    background: #0E0B08; aspect-ratio: 16 / 9;
+    transition: transform .4s cubic-bezier(.2,.7,.2,1), box-shadow .4s ease;
+  }
+  .film:nth-child(6n+1) .film-frame { aspect-ratio: 2 / 1; }
+  .film-frame video, .film-frame img {
+    width: 100%; height: 100%; object-fit: cover;
+    transition: transform .7s cubic-bezier(.2,.7,.2,1);
+  }
+  .film-frame:hover { transform: translateY(-4px); box-shadow: 0 30px 70px -30px rgba(0,0,0,.85); }
+  .film-frame:hover video, .film-frame:hover img { transform: scale(1.035); }
+  /* a play affordance visible at rest, not only on hover */
+  .play {
+    position: absolute; left: 17px; bottom: 17px; z-index: 2; pointer-events: none;
+    width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(255,255,255,.92); color: var(--ink);
+    transition: transform .3s cubic-bezier(.2,.7,.2,1), background .3s ease, color .3s ease;
+  }
+  .play svg { width: 15px; height: 15px; margin-left: 2px; }
+  .film-frame:hover .play { transform: scale(1.12); background: var(--coral); color: #fff; }
+  .film-cap { margin-top: 15px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .film-title { font-family: var(--display); font-weight: 600; font-size: clamp(1.08rem, 1.6vw, 1.38rem); letter-spacing: -.015em; color: var(--night-2); }
+  .film-note { font-size: .93rem; color: var(--night-3); }
+
+  /* ── footer, continuing the dark band ── */
+  footer { background: var(--night); color: var(--night-3); padding: clamp(44px, 6vw, 76px) 0 clamp(32px, 4vw, 50px); }
+  .foot { border-top: 1px solid var(--night-hair); padding-top: 28px; display: flex; align-items: center; justify-content: space-between; gap: 22px; flex-wrap: wrap; }
+  .foot .brand { color: var(--night-2); }
+  .foot .wordmark { height: 27px; width: auto; opacity: .9; }
+  .foot-links { display: flex; gap: 24px; font-size: .95rem; flex-wrap: wrap; }
+  .foot-links a { color: var(--night-3); transition: color .2s ease; }
+  .foot-links a:hover { color: var(--night-2); }
+  .foot-cr { width: 100%; margin-top: 22px; font-size: .88rem; color: #756B60; }
+
+  /* ── soft reveals ── */
+  .js .up { opacity: 0; transform: translateY(20px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1); }
+  .js .up.in { opacity: 1; transform: none; }
+
+  /* ── responsive ── */
+  @media (max-width: 1080px) {
+    .contact { grid-template-columns: 1fr; }
+    .contact-copy p { max-width: 52ch; }
+  }
+  @media (max-width: 860px) {
+    /* copy first, then the reel immediately under it - no empty screen before the work */
+    .hero { padding-top: 104px; }
+    .hero-grid { grid-template-columns: 1fr; gap: 28px; }
+    .hero .sub { max-width: 46ch; }
+    .reel-frame { aspect-ratio: 4 / 5; }
+    .nav-mid { display: none; }
+    .plans { grid-template-columns: 1fr; }
+    .films { gap: 30px 0; }
+    .film, .film:nth-child(n) { grid-column: 1 / -1; margin-top: 0; }
+    .film:nth-child(6n+1) .film-frame { aspect-ratio: 16 / 9; }
+  }
+  @media (max-width: 620px) {
+    .row2, .pick { grid-template-columns: 1fr; }
+    .clients span { width: 100%; }
+    .hero-cta .btn { flex: 1 1 auto; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+    .js .up { opacity: 1; transform: none; }
+    .film-frame:hover { transform: none; }
+    .film-frame:hover video, .film-frame:hover img { transform: none; }
+  }
+</style>
+</head>
+<body>
+<!-- SHYOW wordmark - the same symbol the homepage nav uses. -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute;overflow:hidden">
+  <symbol id="shyow-wordmark" viewBox="-12 -11 706 122">
+    <path fill="currentColor" d="M54 3.63A36 27.13 0 1 0 36 54.25L36 45.75A27.5 18.63 0 1 1 49.75 11ZM18 96.37A36 27.13 0 1 0 36 45.75L36 54.25A27.5 18.63 0 1 1 22.25 89Z"/>
+    <path fill="currentColor" d="M112 0h8.5v100h-8.5zM183.5 0h8.5v100h-8.5zM112 45.75h80v8.5h-80z"/>
+    <path fill="currentColor" d="M270.75 46h8.5v54h-8.5zM228.9 2.9L271.9 48.9L278.1 43.1L235.1 -2.9zM314.9 -2.9L271.9 43.1L278.1 48.9L321.1 2.9z"/>
+    <path fill="currentColor" d="M419.47 2.99A53 53 0 1 1 406.47 -1.74L404.42 7.53A43.5 43.5 0 1 0 415.09 11.42z"/>
+    <path fill="currentColor" d="M376.5 41a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0 -11 0z"/>
+    <path fill="currentColor" d="M402.5 41a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0 -11 0z"/>
+    <path fill="currentColor" d="M387 63a8 8 0 1 0 16 0a8 8 0 1 0 -16 0z"/>
+    <path fill="currentColor" d="M470.01 1.46L506.61 101.46L514.59 98.54L477.99 -1.46zM514.73 101.01L539.13 1.01L530.87 -1.01L506.47 98.99zM530.87 1.01L555.27 101.01L563.53 98.99L539.13 -1.01zM563.39 101.46L599.99 1.46L592.01 -1.46L555.41 98.54z"/>
+    <path fill="currentColor" d="M631 60h8v40h-8zM630.5 51.5a4.5 4.5 0 1 0 9 0a4.5 4.5 0 1 0 -9 0z"/>
+    <path fill="currentColor" d="M614 95a5 5 0 1 0 10 0a5 5 0 1 0 -10 0z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M642 80a20 20 0 1 0 40 0a20 20 0 1 0 -40 0zM650 80a12 12 0 1 0 24 0a12 12 0 1 0 -24 0z"/>
+  </symbol>
+  <symbol id="i-wa" viewBox="0 0 24 24"><path fill="currentColor" d="M.06 24l1.69-6.16A11.87 11.87 0 010 11.9C0 5.33 5.36 0 11.95 0a11.9 11.9 0 018.46 3.5 11.74 11.74 0 013.5 8.4c0 6.57-5.36 11.9-11.96 11.9a12 12 0 01-5.72-1.45L.06 24zM6.6 20.2l.36.22a9.9 9.9 0 005.04 1.38c5.48 0 9.95-4.43 9.95-9.9a9.8 9.8 0 00-2.9-7A9.85 9.85 0 0011.95 2C6.47 2 2 6.43 2 11.9c0 1.88.53 3.7 1.52 5.28l.24.38-1 3.64 3.84-1zm11.43-5.55c-.07-.12-.27-.2-.57-.35-.3-.15-1.76-.86-2.03-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.26-.46-2.4-1.47-.88-.78-1.48-1.76-1.65-2.05-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.53.15-.18.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.67-1.6-.92-2.2-.24-.58-.49-.5-.67-.5l-.57-.01c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.22 3.08.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.69.63.71.22 1.36.2 1.87.12.57-.08 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41z"/></symbol>
+  <symbol id="i-arr" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 12h15M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></symbol>
+</svg>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SHYOW - /commercials   Paid-traffic page.
+     hero + reel → made for → pricing → contact → the full work → footer
+     • Films: GET /api/showcase (title, caption, url, poster). Captions print
+       verbatim when they exist; nothing about a project is invented here.
+     • Inquiry: POST /api/lead. WhatsApp is the instant alternative.
+     • track() feeds whatever analytics provider gets installed later.
+   ═══════════════════════════════════════════════════════════════════════ -->
+
+<header id="hdr">
+  <div class="wrap nav">
+    <a class="brand" href="#top" aria-label="Shyow"><svg class="wordmark" viewBox="-12 -11 706 122" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
+    <nav class="nav-mid" aria-label="Primary">
+      <a href="#work">Work</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <a class="btn btn-solid btn-sm" href="#contact" data-cta="nav">Start a project</a>
+  </div>
+</header>
+
+<main id="top">
+  <!-- ── hero + showreel, sharing the first screen ────────────────────── -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <h1>The most ambitious briefs need the right team.</h1>
+        <p class="sub">Creative direction, controlled AI production and high-end post for commercials and campaigns.</p>
+        <div class="hero-cta">
+          <a class="btn btn-coral btn-lg" href="#contact" data-cta="hero">Start a project <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
+          <a class="btn btn-line btn-lg" href="#work" data-cta="hero-work">See the work</a>
+        </div>
+        <p class="anchors">
+          <b>Projects from $7,500</b><i aria-hidden="true"></i><b>Ongoing production from $9,000/mo</b>
+        </p>
+      </div>
+
+      <div class="hero-reel">
+        <div class="reel-frame">
+          <video id="reelVid" autoplay muted loop playsinline preload="auto" aria-label="Shyow showreel"></video>
+          <button class="reel-sound" id="reelSound" type="button" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M16.5 8.5a5 5 0 010 7"/></svg>
+            <span id="reelSoundLabel">Sound on</span>
+          </button>
+        </div>
+        <script>
+          /* One video autoplays on this page, and this is it. Landscape cut on
+             desktop, the portrait cut in a taller frame on phones - only the
+             chosen file downloads. Reduced motion gets the still and no video. */
+          (function () {
+            var v = document.getElementById('reelVid'); if (!v) return;
+            var small = matchMedia('(max-width: 860px)').matches;
+            v.poster = small ? '/landing/media/hero-poster-mobile.jpg' : '/landing/media/hero-poster.jpg';
+            if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+              var b = document.getElementById('reelSound'); if (b) b.hidden = true;
+              return;
+            }
+            var s = document.createElement('source'); s.type = 'video/mp4';
+            s.src = small ? '/landing/media/hero-bg-mobile.mp4' : '/landing/media/hero-bg.mp4';
+            v.appendChild(s); v.load();
+            try { var p = v.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+          })();
+        </script>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── made for ── -->
+  <div class="wrap">
+    <div class="clients up">
+      <span>Made for</span>
+      <img class="l-pandora" src="/landing/logos/pandora.svg" alt="Pandora" loading="lazy" />
+      <img class="l-opel" src="/landing/logos/opel.svg" alt="Opel" loading="lazy" />
+      <img class="l-clalit" src="/landing/logos/clalit.png" alt="Clalit" loading="lazy" />
+      <img class="l-tomix" src="/landing/logos/tomix.png" alt="toMix" loading="lazy" />
+    </div>
+  </div>
+
+  <!-- ── pricing, closing into contact ───────────────────────────────── -->
+  <section class="section" id="pricing">
+    <div class="wrap">
+      <h2 class="lede up">Two ways to work with us.</h2>
+
+      <div class="plans up">
+        <div class="plan plan--single">
+          <div class="plan-top"><span class="plan-kind">Single production</span></div>
+          <div class="plan-price">From $7,500</div>
+          <p class="plan-rate">$300 studio hour</p>
+          <p class="plan-body">For a specific commercial, campaign or launch.</p>
+          <div class="plan-cta-wrap">
+            <a class="btn btn-line" href="#contact" data-cta="plan-single" data-plan="single">Get a quote <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
+          </div>
+        </div>
+
+        <div class="plan plan--ongoing">
+          <div class="plan-top">
+            <span class="plan-kind">Ongoing studio</span>
+            <span class="plan-flag">Best for active advertisers</span>
+          </div>
+          <div class="plan-price">From $9,000 <small>/ month</small></div>
+          <p class="plan-rate">$240 preferred studio hour &middot; 3-month minimum</p>
+          <p class="plan-body">Reserved monthly production capacity for brands that need advertising content continuously.</p>
+          <p class="plan-body">Use the capacity wherever the campaign needs it &mdash; one larger film, several smaller films, or a mix.</p>
+          <div class="plan-cta-wrap">
+            <a class="btn btn-coral" href="#contact" data-cta="plan-ongoing" data-plan="ongoing">Talk about a retainer <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
+          </div>
+        </div>
+      </div>
+
+      <p class="plans-note up">Budget depends on production complexity, not video duration.</p>
+
+      <!-- contact flows straight out of pricing -->
+      <div class="contact up" id="contact">
+        <div class="contact-copy">
+          <h2 class="lede">Got something in mind?</h2>
+          <p>Tell us what you&rsquo;re making. We&rsquo;ll come back with an approach and a range.</p>
+          <a class="wa" data-wa href="#" data-cta="contact-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>Or message us on WhatsApp</a>
+        </div>
+
+        <div class="contact-form">
+          <form id="leadForm" novalidate>
+            <div class="row2">
+              <div>
+                <label for="f-name">Name</label>
+                <input id="f-name" name="name" type="text" autocomplete="name" required placeholder="Your name" />
+              </div>
+              <div>
+                <label for="f-company">Company</label>
+                <input id="f-company" name="company" type="text" autocomplete="organization" required placeholder="Brand or agency" />
+              </div>
+            </div>
+            <div>
+              <label for="f-email">Work email</label>
+              <input id="f-email" name="email" type="email" autocomplete="email" required placeholder="you@company.com" />
+            </div>
+            <div>
+              <span class="lab" id="lab-interest">What are you after?</span>
+              <div class="pick" role="radiogroup" aria-labelledby="lab-interest">
+                <input type="radio" id="i-one" name="interest" value="One film" required />
+                <label for="i-one">One film</label>
+                <input type="radio" id="i-ongoing" name="interest" value="Ongoing production" />
+                <label for="i-ongoing">Ongoing</label>
+                <input type="radio" id="i-unsure" name="interest" value="Not sure yet" />
+                <label for="i-unsure">Not sure</label>
+              </div>
+            </div>
+            <div>
+              <label for="f-brief">A short brief <span class="lab-opt">&mdash; optional</span></label>
+              <textarea id="f-brief" name="brief" rows="3" placeholder="What you're making, roughly when, and anything we should know."></textarea>
+            </div>
+            <div class="hp" aria-hidden="true"><label for="f-website">Website</label><input id="f-website" name="website" type="text" tabindex="-1" autocomplete="off" /></div>
+            <div class="send">
+              <button class="btn btn-solid btn-lg" type="submit" id="submitBtn">Let&rsquo;s talk <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></button>
+              <span class="by">
+                <span class="faces" aria-hidden="true">
+                  <img src="/landing/team/liran-segal.jpg" alt="" loading="lazy" />
+                  <img src="/landing/team/yossi-bozo.jpg" alt="" loading="lazy" />
+                  <img src="/landing/team/itzik-mizruhin.jpg" alt="" loading="lazy" />
+                </span>
+                <span>Goes straight to the people making the work.</span>
+              </span>
+            </div>
+            <p class="msg" id="formMsg" role="alert" hidden></p>
+          </form>
+
+          <div class="thanks" id="thanks" hidden>
+            <h3>Got it &mdash; thank you.</h3>
+            <p>Your note is with us. We&rsquo;ll come back with an approach and a range. If it&rsquo;s urgent, WhatsApp is the fastest way to reach us.</p>
+            <a class="wa" data-wa href="#" data-cta="thanks-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>Message us on WhatsApp</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── the full work, last, for anyone who wants to dig ────────────── -->
+  <section class="section screen" id="work">
+    <div class="wrap">
+      <h2 class="lede up">Selected work</h2>
+      <p class="screen-note up">Commercials, brand films and campaign work. Hover to preview, click to watch.</p>
+      <div class="films" id="films">
+        <!-- Real films load here from /api/showcase. These frames from the reel
+             stand in if it's unreachable, so the section is never empty. -->
+        <article class="film up">
+          <div class="film-frame">
+            <img src="/landing/media/still-01.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+          </div>
+          <div class="film-cap"><h3 class="film-title">Brand film</h3></div>
+        </article>
+        <article class="film up">
+          <div class="film-frame">
+            <img src="/landing/media/still-02.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+          </div>
+          <div class="film-cap"><h3 class="film-title">Product film</h3></div>
+        </article>
+        <article class="film up">
+          <div class="film-frame">
+            <img src="/landing/media/still-03.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+          </div>
+          <div class="film-cap"><h3 class="film-title">Campaign film</h3></div>
+        </article>
+        <article class="film up">
+          <div class="film-frame">
+            <img src="/landing/media/still-04.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+          </div>
+          <div class="film-cap"><h3 class="film-title">Commercial</h3></div>
+        </article>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <a class="brand" href="#top" aria-label="Shyow"><svg class="wordmark" viewBox="-12 -11 706 122" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
+    <div class="foot-links">
+      <a href="#work">Work</a><a href="#pricing">Pricing</a><a href="#contact">Contact</a><a data-wa href="#" data-cta="footer-whatsapp">WhatsApp</a><a href="/">shyow.io</a>
+    </div>
+    <div class="foot-cr">&copy; 2026 Shyow &middot; Working worldwide</div>
+  </div>
+</footer>
+
+<script>
+  // ── the studio's contact channel, in one place ─────────────────────────────
+  const WA_NUMBER = "972523993994";          // Shyow - +972 52-399-3994
+  const WA_TEXT = "Hi Shyow, I'd like to talk about a film.";
+  const waHref = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(WA_TEXT)}`;
+  document.querySelectorAll('[data-wa]').forEach(a => { a.href = waHref; a.target = "_blank"; a.rel = "noopener"; });
+
+  // ── analytics ──────────────────────────────────────────────────────────────
+  // No provider is bundled. This feeds GTM / GA4 / Plausible the moment one is
+  // added to the page, and is a no-op until then.
+  function track(event, props) {
+    try {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push(Object.assign({ event }, props || {}));
+      if (typeof window.gtag === 'function') window.gtag('event', event, props || {});
+      if (typeof window.plausible === 'function') window.plausible(event, { props: props || {} });
+    } catch (e) { /* analytics must never break the page */ }
+  }
+  document.querySelectorAll('[data-cta]').forEach(el => {
+    el.addEventListener('click', () => {
+      const name = el.getAttribute('data-cta');
+      track(name.indexOf('whatsapp') > -1 ? 'whatsapp_click' : 'cta_click', { location: name });
+    });
+  });
+
+  // ── nav ────────────────────────────────────────────────────────────────────
+  const hdr = document.getElementById('hdr');
+  const onScroll = () => hdr.classList.toggle('scrolled', window.scrollY > 8);
+  onScroll(); addEventListener('scroll', onScroll, { passive: true });
+
+  // ── soft reveals + section events ──────────────────────────────────────────
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((es) => {
+      es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: .12 });
+    document.querySelectorAll('.up').forEach(el => io.observe(el));
+
+    const seen = new IntersectionObserver((es) => {
+      es.forEach(e => { if (!e.isIntersecting) return; track('section_view', { section: e.target.id }); seen.unobserve(e.target); });
+    }, { threshold: .25 });
+    ['pricing', 'contact', 'work'].forEach(id => { const el = document.getElementById(id); if (el) seen.observe(el); });
+  } else {
+    document.querySelectorAll('.up').forEach(el => el.classList.add('in'));
+  }
+
+  // ── showreel sound toggle (it autoplays muted, as it must) ─────────────────
+  (() => {
+    const v = document.getElementById('reelVid');
+    const btn = document.getElementById('reelSound');
+    const lab = document.getElementById('reelSoundLabel');
+    if (!v || !btn) return;
+    btn.addEventListener('click', () => {
+      v.muted = !v.muted;
+      btn.setAttribute('aria-pressed', String(!v.muted));
+      lab.textContent = v.muted ? 'Sound on' : 'Sound off';
+      if (!v.muted) { v.play().catch(() => {}); track('reel_sound_on', {}); }
+    });
+  })();
+
+  // ── the pricing CTAs pre-select the matching option in the form ────────────
+  document.querySelectorAll('[data-plan]').forEach(el => {
+    el.addEventListener('click', () => {
+      const r = document.getElementById(el.dataset.plan === 'ongoing' ? 'i-ongoing' : 'i-one');
+      if (r) r.checked = true;
+    });
+  });
+
+  // ── the form ───────────────────────────────────────────────────────────────
+  (() => {
+    const form = document.getElementById('leadForm');
+    const btn = document.getElementById('submitBtn');
+    const msg = document.getElementById('formMsg');
+    const thanks = document.getElementById('thanks');
+    let started = false;
+
+    form.addEventListener('input', () => { if (!started) { started = true; track('form_start', {}); } });
+    const show = (t) => { msg.textContent = t; msg.hidden = false; };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.hidden = true;
+
+      if (!form.checkValidity()) {
+        show('Please add your name, company, work email and what you’re after.');
+        const bad = form.querySelector(':invalid'); if (bad) bad.focus();
+        track('form_error', { reason: 'validation' });
+        return;
+      }
+
+      const data = Object.fromEntries(new FormData(form).entries());
+      data.page = location.pathname;
+      data.referrer = document.referrer || '';
+      // keep campaign parameters with the lead so paid traffic stays attributable
+      new URLSearchParams(location.search).forEach((v, k) => { if (/^(utm_|gclid|fbclid|msclkid)/i.test(k)) data[k] = v; });
+
+      btn.disabled = true;
+      const label = btn.innerHTML;
+      btn.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) throw new Error('failed');
+        track('form_submit', { interest: data.interest || '' });
+        form.hidden = true;
+        thanks.hidden = false;
+        thanks.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = label;
+        show('That didn’t go through. Please try again — or message us on WhatsApp and we’ll pick it up straight away.');
+        track('form_error', { reason: 'network' });
+      }
+    });
+  })();
+
+  // ── the full work: real films replace the standby frames ───────────────────
+  // Every published film, in the studio's own Showcase order. The layout gives
+  // each slot a different width and drop, on a six-film repeating rhythm.
+  (async () => {
+    let items = [];
+    try { items = await (await fetch('/api/showcase')).json(); } catch { return; }
+    if (!Array.isArray(items) || !items.length) return;
+    const grid = document.getElementById('films');
+    grid.innerHTML = '';
+    const isTouch = matchMedia('(hover: none)').matches;
+
+    items.forEach((it, i) => {
+      const card = document.createElement('article');
+      card.className = 'film up in';
+
+      const frame = document.createElement('div');
+      frame.className = 'film-frame';
+
+      const v = document.createElement('video');
+      // preload="none" + a poster still = instant thumbnails, zero video bytes
+      // until someone actually asks for one.
+      Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none' });
+      if (it.poster) v.poster = it.poster;
+      const ensureSrc = () => { if (!v.getAttribute('src')) v.setAttribute('src', it.url); };
+      // Touch has no hover, and iOS Safari can't fullscreen a <video> through
+      // requestFullscreen - so phones get the native controls instead.
+      if (isTouch) { Object.assign(v, { controls: true, muted: false, preload: 'metadata' }); ensureSrc(); }
+
+      const play = document.createElement('span');
+      play.className = 'play';
+      play.setAttribute('aria-hidden', 'true');
+      play.innerHTML = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>';
+      frame.append(v, play);
+
+      const cap = document.createElement('div');
+      cap.className = 'film-cap';
+      const h3 = document.createElement('h3');
+      h3.className = 'film-title';
+      h3.textContent = it.title || 'Selected film';
+      cap.append(h3);
+      // The short line under a title is whatever the studio typed into that
+      // Showcase entry's caption. Never invented here - no caption, no line.
+      if (it.caption) {
+        const note = document.createElement('span');
+        note.className = 'film-note';
+        note.textContent = it.caption;
+        cap.append(note);
+      }
+
+      card.append(frame, cap);
+
+      const played = () => track('work_play', { title: h3.textContent, position: i + 1 });
+      if (isTouch) {
+        play.style.display = 'none';   // the native control takes over
+        v.addEventListener('play', played, { once: true });
+      } else {
+        frame.addEventListener('mouseenter', () => { ensureSrc(); v.play().catch(() => {}); });
+        frame.addEventListener('mouseleave', () => { v.pause(); });
+        frame.addEventListener('click', () => {
+          ensureSrc();
+          v.muted = false;
+          v.play().catch(() => {});
+          played();
+          if (v.requestFullscreen) v.requestFullscreen().catch(() => {});
+          else if (v.webkitRequestFullscreen) v.webkitRequestFullscreen();
+          else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+        });
+      }
+
+      grid.appendChild(card);
+    });
+  })();
+</script>
+</body>
+</html>

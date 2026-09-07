@@ -75,12 +75,40 @@ Edit these files to change the base behavior for **all** projects. To tweak just
 
 ---
 
+## The public site
+
+Two pages live in `landing/`, both plain self-contained HTML (no build step):
+
+| Page | URL | Purpose |
+|---|---|---|
+| `index.html` | `shyow.io/` | The studio homepage. |
+| `commercials.html` | `shyow.io/commercials` | Dedicated acquisition page for paid traffic — the offer, the prices and an inquiry form. |
+
+Both pull their portfolio from the **Showcase** tab in the app (`GET /api/showcase`, public).
+Each entry's **caption** is printed under its title on `/commercials` as the credit line, so
+write it the way it should read — e.g. `Commercial · Creative, AI Production, Edit & Finish`.
+An entry with no caption just shows its title; nothing is invented.
+
+**Inquiries** from `/commercials` `POST /api/lead` (public, validated, rate-limited per IP).
+They land in Firestore's `leads` collection in the cloud, or `projects-data/_leads/leads.json`
+when running locally. Read them back with `GET /api/leads` (behind the login). Every new lead
+is also printed in the host logs, so Render's log tail doubles as an inbox alert.
+
+**Analytics** — no provider is installed. `track()` in `commercials.html` already fires the
+conversion events (CTA clicks, pricing/section views, form start + submit, WhatsApp clicks)
+into `dataLayer` / `gtag` / `plausible`, so dropping in GTM, GA4 or Plausible starts
+reporting immediately with no further edits.
+
+---
+
 ## Working on this with Claude in the terminal
 
 This folder is a normal Node project. Open it with Claude Code and you can iterate on the gems, the UI, or add features (e.g. a Kling API integration, batch generation, or export-to-CSV). Key files:
 
 ```
 server/index.js     all API routes (projects, chat, generate, library)
+server/leads.js     inquiries from the /commercials landing page
+landing/*.html      the public site (homepage + /commercials campaign page)
 gems/*.txt          the three system prompts
 public/app.js       all frontend logic
 public/styles.css   the studio theme

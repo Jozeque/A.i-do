@@ -14,6 +14,7 @@ import { createDataStore } from './data.js';
 import { computeUsage } from './usage.js';
 import { requireAuth, authEnabled, allowedEmails, webConfig } from './auth.js';
 import { createShowcase } from './showcase.js';
+import { createLeads } from './leads.js';
 import { Jimp } from 'jimp';   // resize swap outputs to the input image's exact pixel dimensions
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -65,6 +66,10 @@ const data = createDataStore(DATA_DIR);
 
 // Showcase seam — Firestore 'showcase' collection + the storage seam for video files.
 const showcase = createShowcase(storage);
+
+// Leads seam — inquiries from the /production landing page. Firestore when configured,
+// a local JSON file otherwise, so the form never silently drops a lead.
+const leads = createLeads(DATA_DIR);
 
 // ── API clients (lazily validated) ──────────────────────────────────────────
 const anthropic = process.env.ANTHROPIC_API_KEY
@@ -386,7 +391,9 @@ app.param('pid', (req, res, next, pid) => {
 const APP_PASSWORD = process.env.APP_PASSWORD;
 const APP_USER = process.env.APP_USER || 'studio';
 if (authEnabled()) {
-  app.use('/api', requireAuth({ open: ['/health', '/auth-config', 'GET /showcase'] }));
+  // POST /lead is open on purpose — it's the public landing page's inquiry form.
+  // It validates, rate-limits per IP and stores nothing but the form's own fields.
+  app.use('/api', requireAuth({ open: ['/health', '/auth-config', 'GET /showcase', 'POST /lead'] }));
   // /media is intentionally NOT Bearer-gated: images load via <img src>, which can't
   // send an Authorization header. Filenames are unguessable and the credit-burning
   // surface (/api) is fully locked. Proper media privacy (signed URLs via the server
@@ -415,6 +422,12 @@ const LANDING_HOSTS = (process.env.LANDING_HOSTS || 'shyow.io,www.shyow.io')
 const isLandingHost = (req) => LANDING_HOSTS.includes((req.hostname || '').toLowerCase());
 // On the marketing domain the root serves the landing page instead of the app shell.
 app.get('/', (req, res, next) => (isLandingHost(req) ? res.sendFile(path.join(LANDING_DIR, 'index.html')) : next()));
+// Clean campaign URL for the paid-acquisition page: shyow.io/commercials. Registered on
+// every host (not just the marketing one) so it's testable at localhost:4505/commercials;
+// it also stays reachable at /landing/commercials.html through the static mount below.
+// Nothing else about the marketing domain changes — shyow.io/ is still the homepage, and
+// every other path (/production included) still falls through to the SPA handler.
+app.get('/commercials', (req, res) => res.sendFile(path.join(LANDING_DIR, 'commercials.html')));
 
 // Never cache the app shell (index.html / app.js / styles.css) so UI updates always load.
 app.use(express.static(PUBLIC_DIR, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-store') }));
@@ -528,6 +541,25 @@ app.post('/api/showcase', uploadVideo.single('video'), async (req, res) => {
 });
 app.delete('/api/showcase/:sid', async (req, res) => {
   try { await showcase.remove(req.params.sid); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── LEADS — the /production landing page's inquiry form ───────────────────────
+// POST is PUBLIC (it IS the conversion action) and validated + rate-limited in
+// leads.js; GET is gated, so only the studio can read the inbox.
+app.post('/api/lead', async (req, res) => {
+  // Render sits behind a proxy, so the real client IP is the first x-forwarded-for hop.
+  const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '';
+  if (!leads.allow(ip)) return res.status(429).json({ error: 'Too many submissions — please try again shortly.' });
+  try {
+    const lead = await leads.add(req.body, { ip, userAgent: req.headers['user-agent'] || '' });
+    // Printed so a new inquiry is visible in the host logs even before anyone opens the inbox.
+    console.log(`  ✉  New lead — ${lead.name} · ${lead.company} · ${lead.email} · ${lead.interest || 'unspecified'}`);
+    res.json({ ok: true });
+  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
+});
+app.get('/api/leads', async (req, res) => {
+  try { res.json(await leads.list({ limit: Math.min(Number(req.query.limit) || 200, 500) })); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
