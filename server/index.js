@@ -428,6 +428,9 @@ app.get('/', (req, res, next) => (isLandingHost(req) ? res.sendFile(path.join(LA
 // Nothing else about the marketing domain changes — shyow.io/ is still the homepage, and
 // every other path (/production included) still falls through to the SPA handler.
 app.get('/commercials', (req, res) => res.sendFile(path.join(LANDING_DIR, 'commercials.html')));
+// The singular is an easy URL to mistype or misremember, and on a paid page a click that
+// lands on the homepage instead is a click paid for and lost. Send it to the canonical one.
+app.get('/commercial', (req, res) => res.redirect(301, '/commercials'));
 
 // Never cache the app shell (index.html / app.js / styles.css) so UI updates always load.
 app.use(express.static(PUBLIC_DIR, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-store') }));
