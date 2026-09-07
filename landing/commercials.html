@@ -144,10 +144,13 @@
   /* ── hero: copy and the reel share the first screen ── */
   .hero { padding: clamp(112px, 15vh, 150px) 0 clamp(30px, 4vw, 46px); }
   .hero-grid {
-    display: grid; grid-template-columns: minmax(0, .72fr) minmax(0, 1fr);
+    display: grid; grid-template-columns: minmax(0, .82fr) minmax(0, 1fr);
     gap: clamp(30px, 4vw, 62px); align-items: center;
   }
-  .hero h1 { font-size: clamp(2.35rem, 3.5vw, 3.5rem); }
+  /* sized so "Got something to show?" holds one line: the setup and the payoff each
+     get their own, which is the whole shape of the line */
+  .hero h1 { font-size: clamp(2.05rem, 3.05vw, 2.8rem); }
+  .hero h1 .brandword { color: var(--coral); letter-spacing: 0; }
   .hero .sub {
     margin-top: 20px; font-size: clamp(1.05rem, 1.3vw, 1.2rem);
     color: var(--ink-2); line-height: 1.5; max-width: 38ch; text-wrap: pretty;
@@ -433,7 +436,7 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div class="hero-copy">
-        <h1>The most ambitious briefs need the right team.</h1>
+        <h1>Got something to show?<br>Let&rsquo;s <span class="brandword">SHYOW</span> it.</h1>
         <p class="sub">Creative direction, controlled AI production and high-end post for commercials and campaigns.</p>
         <div class="hero-cta">
           <a class="btn btn-coral btn-lg" href="#contact" data-cta="hero">Start a project <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
@@ -529,8 +532,8 @@
       <!-- contact flows straight out of pricing -->
       <div class="contact up" id="contact">
         <div class="contact-copy">
-          <h2 class="lede">Got something in mind?</h2>
-          <p>Tell us what you&rsquo;re making. We&rsquo;ll come back with an approach and a range.</p>
+          <h2 class="lede">So, what are you making?</h2>
+          <p>A line or two is enough. We&rsquo;ll come back with an approach and a range.</p>
           <a class="wa" data-wa href="#" data-cta="contact-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>Or message us on WhatsApp</a>
         </div>
 
