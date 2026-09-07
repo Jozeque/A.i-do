@@ -177,18 +177,38 @@
   .reel-sound:hover { background: rgba(23,19,14,.8); transform: translateY(-1px); }
   .reel-sound svg { width: 15px; height: 15px; }
 
-  /* ── made for - one quiet row, no section of its own ── */
-  .clients {
-    display: flex; align-items: center; gap: clamp(20px, 3.2vw, 46px); flex-wrap: wrap;
-    padding-bottom: clamp(26px, 4vw, 44px);
+  /* ── made for: a continuous roller, no section of its own ─────────────────────
+     The track holds the six marks twice and travels exactly half its width, so the
+     second set lands where the first began and the loop never seams. Spacing is
+     padding on each item rather than a flex gap, which is what keeps that halfway
+     point exact. Grayscale at rest so the films stay the only colour on the page;
+     hovering the strip stops it and brings the brands back to their own colours. */
+  .madefor { font-size: .93rem; color: var(--ink-3); margin-bottom: 16px; }
+  .roll {
+    overflow: hidden; padding-bottom: clamp(26px, 4vw, 44px);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
   }
-  .clients span { font-size: .93rem; color: var(--ink-3); flex: none; }
-  .clients img { filter: brightness(0); opacity: .46; transition: opacity .25s ease; }
-  .clients img:hover { opacity: .78; }
-  .clients .l-pandora { height: 27px; }
-  .clients .l-clalit  { height: 26px; }
-  .clients .l-tomix   { height: 21px; }
-  .clients .l-opel    { height: 38px; }
+  .roll-track { display: flex; align-items: center; width: max-content; animation: roll 46s linear infinite; }
+  .roll:hover .roll-track { animation-play-state: paused; }
+  @keyframes roll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .roll-item { flex: none; padding-inline: clamp(22px, 3vw, 46px); display: flex; align-items: center; }
+  .roll-item img {
+    filter: grayscale(1) brightness(.88) contrast(1.08); opacity: .72;
+    transition: filter .4s ease, opacity .4s ease;
+  }
+  .roll:hover .roll-item img { filter: none; opacity: 1; }
+  /* the black wordmarks come through grayscale far darker than the colour marks, so the
+     colour ones are pulled down to match; hover still overrides all of it */
+  .roll-item img.l-clalit,
+  .roll-item img.l-leumit { filter: grayscale(1) brightness(.6) contrast(1.12); }
+  .roll-item img.l-yoch   { filter: grayscale(1) brightness(.72) contrast(1.3); }
+  .l-pandora { height: 27px; }
+  .l-opel    { height: 38px; }
+  .l-clalit  { height: 26px; }
+  .l-tomix   { height: 21px; }
+  .l-leumit  { height: 27px; }
+  .l-yoch    { height: 36px; }
 
   /* ── section rhythm ── */
   .section { padding: clamp(52px, 7.5vw, 92px) 0; }
@@ -353,7 +373,6 @@
   }
   @media (max-width: 620px) {
     .row2, .pick { grid-template-columns: 1fr; }
-    .clients span { width: 100%; }
     .hero-cta .btn { flex: 1 1 auto; }
   }
 
@@ -361,6 +380,8 @@
     html { scroll-behavior: auto; }
     *, *::before, *::after { transition: none !important; animation: none !important; }
     .js .up { opacity: 1; transform: none; }
+    .roll-track { animation: none; width: auto; flex-wrap: wrap; justify-content: center; }
+    .roll-track [data-dup] { display: none; }
     .film-frame:hover { transform: none; }
     .film-frame:hover video, .film-frame:hover img { transform: none; }
   }
@@ -454,13 +475,21 @@
   </section>
 
   <!-- ── made for ── -->
-  <div class="wrap">
-    <div class="clients up">
-      <span>Made for</span>
-      <img class="l-pandora" src="/landing/logos/pandora.svg" alt="Pandora" loading="lazy" />
-      <img class="l-opel" src="/landing/logos/opel.svg" alt="Opel" loading="lazy" />
-      <img class="l-clalit" src="/landing/logos/clalit.png" alt="Clalit" loading="lazy" />
-      <img class="l-tomix" src="/landing/logos/tomix.png" alt="toMix" loading="lazy" />
+  <div class="wrap"><p class="madefor up">Made for</p></div>
+  <div class="roll up" role="group" aria-label="Selected clients">
+    <div class="roll-track">
+        <span class="roll-item"><img class="l-pandora" src="/landing/logos/pandora.svg" alt="Pandora" loading="lazy" /></span>
+        <span class="roll-item"><img class="l-opel" src="/landing/logos/opel.svg" alt="Opel" loading="lazy" /></span>
+        <span class="roll-item"><img class="l-clalit" src="/landing/logos/clalit.png" alt="Clalit" loading="lazy" /></span>
+        <span class="roll-item"><img class="l-tomix" src="/landing/logos/tomix-ink.png" alt="toMix" loading="lazy" /></span>
+        <span class="roll-item"><img class="l-leumit" src="/landing/logos/leumit.png" alt="Leumit" loading="lazy" /></span>
+        <span class="roll-item"><img class="l-yoch" src="/landing/logos/yochananof.png" alt="Yochananof" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-pandora" src="/landing/logos/pandora.svg" alt="" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-opel" src="/landing/logos/opel.svg" alt="" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-clalit" src="/landing/logos/clalit.png" alt="" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-tomix" src="/landing/logos/tomix-ink.png" alt="" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-leumit" src="/landing/logos/leumit.png" alt="" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-yoch" src="/landing/logos/yochananof.png" alt="" loading="lazy" /></span>
     </div>
   </div>
 
