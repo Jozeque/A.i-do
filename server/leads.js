@@ -1,8 +1,8 @@
-// ── Leads seam — inquiries from the /production landing page ─────────────────
+// ── Leads seam: inquiries from the /commercials landing page ─────────────────
 // The landing page's form is the studio's primary conversion action, so a lead can
 // never be dropped on the floor. Records go to the Firestore 'leads' collection when
 // Firestore is configured (same credentials as everything else), and to a local JSON
-// file otherwise — so the form works identically on localhost with no cloud set up.
+// file otherwise, so the form works identically on localhost with no cloud set up.
 //
 // Local file lives at projects-data/_leads/leads.json. The leading underscore keeps it
 // out of the project list (listProjects skips directories with no project.json) and
@@ -16,7 +16,7 @@ import fsp from 'fs/promises';
 import path from 'path';
 import { getAdminApp } from './firebase.js';
 
-// Generous caps — long enough for a real brief, short enough that nobody can post a
+// Generous caps: long enough for a real brief, short enough that nobody can post a
 // novel into the database through a public endpoint.
 const LIMITS = { name: 120, company: 160, email: 200, interest: 80, budget: 80, brief: 5000, page: 200, referrer: 600, campaign: 200 };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -96,7 +96,7 @@ function createLocalLeads(dataDir) {
       const all = await read();
       all.unshift(lead);
       await fsp.mkdir(dir, { recursive: true });
-      // Atomic write — a crash mid-write can never truncate the whole lead history.
+      // Atomic write: a crash mid-write can never truncate the whole lead history.
       await fsp.writeFile(`${file}.tmp`, JSON.stringify(all, null, 2));
       await fsp.rename(`${file}.tmp`, file);
       return lead;

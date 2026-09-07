@@ -67,7 +67,7 @@ const data = createDataStore(DATA_DIR);
 // Showcase seam — Firestore 'showcase' collection + the storage seam for video files.
 const showcase = createShowcase(storage);
 
-// Leads seam — inquiries from the /production landing page. Firestore when configured,
+// Leads seam: inquiries from the /commercials landing page. Firestore when configured,
 // a local JSON file otherwise, so the form never silently drops a lead.
 const leads = createLeads(DATA_DIR);
 
@@ -391,7 +391,7 @@ app.param('pid', (req, res, next, pid) => {
 const APP_PASSWORD = process.env.APP_PASSWORD;
 const APP_USER = process.env.APP_USER || 'studio';
 if (authEnabled()) {
-  // POST /lead is open on purpose — it's the public landing page's inquiry form.
+  // POST /lead is open on purpose: it's the public landing page's inquiry form.
   // It validates, rate-limits per IP and stores nothing but the form's own fields.
   app.use('/api', requireAuth({ open: ['/health', '/auth-config', 'GET /showcase', 'POST /lead'] }));
   // /media is intentionally NOT Bearer-gated: images load via <img src>, which can't
@@ -425,7 +425,7 @@ app.get('/', (req, res, next) => (isLandingHost(req) ? res.sendFile(path.join(LA
 // Clean campaign URL for the paid-acquisition page: shyow.io/commercials. Registered on
 // every host (not just the marketing one) so it's testable at localhost:4505/commercials;
 // it also stays reachable at /landing/commercials.html through the static mount below.
-// Nothing else about the marketing domain changes — shyow.io/ is still the homepage, and
+// Nothing else about the marketing domain changes: shyow.io/ is still the homepage, and
 // every other path (/production included) still falls through to the SPA handler.
 app.get('/commercials', (req, res) => res.sendFile(path.join(LANDING_DIR, 'commercials.html')));
 // The singular is an easy URL to mistype or misremember, and on a paid page a click that
@@ -547,17 +547,17 @@ app.delete('/api/showcase/:sid', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── LEADS — the /production landing page's inquiry form ───────────────────────
+// ── LEADS: the /commercials landing page's inquiry form ───────────────────────
 // POST is PUBLIC (it IS the conversion action) and validated + rate-limited in
 // leads.js; GET is gated, so only the studio can read the inbox.
 app.post('/api/lead', async (req, res) => {
   // Render sits behind a proxy, so the real client IP is the first x-forwarded-for hop.
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '';
-  if (!leads.allow(ip)) return res.status(429).json({ error: 'Too many submissions — please try again shortly.' });
+  if (!leads.allow(ip)) return res.status(429).json({ error: 'Too many submissions. Please try again shortly.' });
   try {
     const lead = await leads.add(req.body, { ip, userAgent: req.headers['user-agent'] || '' });
     // Printed so a new inquiry is visible in the host logs even before anyone opens the inbox.
-    console.log(`  ✉  New lead — ${lead.name} · ${lead.company} · ${lead.email} · ${lead.interest || 'unspecified'}`);
+    console.log(`  ✉  New lead: ${lead.name} · ${lead.company} · ${lead.email} · ${lead.interest || 'unspecified'}`);
     res.json({ ok: true });
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
