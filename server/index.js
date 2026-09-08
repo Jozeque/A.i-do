@@ -508,6 +508,7 @@ app.get('/api/health', (req, res) => {
     hasGemini: !!genai,
     hasFal: !!FAL_KEY,
     hasOpenai: !!OPENAI_API_KEY,
+    hasMetaCapi: !!process.env.META_CAPI_ACCESS_TOKEN,
     authEnabled: authEnabled(),
     storage: storage.backend,
     data: data.backend,
