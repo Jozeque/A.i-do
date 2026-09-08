@@ -52,6 +52,10 @@ services:
         sync: false
       - key: DRIVE_ROOT_FOLDER       # the Drive folder media lives under
         value: AI Video Studio
+      # --- Meta Conversions API: mirrors the Lead event server-side. Leave unset to disable. ---
+      # Generate in Events Manager → dataset 1619487023147325 → Settings → Conversions API.
+      - key: META_CAPI_ACCESS_TOKEN
+        sync: false
       # --- interim fallback gate, only used if the Firebase vars above are NOT set ---
       - key: APP_USER         # username for the password gate (e.g. "studio")
         sync: false
