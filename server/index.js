@@ -15,6 +15,7 @@ import { computeUsage } from './usage.js';
 import { requireAuth, authEnabled, allowedEmails, webConfig } from './auth.js';
 import { createShowcase } from './showcase.js';
 import { createLeads } from './leads.js';
+import { sendLead } from './meta-capi.js';
 import { Jimp } from 'jimp';   // resize swap outputs to the input image's exact pixel dimensions
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -558,6 +559,15 @@ app.post('/api/lead', async (req, res) => {
     const lead = await leads.add(req.body, { ip, userAgent: req.headers['user-agent'] || '' });
     // Printed so a new inquiry is visible in the host logs even before anyone opens the inbox.
     console.log(`  ✉  New lead: ${lead.name} · ${lead.company} · ${lead.email} · ${lead.interest || 'unspecified'}`);
+    // Fire-and-forget: a Meta outage must never turn a captured lead into an error.
+    sendLead(lead, {
+      eventId: req.body?.event_id,
+      fbclid: req.body?.fbclid,
+      ip,
+      userAgent: req.headers['user-agent'] || '',
+      cookieHeader: req.headers.cookie,
+      sourceUrl: `https://shyow.io${lead.page || '/commercials'}`,
+    }).catch((e) => console.warn(`  ⚠  Meta CAPI Lead failed: ${e.message}`));
     res.json({ ok: true });
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });

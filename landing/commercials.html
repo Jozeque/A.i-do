@@ -389,6 +389,18 @@
     .film-frame:hover video, .film-frame:hover img { transform: none; }
   }
 </style>
+<!-- Meta pixel - Shyow Studio Website dataset -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1619487023147325');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none" alt=""
+src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /></noscript>
 </head>
 <body>
 <!-- SHYOW wordmark - the same symbol the homepage nav uses. -->
@@ -652,14 +664,22 @@
   document.querySelectorAll('[data-wa]').forEach(a => { a.href = waHref; a.target = "_blank"; a.rel = "noopener"; });
 
   // ── analytics ──────────────────────────────────────────────────────────────
-  // No provider is bundled. This feeds GTM / GA4 / Plausible the moment one is
-  // added to the page, and is a no-op until then.
-  function track(event, props) {
+  // The Meta pixel is bundled (see <head>). This also feeds GTM / GA4 / Plausible
+  // the moment one is added to the page, and is a no-op for those until then.
+  // Only the two events that represent a real enquiry map to Meta standard events;
+  // everything else stays local so the ad account optimises on genuine intent.
+  const FB_STANDARD = { form_submit: 'Lead', whatsapp_click: 'Contact' };
+  function track(event, props, eventId) {
     try {
       window.dataLayer = window.dataLayer || [];
       window.dataLayer.push(Object.assign({ event }, props || {}));
       if (typeof window.gtag === 'function') window.gtag('event', event, props || {});
       if (typeof window.plausible === 'function') window.plausible(event, { props: props || {} });
+      if (typeof window.fbq === 'function') {
+        const standard = FB_STANDARD[event];
+        if (standard) fbq('track', standard, props || {}, eventId ? { eventID: eventId } : undefined);
+        else if (event === 'form_start') fbq('trackCustom', 'FormStart', props || {});
+      }
     } catch (e) { /* analytics must never break the page */ }
   }
   document.querySelectorAll('[data-cta]').forEach(el => {
@@ -738,6 +758,11 @@
       data.referrer = document.referrer || '';
       // keep campaign parameters with the lead so paid traffic stays attributable
       new URLSearchParams(location.search).forEach((v, k) => { if (/^(utm_|gclid|fbclid|msclkid)/i.test(k)) data[k] = v; });
+      // shared id so the pixel Lead and any server-side Lead collapse into one conversion
+      const eventId = (window.crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : 'lead-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+      data.event_id = eventId;
 
       btn.disabled = true;
       const label = btn.innerHTML;
@@ -749,7 +774,7 @@
           body: JSON.stringify(data),
         });
         if (!res.ok) throw new Error('failed');
-        track('form_submit', { interest: data.interest || '' });
+        track('form_submit', { interest: data.interest || '' }, eventId);
         form.hidden = true;
         thanks.hidden = false;
         thanks.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
