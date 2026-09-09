@@ -21,6 +21,10 @@ import { getAdminApp } from './firebase.js';
 const LIMITS = { name: 120, company: 160, email: 200, interest: 80, budget: 80, brief: 5000, page: 200, referrer: 600, campaign: 200 };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const CAMPAIGN_KEYS = /^(utm_[a-z_]{1,20}|gclid|fbclid|msclkid)$/i;
+// How long after a lead is created its brief can still be filled in from the
+// thank-you step. Long enough for someone to finish typing, short enough that a
+// stale id is worthless.
+const NOTE_WINDOW_MS = 60 * 60 * 1000;
 
 const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
@@ -109,7 +113,24 @@ function createLocalLeads(dataDir) {
     return (await read()).slice(0, limit);
   }
 
-  return { backend: 'local', add, list, allow };
+  // A brief arrives after the lead is already stored, from the thank-you step, so it
+  // only ever fills an empty field, once, and only shortly after the lead was made.
+  async function addNote(id, brief) {
+    const run = tail.then(async () => {
+      const all = await read();
+      const i = all.findIndex((l) => l.id === id);
+      if (i < 0 || all[i].brief || Date.now() - (all[i].createdAt || 0) > NOTE_WINDOW_MS) return false;
+      all[i] = { ...all[i], brief: str(brief, LIMITS.brief) };
+      await fsp.mkdir(dir, { recursive: true });
+      await fsp.writeFile(`${file}.tmp`, JSON.stringify(all, null, 2));
+      await fsp.rename(`${file}.tmp`, file);
+      return true;
+    });
+    tail = run.catch(() => false);
+    return run;
+  }
+
+  return { backend: 'local', add, addNote, list, allow };
 }
 
 // ── Firestore backend ─────────────────────────────────────────────────────────
@@ -135,7 +156,17 @@ function createFirestoreLeads() {
     return snap.docs.map((d) => d.data());
   }
 
-  return { backend: 'firestore', add, list, allow };
+  async function addNote(id, brief) {
+    const ref = (await col()).doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) return false;
+    const lead = snap.data();
+    if (lead.brief || Date.now() - (lead.createdAt || 0) > NOTE_WINDOW_MS) return false;
+    await ref.set({ brief: str(brief, LIMITS.brief) }, { merge: true });
+    return true;
+  }
+
+  return { backend: 'firestore', add, addNote, list, allow };
 }
 
 export function createLeads(dataDir, { backend = process.env.DATA_BACKEND || 'local' } = {}) {

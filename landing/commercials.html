@@ -367,6 +367,58 @@
   .foot-links a:hover { color: var(--night-2); }
   .foot-cr { width: 100%; margin-top: 22px; font-size: .88rem; color: #756B60; }
 
+  /* ── the start-a-project sheet ────────────────────────────────────────────
+     A CTA pressed at high intent should open a conversation, not send the
+     visitor on a journey down the page. Native <dialog>, so the focus trap and
+     Esc come free. Beat one asks what they want to make; choosing reveals the
+     three fields that actually constitute a lead. The brief comes afterwards,
+     once the lead is already safe, so closing the window costs nothing. */
+  .sheet {
+    /* the global * { margin: 0 } reset kills the UA margin:auto that centres a dialog */
+    margin: auto;
+    width: min(520px, calc(100vw - 28px)); max-height: min(88vh, 780px);
+    padding: clamp(26px, 3.4vw, 40px); border: 0; border-radius: var(--r-card);
+    background: var(--paper); color: var(--ink); overflow-y: auto;
+    box-shadow: 0 40px 100px -30px rgba(59,38,18,.55);
+  }
+  .sheet::backdrop { background: rgba(27,22,16,.5); backdrop-filter: blur(4px); }
+  .sheet[open] { animation: sheetIn .26s cubic-bezier(.2,.7,.2,1); }
+  @keyframes sheetIn { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+  .sheet h2 { font-size: clamp(1.55rem, 3.2vw, 2.05rem); padding-right: 34px; }
+  .sheet-sub { margin-top: 12px; color: var(--ink-2); font-size: 1.02rem; }
+  .sheet-x {
+    position: absolute; top: 15px; right: 16px; width: 34px; height: 34px; padding: 0;
+    border: 0; border-radius: 50%; background: transparent; color: var(--ink-3);
+    font-family: var(--sans); font-size: 1.45rem; line-height: 1; cursor: pointer;
+    transition: background .2s ease, color .2s ease;
+  }
+  .sheet-x:hover { background: var(--sand); color: var(--ink); }
+  .big-pick { display: grid; gap: 9px; margin-top: 22px; }
+  .big-pick input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .big-pick label {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0;
+    padding: 16px 18px; border: 1px solid var(--hair); border-radius: var(--r-btn);
+    background: #FCFAF6; font-size: 1.02rem; font-weight: 500; color: var(--ink); cursor: pointer;
+    transition: background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+  }
+  .big-pick label::after {
+    content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%;
+    border: 1px solid var(--ink-3); transition: background .2s ease, border-color .2s ease;
+  }
+  .big-pick label:hover { border-color: var(--ink-3); transform: translateY(-1px); }
+  .big-pick input:checked + label { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .big-pick input:checked + label::after { background: var(--coral); border-color: var(--coral); }
+  .big-pick input:focus-visible + label { outline: 2px solid var(--coral-2); outline-offset: 2px; }
+  .sheet-rest { display: grid; gap: 14px; margin-top: 20px; }
+  .sheet-rest .btn { width: 100%; margin-top: 4px; }
+  .sheet-wa { margin-top: 18px; font-size: .95rem; color: var(--ink-3); }
+  .sheet-wa a { font-weight: 500; color: var(--ink-2); border-bottom: 1px solid var(--hair); }
+  .sheet-wa a:hover { color: var(--coral-2); border-color: currentColor; }
+  .sheet-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+  /* on a phone the primary CTA keeps a WhatsApp exit right beside it */
+  .wa-icon { display: none; }
+  .wa-icon svg { width: 20px; height: 20px; }
+
   /* ── soft reveals ── */
   .js .up { opacity: 0; transform: translateY(20px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1); }
   .js .up.in { opacity: 1; transform: none; }
@@ -389,6 +441,10 @@
     .film:nth-child(6n+1) .film-frame { aspect-ratio: 16 / 9; }
   }
   @media (max-width: 620px) {
+    .hero-cta { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    .hero-cta .btn-coral { grid-column: 1; }
+    .wa-icon { display: inline-flex; grid-column: 2; padding-inline: 16px; }
+    .hero-cta .btn-line:not(.wa-icon) { grid-column: 1 / -1; }
     .row2, .pick { grid-template-columns: 1fr; }
     .hero-cta .btn { flex: 1 1 auto; }
   }
@@ -453,7 +509,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
       <a href="#pricing">Pricing</a>
       <a href="#contact">Contact</a>
     </nav>
-    <a class="btn btn-solid btn-sm" href="#contact" data-cta="nav">Start a project</a>
+    <a class="btn btn-solid btn-sm" href="#contact" data-cta="nav" data-open-sheet>Start a project</a>
   </div>
 </header>
 
@@ -465,7 +521,8 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
         <h1>Got something to show?<br>Let&rsquo;s <span class="brandword">SHYOW</span> it.</h1>
         <p class="sub">Creative direction, controlled AI production and high-end post for commercials and campaigns.</p>
         <div class="hero-cta">
-          <a class="btn btn-coral btn-lg" href="#contact" data-cta="hero">Start a project <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
+          <a class="btn btn-coral btn-lg" href="#contact" data-cta="hero" data-open-sheet>Start a project <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
+          <a class="btn btn-line btn-lg wa-icon" data-wa href="#" aria-label="Message us on WhatsApp" data-cta="hero-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg></a>
           <a class="btn btn-line btn-lg" href="#work" data-cta="hero-work">See the work</a>
         </div>
         <p class="anchors">
@@ -541,7 +598,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
           <p class="plan-rate"><span data-usd="300">$300</span> studio hour</p>
           <p class="plan-body">For a specific commercial, campaign or launch.</p>
           <div class="plan-cta-wrap">
-            <a class="btn btn-line" href="#contact" data-cta="plan-single" data-plan="single">Get a quote <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
+            <a class="btn btn-line" href="#contact" data-cta="plan-single" data-open-sheet data-preset="One project">Get a quote <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
           </div>
         </div>
 
@@ -555,7 +612,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
           <p class="plan-body">Reserved monthly production capacity for brands that need advertising content continuously.</p>
           <p class="plan-body">Use the capacity wherever the campaign needs it: one larger film, several smaller films, or a mix.</p>
           <div class="plan-cta-wrap">
-            <a class="btn btn-coral" href="#contact" data-cta="plan-ongoing" data-plan="ongoing">Talk about a retainer <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
+            <a class="btn btn-coral" href="#contact" data-cta="plan-ongoing" data-open-sheet data-preset="Ongoing production">Talk about a retainer <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
           </div>
         </div>
       </div>
@@ -590,8 +647,8 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
             <div>
               <span class="lab" id="lab-interest">What are you after?</span>
               <div class="pick" role="radiogroup" aria-labelledby="lab-interest">
-                <input type="radio" id="i-one" name="interest" value="One film" required />
-                <label for="i-one">One film</label>
+                <input type="radio" id="i-one" name="interest" value="One project" required />
+                <label for="i-one">One project</label>
                 <input type="radio" id="i-ongoing" name="interest" value="Ongoing production" />
                 <label for="i-ongoing">Ongoing</label>
                 <input type="radio" id="i-unsure" name="interest" value="Not sure yet" />
@@ -667,6 +724,50 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
     </div>
   </section>
 </main>
+
+<!-- Opened by every primary CTA. The contact section above stays for anyone who scrolls. -->
+<dialog class="sheet" id="startSheet" aria-labelledby="sheetTitle">
+  <button class="sheet-x" type="button" data-close aria-label="Close">&times;</button>
+
+  <div id="sheetPane">
+    <h2 id="sheetTitle">Let&rsquo;s make something.</h2>
+    <p class="sheet-sub">Tell us where to reach you. We&rsquo;ll take it from there.</p>
+    <form id="sheetLead" novalidate>
+      <span class="lab" id="sheetPickLab" style="margin-top:22px">What are you looking to make?</span>
+      <div class="big-pick" role="radiogroup" aria-labelledby="sheetPickLab">
+        <input type="radio" id="s-one" name="interest" value="One project" required autofocus />
+        <label for="s-one">One project</label>
+        <input type="radio" id="s-ongoing" name="interest" value="Ongoing production" />
+        <label for="s-ongoing">Ongoing production</label>
+        <input type="radio" id="s-unsure" name="interest" value="Not sure yet" />
+        <label for="s-unsure">Not sure yet</label>
+      </div>
+      <div class="sheet-rest" id="sheetRest" hidden>
+        <div><label for="s-name">Name</label><input id="s-name" name="name" type="text" autocomplete="name" required placeholder="Your name" /></div>
+        <div><label for="s-company">Company</label><input id="s-company" name="company" type="text" autocomplete="organization" required placeholder="Brand or agency" /></div>
+        <div><label for="s-email">Work email</label><input id="s-email" name="email" type="email" autocomplete="email" required placeholder="you@company.com" /></div>
+        <div class="hp" aria-hidden="true"><label for="s-website">Website</label><input id="s-website" name="website" type="text" tabindex="-1" autocomplete="off" /></div>
+        <button class="btn btn-solid btn-lg" type="submit" id="sheetSubmit">Let&rsquo;s talk</button>
+        <p class="msg" id="sheetMsg" role="alert" hidden></p>
+      </div>
+    </form>
+    <p class="sheet-wa">Prefer WhatsApp? <a data-wa href="#" data-cta="sheet-whatsapp">Message us &rarr;</a></p>
+  </div>
+
+  <div id="sheetThanks" hidden>
+    <h2>Got it.</h2>
+    <p class="sheet-sub">We&rsquo;ll come back with an approach and a range. Anything else you want us to know?</p>
+    <form id="sheetNote" style="margin-top:18px">
+      <textarea id="s-note" rows="3" placeholder="What you're making, roughly when, anything useful. Optional."></textarea>
+      <div class="sheet-actions">
+        <button class="btn btn-solid" type="submit" id="noteSubmit">Send</button>
+        <button class="btn btn-line" type="button" data-close>No thanks</button>
+      </div>
+      <p class="msg" id="noteMsg" role="alert" hidden></p>
+    </form>
+    <p class="sheet-wa">Or <a data-wa href="#" data-cta="sheet-thanks-whatsapp">message us on WhatsApp &rarr;</a></p>
+  </div>
+</dialog>
 
 <footer>
   <div class="wrap foot">
@@ -746,12 +847,121 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
   })();
 
   // ── the pricing CTAs pre-select the matching option in the form ────────────
-  document.querySelectorAll('[data-plan]').forEach(el => {
-    el.addEventListener('click', () => {
-      const r = document.getElementById(el.dataset.plan === 'ongoing' ? 'i-ongoing' : 'i-one');
-      if (r) r.checked = true;
+  // One path that actually posts a lead. Both the sheet and the contact section
+  // at the foot of the page go through it, so attribution, the shared Meta event
+  // id and the tracking behave identically wherever the visitor started.
+  async function postLead(form) {
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.page = location.pathname;
+    data.referrer = document.referrer || '';
+    // keep campaign parameters with the lead so paid traffic stays attributable
+    new URLSearchParams(location.search).forEach((v, k) => { if (/^(utm_|gclid|fbclid|msclkid)/i.test(k)) data[k] = v; });
+    // shared id so the pixel Lead and any server-side Lead collapse into one conversion
+    const eventId = (window.crypto && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : 'lead-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+    data.event_id = eventId;
+    const res = await fetch('/api/lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
-  });
+    if (!res.ok) throw new Error('failed');
+    track('form_submit', { interest: data.interest || '' }, eventId);
+    return (await res.json().catch(() => ({}))).id || null;
+  }
+
+  // ── the start-a-project sheet ──────────────────────────────────────────────
+  // Every primary CTA opens this instead of scrolling. Without <dialog> support
+  // the CTAs keep their href and the page behaves exactly as it did before.
+  (() => {
+    const dlg = document.getElementById('startSheet');
+    if (!dlg || typeof dlg.showModal !== 'function') return;
+    const form = document.getElementById('sheetLead');
+    const rest = document.getElementById('sheetRest');
+    const msg = document.getElementById('sheetMsg');
+    const submit = document.getElementById('sheetSubmit');
+    const pane = document.getElementById('sheetPane');
+    const thanks = document.getElementById('sheetThanks');
+    const noteForm = document.getElementById('sheetNote');
+    const noteMsg = document.getElementById('noteMsg');
+    const noteBtn = document.getElementById('noteSubmit');
+    const submitLabel = submit.innerHTML;
+    let started = false, leadId = null;
+
+    const say = (el, t) => { el.textContent = t; el.hidden = false; };
+    const reveal = (focusName) => {
+      rest.hidden = false;
+      if (!started) { started = true; track('form_start', { where: 'sheet' }); }
+      if (focusName) document.getElementById('s-name').focus();
+    };
+
+    form.querySelectorAll('input[name="interest"]').forEach((r) =>
+      r.addEventListener('change', () => reveal(true)));
+
+    const open = (preset) => {
+      pane.hidden = false; thanks.hidden = true;
+      msg.hidden = true; noteMsg.hidden = true;
+      form.reset(); rest.hidden = true;
+      submit.disabled = false; submit.innerHTML = submitLabel;
+      noteBtn.disabled = false; noteBtn.textContent = 'Send';
+      leadId = null;
+      const r = preset && form.querySelector('input[name="interest"][value="' + preset + '"]');
+      if (r) r.checked = true;
+      dlg.showModal();
+      if (r) reveal(true);   // arrived from a pricing CTA: skip straight to the fields
+    };
+
+    document.querySelectorAll('[data-open-sheet]').forEach((el) =>
+      el.addEventListener('click', (e) => { e.preventDefault(); open(el.dataset.preset || ''); }));
+
+    dlg.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => dlg.close()));
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });   // backdrop
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.hidden = true;
+      if (!form.checkValidity()) {
+        say(msg, 'Please add your name, company and work email.');
+        const bad = form.querySelector(':invalid'); if (bad) bad.focus();
+        track('form_error', { reason: 'validation', where: 'sheet' });
+        return;
+      }
+      submit.disabled = true;
+      submit.textContent = 'Sending…';
+      try {
+        leadId = await postLead(form);
+        pane.hidden = true; thanks.hidden = false;
+        document.getElementById('s-note').focus();
+      } catch (err) {
+        submit.disabled = false; submit.innerHTML = submitLabel;
+        say(msg, 'That didn’t go through. Please try again, or message us on WhatsApp.');
+        track('form_error', { reason: 'network', where: 'sheet' });
+      }
+    });
+
+    // The brief is asked for only now, with the lead already stored, so closing
+    // the window at this point still leaves us a lead.
+    noteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const brief = document.getElementById('s-note').value.trim();
+      if (!brief || !leadId) { dlg.close(); return; }
+      noteBtn.disabled = true; noteBtn.textContent = 'Sending…';
+      try {
+        const r = await fetch('/api/lead-note', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: leadId, brief }),
+        });
+        if (!r.ok) throw new Error('failed');
+        track('lead_note', {});
+        dlg.close();
+      } catch (err) {
+        noteBtn.disabled = false; noteBtn.textContent = 'Send';
+        say(noteMsg, 'That didn’t send, but your enquiry is already with us.');
+      }
+    });
+  })();
 
   // ── currency ───────────────────────────────────────────────────────────────
   // USD is the billing currency. ILS and EUR are conversions, rounded so a rate
@@ -804,7 +1014,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
     const thanks = document.getElementById('thanks');
     let started = false;
 
-    form.addEventListener('input', () => { if (!started) { started = true; track('form_start', {}); } });
+    form.addEventListener('input', () => { if (!started) { started = true; track('form_start', { where: 'page' }); } });
     const show = (t) => { msg.textContent = t; msg.hidden = false; };
 
     form.addEventListener('submit', async (e) => {
@@ -818,28 +1028,11 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
         return;
       }
 
-      const data = Object.fromEntries(new FormData(form).entries());
-      data.page = location.pathname;
-      data.referrer = document.referrer || '';
-      // keep campaign parameters with the lead so paid traffic stays attributable
-      new URLSearchParams(location.search).forEach((v, k) => { if (/^(utm_|gclid|fbclid|msclkid)/i.test(k)) data[k] = v; });
-      // shared id so the pixel Lead and any server-side Lead collapse into one conversion
-      const eventId = (window.crypto && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : 'lead-' + Date.now() + '-' + Math.random().toString(16).slice(2);
-      data.event_id = eventId;
-
       btn.disabled = true;
       const label = btn.innerHTML;
       btn.textContent = 'Sending…';
       try {
-        const res = await fetch('/api/lead', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        if (!res.ok) throw new Error('failed');
-        track('form_submit', { interest: data.interest || '' }, eventId);
+        await postLead(form);
         form.hidden = true;
         thanks.hidden = false;
         thanks.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });

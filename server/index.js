@@ -394,7 +394,7 @@ const APP_USER = process.env.APP_USER || 'studio';
 if (authEnabled()) {
   // POST /lead is open on purpose: it's the public landing page's inquiry form.
   // It validates, rate-limits per IP and stores nothing but the form's own fields.
-  app.use('/api', requireAuth({ open: ['/health', '/auth-config', 'GET /showcase', 'POST /lead', 'GET /fx'] }));
+  app.use('/api', requireAuth({ open: ['/health', '/auth-config', 'GET /showcase', 'POST /lead', 'POST /lead-note', 'GET /fx'] }));
   // /media is intentionally NOT Bearer-gated: images load via <img src>, which can't
   // send an Authorization header. Filenames are unguessable and the credit-burning
   // surface (/api) is fully locked. Proper media privacy (signed URLs via the server
@@ -569,8 +569,26 @@ app.post('/api/lead', async (req, res) => {
       cookieHeader: req.headers.cookie,
       sourceUrl: `https://shyow.io${lead.page || '/commercials'}`,
     }).catch((e) => console.warn(`  ⚠  Meta CAPI Lead failed: ${e.message}`));
-    res.json({ ok: true });
+    // the id goes back so the thank-you step can attach a brief to this same lead
+    res.json({ ok: true, id: lead.id });
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
+});
+
+// A brief typed on the thank-you screen, after the lead itself is already captured.
+// Public like POST /lead, and bounded the same way: it can only fill an empty brief,
+// once, within an hour of the lead being created, so a leaked id buys nothing.
+app.post('/api/lead-note', async (req, res) => {
+  const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '';
+  if (!leads.allow(ip)) return res.status(429).json({ error: 'Too many submissions. Please try again shortly.' });
+  const id = String(req.body?.id || '').slice(0, 60);
+  const brief = String(req.body?.brief || '').trim();
+  if (!id || !brief) return res.status(400).json({ error: 'Nothing to add.' });
+  try {
+    const ok = await leads.addNote(id, brief);
+    if (!ok) return res.status(409).json({ error: 'That note can no longer be attached.' });
+    console.log(`  ✎  Lead ${id} added a brief`);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/leads', async (req, res) => {
   try { res.json(await leads.list({ limit: Math.min(Number(req.query.limit) || 200, 500) })); }
