@@ -394,7 +394,7 @@ const APP_USER = process.env.APP_USER || 'studio';
 if (authEnabled()) {
   // POST /lead is open on purpose: it's the public landing page's inquiry form.
   // It validates, rate-limits per IP and stores nothing but the form's own fields.
-  app.use('/api', requireAuth({ open: ['/health', '/auth-config', 'GET /showcase', 'POST /lead'] }));
+  app.use('/api', requireAuth({ open: ['/health', '/auth-config', 'GET /showcase', 'POST /lead', 'GET /fx'] }));
   // /media is intentionally NOT Bearer-gated: images load via <img src>, which can't
   // send an Authorization header. Filenames are unguessable and the credit-burning
   // surface (/api) is fully locked. Proper media privacy (signed URLs via the server
@@ -575,6 +575,44 @@ app.post('/api/lead', async (req, res) => {
 app.get('/api/leads', async (req, res) => {
   try { res.json(await leads.list({ limit: Math.min(Number(req.query.limit) || 200, 500) })); }
   catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── FX: indicative currency display for the /commercials rate card ────────────
+// USD is the billing currency; ILS and EUR are shown for orientation. Rates come
+// from the ECB via frankfurter, with a second source behind it and hardcoded
+// constants behind that, because a pricing block must never render a broken
+// number. Cached in memory for twelve hours: rates move far slower than that, and
+// it keeps a public endpoint from turning into a way to hammer someone's API.
+const FX_FALLBACK = { ILS: 3.01, EUR: 0.861 };   // ECB, 2026-09-08
+const FX_TTL_MS = 12 * 60 * 60 * 1000;
+let fxRates = FX_FALLBACK, fxSource = 'fallback', fxAt = 0;
+
+async function fetchRates() {
+  const sources = [
+    ['ecb', 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ILS,EUR'],
+    ['er-api', 'https://open.er-api.com/v6/latest/USD'],
+  ];
+  for (const [name, url] of sources) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      if (!r.ok) continue;
+      const got = (await r.json())?.rates;
+      if (Number(got?.ILS) > 0 && Number(got?.EUR) > 0) {
+        return { rates: { ILS: Number(got.ILS), EUR: Number(got.EUR) }, source: name };
+      }
+    } catch { /* try the next source */ }
+  }
+  return null;
+}
+
+app.get('/api/fx', async (req, res) => {
+  if (Date.now() - fxAt > FX_TTL_MS) {
+    const fresh = await fetchRates();
+    if (fresh) { fxRates = fresh.rates; fxSource = fresh.source; fxAt = Date.now(); }
+    else { fxAt = Date.now() - FX_TTL_MS + 5 * 60 * 1000; }   // both down: retry in five minutes
+  }
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.json({ base: 'USD', rates: fxRates, source: fxSource, fetchedAt: fxAt });
 });
 
 // ── PROJECTS ──────────────────────────────────────────────────────────────────
