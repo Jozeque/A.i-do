@@ -1,4 +1,6 @@
 // ── AI Video Studio — frontend ────────────────────────────────────────────────
+import { createCrm } from './crm.js?v=1';
+
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
@@ -85,6 +87,9 @@ const toast = (msg, err = false) => {
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 3200);
 };
+
+// The CRM lives in its own module (crm.js); it borrows the helpers it needs from here.
+const crm = createCrm({ $, api, escapeHtml, toast, firestore: () => ({ fs: _fs, fsApi: _fsApi }) });
 
 const GEM_META = {
   'nb-frames': { name: 'NB Frames', blurb: 'Attach a reference image + describe the scene. Returns <b>3</b> cinematic Nano Banana 2 prompts.' },
@@ -556,7 +561,10 @@ async function boot() {
     pick = (withContent || state.projects[0])?.id;
   }
   startProjectListSync();          // live sidebar (projects added/renamed/deleted by either user)
-  if (pick) openProject(pick);
+  crm.start();                     // leads: the live list + the sidebar's new-lead count
+  // The lead-alert email links straight to app.shyow.io/#crm.
+  if (location.hash === '#crm') openCrm();
+  else if (pick) openProject(pick);
 }
 function renderKeyStatus() {
   const c = state.config;
@@ -570,6 +578,7 @@ function wireGlobal() {
   $('#newProjectBtn2').onclick = newProject;
   $('#showcaseBtn').onclick = openShowcase;
   $('#expensesBtn').onclick = openExpenses;
+  $('#crmBtn').onclick = openCrm;
   $('#lightboxClose').onclick = () => $('#lightbox').classList.add('hidden');
   $('#lightbox').onclick = (e) => { if (e.target.id === 'lightbox') $('#lightbox').classList.add('hidden'); };
   $('#lightboxPrev').onclick = (e) => { e.stopPropagation(); lightboxNav(-1); };
@@ -736,6 +745,7 @@ async function openProject(pid) {
   $('#emptyState').classList.add('hidden');
   $('#showcaseView').classList.add('hidden');
   $('#expensesView').classList.add('hidden');
+  hideCrm();
   $('#workspace').classList.remove('hidden');
   $('#projectNameInput').value = state.current.name;
   $('#wsMeta').textContent = `created ${new Date(state.current.createdAt).toLocaleDateString()}`;
@@ -755,7 +765,22 @@ function showEmpty() {
   $('#workspace').classList.add('hidden');
   $('#showcaseView').classList.add('hidden');
   $('#expensesView').classList.add('hidden');
+  hideCrm();
   $('#emptyState').classList.remove('hidden');
+}
+
+// ── CRM (global): website leads + ones added by hand, worked as a pipeline (crm.js) ──
+function openCrm() {
+  $('#emptyState').classList.add('hidden');
+  $('#workspace').classList.add('hidden');
+  $('#showcaseView').classList.add('hidden');
+  $('#expensesView').classList.add('hidden');
+  if (location.hash !== '#crm') history.replaceState(null, '', '#crm');
+  crm.open();
+}
+function hideCrm() {
+  $('#crmView').classList.add('hidden');
+  if (location.hash === '#crm') history.replaceState(null, '', location.pathname + location.search);
 }
 
 // ── Showcase (global): upload portfolio videos that power the public landing page ──
@@ -763,6 +788,7 @@ async function openShowcase() {
   $('#emptyState').classList.add('hidden');
   $('#workspace').classList.add('hidden');
   $('#expensesView').classList.add('hidden');
+  hideCrm();
   const view = $('#showcaseView');
   view.classList.remove('hidden');
   view.innerHTML = `
@@ -790,6 +816,7 @@ async function openExpenses() {
   $('#emptyState').classList.add('hidden');
   $('#workspace').classList.add('hidden');
   $('#showcaseView').classList.add('hidden');
+  hideCrm();
   const view = $('#expensesView');
   view.classList.remove('hidden');
   view.innerHTML = `<div class="exp-head"><h1>Expenses</h1><p>Loading…</p></div>`;

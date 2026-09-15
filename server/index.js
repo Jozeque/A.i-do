@@ -14,8 +14,9 @@ import { createDataStore } from './data.js';
 import { computeUsage } from './usage.js';
 import { requireAuth, authEnabled, allowedEmails, webConfig } from './auth.js';
 import { createShowcase } from './showcase.js';
-import { createLeads } from './leads.js';
+import { createLeads, validId as validLeadId } from './leads.js';
 import { sendLead } from './meta-capi.js';
+import { notifyNewLead, notifyLeadBrief, leadEmailEnabled } from './notify.js';
 import { Jimp } from 'jimp';   // resize swap outputs to the input image's exact pixel dimensions
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -509,6 +510,7 @@ app.get('/api/health', (req, res) => {
     hasFal: !!FAL_KEY,
     hasOpenai: !!OPENAI_API_KEY,
     hasMetaCapi: !!process.env.META_CAPI_ACCESS_TOKEN,
+    hasLeadEmail: leadEmailEnabled(),
     authEnabled: authEnabled(),
     storage: storage.backend,
     data: data.backend,
@@ -551,7 +553,8 @@ app.delete('/api/showcase/:sid', async (req, res) => {
 
 // ── LEADS: the /commercials landing page's inquiry form ───────────────────────
 // POST is PUBLIC (it IS the conversion action) and validated + rate-limited in
-// leads.js; GET is gated, so only the studio can read the inbox.
+// leads.js; everything under /api/leads is the CRM and gated, so only the studio
+// can read or work the inbox.
 app.post('/api/lead', async (req, res) => {
   // Render sits behind a proxy, so the real client IP is the first x-forwarded-for hop.
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '';
@@ -569,6 +572,8 @@ app.post('/api/lead', async (req, res) => {
       cookieHeader: req.headers.cookie,
       sourceUrl: `https://shyow.io${lead.page || '/commercials'}`,
     }).catch((e) => console.warn(`  ⚠  Meta CAPI Lead failed: ${e.message}`));
+    // Same rule for the inbox alert: a mail hiccup must never cost the lead.
+    notifyNewLead(lead).catch((e) => console.warn(`  ⚠  Lead email failed: ${e.message}`));
     // the id goes back so the thank-you step can attach a brief to this same lead
     res.json({ ok: true, id: lead.id });
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
@@ -582,17 +587,47 @@ app.post('/api/lead-note', async (req, res) => {
   if (!leads.allow(ip)) return res.status(429).json({ error: 'Too many submissions. Please try again shortly.' });
   const id = String(req.body?.id || '').slice(0, 60);
   const brief = String(req.body?.brief || '').trim();
-  if (!id || !brief) return res.status(400).json({ error: 'Nothing to add.' });
+  if (!validLeadId(id) || !brief) return res.status(400).json({ error: 'Nothing to add.' });
   try {
-    const ok = await leads.addNote(id, brief);
-    if (!ok) return res.status(409).json({ error: 'That note can no longer be attached.' });
+    const lead = await leads.addNote(id, brief);
+    if (!lead) return res.status(409).json({ error: 'That note can no longer be attached.' });
     console.log(`  ✎  Lead ${id} added a brief`);
+    notifyLeadBrief(lead).catch((e) => console.warn(`  ⚠  Lead brief email failed: ${e.message}`));
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/leads', async (req, res) => {
   try { res.json(await leads.list({ limit: Math.min(Number(req.query.limit) || 200, 500) })); }
   catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── CRM: the studio working those same leads (all gated) ─────────────────────
+// Who did what comes from the verified Google account, never from the request body.
+const leadActor = (req) => req.user?.email || 'studio';
+const leadError = (res, e) => res.status(e.status || 500).json({ error: e.message });
+app.post('/api/leads', async (req, res) => {
+  try { res.json(await leads.create(req.body || {}, leadActor(req))); }
+  catch (e) { leadError(res, e); }
+});
+app.patch('/api/leads/:id', async (req, res) => {
+  if (!validLeadId(req.params.id)) return res.status(400).json({ error: 'Bad lead id.' });
+  try {
+    const lead = await leads.update(req.params.id, req.body || {}, leadActor(req));
+    lead ? res.json(lead) : res.status(404).json({ error: 'Lead not found.' });
+  } catch (e) { leadError(res, e); }
+});
+app.post('/api/leads/:id/notes', async (req, res) => {
+  if (!validLeadId(req.params.id)) return res.status(400).json({ error: 'Bad lead id.' });
+  try {
+    const lead = await leads.comment(req.params.id, req.body?.text, leadActor(req));
+    lead ? res.json(lead) : res.status(404).json({ error: 'Lead not found.' });
+  } catch (e) { leadError(res, e); }
+});
+app.delete('/api/leads/:id', async (req, res) => {
+  if (!validLeadId(req.params.id)) return res.status(400).json({ error: 'Bad lead id.' });
+  try {
+    (await leads.remove(req.params.id)) ? res.json({ ok: true }) : res.status(404).json({ error: 'Lead not found.' });
+  } catch (e) { leadError(res, e); }
 });
 
 // ── FX: indicative currency display for the /commercials rate card ────────────

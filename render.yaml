@@ -56,6 +56,15 @@ services:
       # Generate in Events Manager → dataset 1619487023147325 → Settings → Conversions API.
       - key: META_CAPI_ACCESS_TOKEN
         sync: false
+      # --- Lead alerts: every new /commercials lead is emailed to the studio inbox. ---
+      # Sent through GMAIL_USER's own Gmail. GMAIL_APP_PASSWORD is a Google App Password
+      # for that account (it needs 2-Step Verification on). Leave unset to disable.
+      - key: GMAIL_USER              # the sending Gmail account, e.g. shyow.studio@gmail.com
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: LEAD_NOTIFY_TO          # who receives the alerts
+        value: shyow.studio@gmail.com
       # --- interim fallback gate, only used if the Firebase vars above are NOT set ---
       - key: APP_USER         # username for the password gate (e.g. "studio")
         sync: false

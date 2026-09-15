@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Space+Mono:wght@400;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=26" />
+  <link rel="stylesheet" href="/styles.css?v=27" />
 </head>
 <body>
   <div id="app">
@@ -27,6 +27,7 @@
       <div class="project-list" id="projectList"></div>
 
       <div class="sidebar-foot">
+        <button class="sidebar-nav-btn" id="crmBtn">📇&nbsp;CRM<span class="crm-badge hidden" id="crmBadge"></span></button>
         <button class="sidebar-nav-btn" id="showcaseBtn">🎬&nbsp;Showcase</button>
         <button class="sidebar-nav-btn" id="expensesBtn">💰&nbsp;Expenses</button>
         <span id="keyStatus" class="key-status"></span>
@@ -71,6 +72,9 @@
 
       <!-- Global Expenses view (running Claude + Nano Banana cost, by month/week) -->
       <div class="showcase-view hidden" id="expensesView"></div>
+
+      <!-- Global CRM (leads from shyow.io/commercials + ones added by hand) -->
+      <div class="showcase-view hidden" id="crmView"></div>
     </main>
   </div>
 
@@ -99,6 +103,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=38" type="module"></script>
+  <script src="/app.js?v=39" type="module"></script>
 </body>
 </html>
