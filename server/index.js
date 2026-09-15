@@ -433,6 +433,9 @@ app.get('/commercials', (req, res) => res.sendFile(path.join(LANDING_DIR, 'comme
 // The singular is an easy URL to mistype or misremember, and on a paid page a click that
 // lands on the homepage instead is a click paid for and lost. Send it to the canonical one.
 app.get('/commercial', (req, res) => res.redirect(301, '/commercials'));
+// The privacy policy every landing footer links to. Meta's app settings point here too:
+// the policy itself, and /privacy#delete as the data deletion instructions.
+app.get('/privacy', (req, res) => res.sendFile(path.join(LANDING_DIR, 'privacy.html')));
 
 // Never cache the app shell (index.html / app.js / styles.css) so UI updates always load.
 app.use(express.static(PUBLIC_DIR, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-store') }));
