@@ -419,6 +419,23 @@
   .wa-icon { display: none; }
   .wa-icon svg { width: 20px; height: 20px; }
 
+  /* ── sticky WhatsApp: a conversation stays one tap away on every screen. It keeps
+     WhatsApp's own green, because instant recognition is the whole job; the sheet
+     is a modal <dialog>, so it always opens above this. ── */
+  .wa-fab {
+    position: fixed; z-index: 50;
+    right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center;
+    background: #25D366; color: #fff;
+    box-shadow: 0 14px 30px -10px rgba(18,120,64,.55), 0 2px 6px rgba(27,22,16,.12);
+    transition: transform .2s cubic-bezier(.2,.7,.2,1), background .2s ease, box-shadow .2s ease;
+    animation: fabIn .5s cubic-bezier(.2,.7,.2,1) .6s backwards;
+  }
+  .wa-fab svg { width: 30px; height: 30px; }
+  .wa-fab:hover { background: #1FBE5B; transform: translateY(-2px); box-shadow: 0 18px 36px -12px rgba(18,120,64,.6), 0 2px 6px rgba(27,22,16,.12); }
+  .wa-fab:focus-visible { outline-offset: 4px; border-radius: 50%; }
+  @keyframes fabIn { from { opacity: 0; transform: translateY(12px) scale(.9); } }
+
   /* ── soft reveals ── */
   .js .up { opacity: 0; transform: translateY(20px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1); }
   .js .up.in { opacity: 1; transform: none; }
@@ -778,6 +795,10 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
     <div class="foot-cr">&copy; 2026 Shyow &middot; Working worldwide</div>
   </div>
 </footer>
+
+<!-- sticky WhatsApp: the real number is in the href so it works before (or without) the script,
+     which then adds the prefilled message like every other [data-wa] link -->
+<a class="wa-fab" data-wa href="https://wa.me/972523993994" data-cta="sticky-whatsapp" aria-label="Chat with Shyow on WhatsApp" title="Chat on WhatsApp"><svg aria-hidden="true"><use href="#i-wa"/></svg></a>
 
 <script>
   // ── the studio's contact channel, in one place ─────────────────────────────
