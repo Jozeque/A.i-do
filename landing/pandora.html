@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Behind the scenes: our AI production for PANDORA &middot; Shyow</title>
+<meta name="description" content="Watch how Shyow made one of the world's most ambitious AI productions for PANDORA, then tell us what you're making." />
+<meta name="theme-color" content="#F6F2EB" />
+<link rel="canonical" href="https://shyow.io/pandora" />
+<link rel="icon" type="image/png" href="/landing/favicon.png" />
+<link rel="apple-touch-icon" href="/landing/apple-touch-icon.png" />
+<meta property="og:title" content="Behind the scenes of our AI production for PANDORA" />
+<meta property="og:description" content="How Shyow made one of the world's most ambitious AI productions for PANDORA." />
+<meta property="og:type" content="video.other" />
+<meta property="og:site_name" content="Shyow" />
+<meta property="og:url" content="https://shyow.io/pandora" />
+<meta property="og:image" content="https://shyow.io/landing/media/pandora-bts-og.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<script>document.documentElement.className += ' js';</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="image" href="/landing/media/pandora-bts-poster.jpg" media="(min-width: 861px)">
+<link rel="preload" as="image" href="/landing/media/pandora-bts-poster-mobile.jpg" media="(max-width: 860px)">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..700,100,1&display=swap" rel="stylesheet">
+<style>
+  /* ══════════════════════════════════════════════════════════════════════════
+     SHYOW - /pandora
+
+     Paid-traffic page, a sibling of /commercials, built on the same tokens and
+     the same lead plumbing. One job: play the PANDORA behind-the-scenes film
+     and turn the people it convinces into a conversation.
+
+        headline  →  the film + the ask  →  made for  →  more work  →  contact
+
+     The film is the whole hero, and it plays with sound. There is no sound
+     button. Where a browser refuses to start audio by itself (most do, on a
+     first visit), the film plays silently until the visitor's first tap or
+     click, then starts again from the top with sound. When it ends, the ask
+     is on the frame.
+
+     Self-contained, no build step, same as every other page here.
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  :root {
+    --paper:   #F6F2EB;
+    --sand:    #EFE8DD;
+    --ink:     #1B1610;
+    --ink-2:   #6E6357;
+    --ink-3:   #9C9187;
+    --hair:    rgba(27,22,16,.13);
+    --hair-2:  rgba(27,22,16,.07);
+    --coral:   #FF4F2E;
+    --coral-2: #D63A17;
+    --wa:      #25D366;   /* WhatsApp's own green, only ever on WhatsApp */
+
+    --night:    #17130E;
+    --night-2:  #F1ECE3;
+    --night-3:  #A2988C;
+    --night-hair: rgba(241,236,227,.14);
+
+    --shadow:    0 18px 48px -22px rgba(59,38,18,.34);
+    --shadow-lg: 0 40px 90px -34px rgba(59,38,18,.42);
+
+    --display: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --sans: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+    --maxw: 1360px;
+    --pad: clamp(20px, 5vw, 60px);
+    --r-btn: 18px;
+    --r-card: 26px;
+    --r-media: 24px;
+
+    /* the hero pair: the film and the ask beside it */
+    --panel-w: 380px;
+    --stage-gap: clamp(44px, 5.5vw, 88px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 17px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  img, video { display: block; max-width: 100%; }
+  [hidden] { display: none !important; }
+  ::selection { background: var(--coral); color: #fff; }
+  :focus-visible { outline: 2px solid var(--coral-2); outline-offset: 3px; border-radius: 4px; }
+  [id] { scroll-margin-top: 96px; }
+
+  h1, h2, h3 {
+    font-family: var(--display); font-weight: 600; letter-spacing: -.022em;
+    line-height: 1.04; text-wrap: balance;
+    font-variation-settings: 'SOFT' 100, 'WONK' 1;
+  }
+  .nowrap { white-space: nowrap; }
+
+  .wrap { max-width: var(--maxw); margin-inline: auto; padding-inline: var(--pad); }
+
+  /* ── buttons (as on /commercials) ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    font-family: var(--sans); font-size: 1rem; font-weight: 500; line-height: 1;
+    padding: 15px 24px; border-radius: var(--r-btn); border: 1px solid transparent; cursor: pointer;
+    transition: transform .2s cubic-bezier(.2,.7,.2,1), background .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
+    white-space: nowrap;
+  }
+  .btn svg { width: 17px; height: 17px; flex: none; }
+  .btn-solid { background: var(--ink); color: var(--paper); }
+  .btn-solid:hover { background: #302619; transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn-coral { background: var(--coral); color: #fff; }
+  .btn-coral:hover { background: #F03D1B; transform: translateY(-1px); box-shadow: 0 14px 30px -12px rgba(255,79,46,.55); }
+  .btn-line { background: transparent; color: var(--ink); border-color: var(--hair); }
+  .btn-line:hover { border-color: var(--ink); transform: translateY(-1px); }
+  .btn-sm { padding: 11px 19px; font-size: .94rem; border-radius: 14px; }
+  .btn-lg { padding: 17px 30px; font-size: 1.06rem; }
+  .btn .arr { transition: transform .2s ease; }
+  .btn:hover .arr { transform: translateX(3px); }
+  /* WhatsApp keeps the studio's quiet button and borrows only the glyph's green */
+  .btn-wa svg { width: 20px; height: 20px; color: var(--wa); }
+
+  /* ── nav ── */
+  header {
+    position: fixed; inset: 0 0 auto 0; z-index: 60;
+    transition: background .3s ease, box-shadow .3s ease, backdrop-filter .3s ease;
+  }
+  header.scrolled {
+    background: rgba(246,242,235,.86); backdrop-filter: blur(14px) saturate(120%);
+    box-shadow: 0 1px 0 var(--hair-2);
+  }
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 80px; }
+  .brand { display: inline-flex; align-items: center; color: var(--ink); }
+  .brand .wordmark { height: 29px; width: auto; }
+  .nav-end { display: flex; align-items: center; gap: 26px; }
+  .nav-link {
+    font-size: 1rem; color: var(--ink-2); position: relative; padding: 4px 0;
+    transition: color .2s ease;
+  }
+  .nav-link::after {
+    content: ""; position: absolute; left: 0; right: 100%; bottom: 0; height: 1.5px;
+    background: var(--coral); border-radius: 2px; transition: right .25s ease;
+  }
+  .nav-link:hover { color: var(--ink); }
+  .nav-link:hover::after { right: 0; }
+  .nav-work-sm { display: none; }
+
+  /* ── hero: the headline over the film and the ask ── */
+  .hero { padding: clamp(104px, 12vh, 120px) 0 clamp(34px, 4.5vw, 56px); }
+  /* The block is exactly as wide as the film and the ask beside it, and centred, so
+     a short screen (smaller film) never opens a hole between them. The headline
+     takes no part in that width (width 0, min-width 100%): it wraps to the pair. */
+  .hero-inner { width: fit-content; max-width: 100%; }
+  .hero h1 { font-size: clamp(1.85rem, 3vw, 3rem); width: 0; min-width: 100%; }
+
+  .stage {
+    margin-top: clamp(24px, 2.8vw, 36px);
+    display: grid; grid-template-columns: auto var(--panel-w);
+    gap: var(--stage-gap); align-items: center;
+  }
+
+  /* ── the player ───────────────────────────────────────────────────────────
+     Sized from the viewport height so a laptop sees the whole frame at once,
+     and never wider than the space left beside the panel. */
+  .player {
+    position: relative; overflow: hidden; isolation: isolate;
+    width: min(max(360px, calc((100svh - 272px) * .8)), 620px, calc(100vw - 2 * var(--pad) - var(--panel-w) - var(--stage-gap)));
+    aspect-ratio: 4 / 5; border-radius: clamp(18px, 2.2vw, 30px);
+    background: var(--night); box-shadow: var(--shadow-lg);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .player video { width: 100%; height: 100%; object-fit: cover; }
+  .player[data-mode="muted"], .player[data-mode="idle"], .player[data-mode="watch"] { cursor: pointer; }
+
+  /* every control belongs to one mode; the rest are invisible AND unfocusable.
+     There is deliberately no sound button: sound is simply on, see the script. */
+  .ctl { visibility: hidden; opacity: 0; transition: opacity .25s ease, visibility 0s linear .25s; }
+  .player[data-mode="muted"] .muted-badge,
+  .player[data-mode="watch"] .seek,
+  .player[data-mode="idle"] .bigplay,
+  .player[data-mode="watch"].paused .bigplay,
+  .player[data-mode="ended"] .endcard { visibility: visible; opacity: 1; transition: opacity .25s ease; }
+
+  /* shown only while the browser is holding the sound back, the way Instagram marks a
+     silent video. It isn't a control: the whole frame is, and it never comes back. */
+  .muted-badge {
+    position: absolute; right: 14px; bottom: 14px; z-index: 3; pointer-events: none;
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(23,19,14,.55); backdrop-filter: blur(10px); color: #fff;
+  }
+  .muted-badge svg { width: 17px; height: 17px; }
+
+  /* watch: a stories-style line along the top, clear of the captions and of
+     anything fixed to the bottom of a phone screen */
+  .seek {
+    position: absolute; left: 14px; right: 14px; top: 10px; z-index: 3;
+    height: 28px; display: flex; align-items: center; cursor: pointer; touch-action: none;
+  }
+  .seek::before, .seek i {
+    content: ""; position: absolute; left: 0; right: 0; height: 3px; border-radius: 3px;
+  }
+  .seek::before { background: rgba(255,255,255,.34); }
+  .seek i { background: #fff; transform-origin: left; transform: scaleX(0); box-shadow: 0 0 10px rgba(0,0,0,.25); }
+  .seek:focus-visible { outline-offset: 0; }
+  .bigplay {
+    position: absolute; left: 50%; top: 50%; z-index: 2; pointer-events: none;
+    translate: -50% -50%;
+    width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(255,255,255,.92); color: var(--ink);
+    box-shadow: 0 18px 40px -16px rgba(0,0,0,.6);
+  }
+  .bigplay svg { width: 26px; height: 26px; margin-left: 4px; }
+
+  /* ended: the ask, on the last frame */
+  .endcard {
+    position: absolute; inset: 0; z-index: 4;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 28px; text-align: center; cursor: default;
+    background: rgba(23,19,14,.82); backdrop-filter: blur(10px); color: var(--night-2);
+  }
+  .endcard h2 { font-size: clamp(1.55rem, 2.6vw, 2.15rem); max-width: 14ch; }
+  .endcard-cta { margin-top: 24px; display: grid; gap: 10px; width: min(100%, 290px); }
+  .btn-glass { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.26); }
+  .btn-glass:hover { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.5); transform: translateY(-1px); }
+  .replay {
+    margin-top: 18px; display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border: 0; background: none; cursor: pointer;
+    font-family: var(--sans); font-size: .95rem; font-weight: 500; color: var(--night-3);
+    transition: color .2s ease;
+  }
+  .replay:hover { color: #fff; }
+  .replay svg { width: 17px; height: 17px; }
+
+  /* ── the ask, beside the film ── */
+  .panel h2 { font-size: clamp(1.7rem, 2.4vw, 2.2rem); }
+  .panel-sub { margin-top: 14px; color: var(--ink-2); font-size: 1.06rem; text-wrap: pretty; }
+  .panel-cta { margin-top: 26px; display: grid; gap: 10px; }
+  .by { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
+  .faces { display: flex; flex: none; }
+  .faces img {
+    width: 38px; height: 38px; border-radius: 50%; object-fit: cover; object-position: 50% 22%;
+    border: 2.5px solid var(--paper);
+  }
+  .faces img + img { margin-left: -12px; }
+  .by span { font-size: .9rem; color: var(--ink-3); line-height: 1.4; }
+
+  /* ── made for: the same roller as /commercials ── */
+  .madefor { font-size: .93rem; color: var(--ink-3); margin-bottom: 16px; }
+  .roll {
+    overflow: hidden; padding-bottom: clamp(44px, 6vw, 76px);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+  }
+  .roll-track { display: flex; align-items: center; width: max-content; animation: roll 46s linear infinite; }
+  .roll:hover .roll-track { animation-play-state: paused; }
+  @keyframes roll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .roll-item { flex: none; padding-inline: clamp(22px, 3vw, 46px); display: flex; align-items: center; }
+  .roll-item img {
+    filter: grayscale(1) brightness(.88) contrast(1.08); opacity: .72;
+    transition: filter .4s ease, opacity .4s ease;
+  }
+  .roll:hover .roll-item img { filter: none; opacity: 1; }
+  .roll-item img.l-clalit,
+  .roll-item img.l-leumit { filter: grayscale(1) brightness(.6) contrast(1.12); }
+  .roll-item img.l-yoch   { filter: grayscale(1) brightness(.72) contrast(1.3); }
+  .l-pandora { height: 27px; }
+  .l-opel    { height: 38px; }
+  .l-clalit  { height: 26px; }
+  .l-tomix   { height: 21px; }
+  .l-leumit  { height: 27px; }
+  .l-yoch    { height: 36px; }
+
+  /* ── more work, in the screening room ── */
+  .screen {
+    background: var(--night); color: var(--night-2);
+    border-radius: clamp(24px, 3vw, 44px) clamp(24px, 3vw, 44px) 0 0;
+    padding-top: clamp(52px, 7.5vw, 92px);
+  }
+  .lede { font-size: clamp(1.9rem, 3.9vw, 2.8rem); }
+  .screen-note { margin-top: 14px; color: var(--night-3); font-size: 1.02rem; max-width: 44ch; }
+
+  .films {
+    margin-top: clamp(34px, 5vw, 58px);
+    display: grid; grid-template-columns: repeat(12, 1fr);
+    gap: clamp(30px, 3.6vw, 56px) clamp(20px, 2.6vw, 38px); align-items: start;
+  }
+  .film { grid-column: 1 / -1; }
+  .film:nth-child(6n+2) { grid-column: 1 / 8; }
+  .film:nth-child(6n+3) { grid-column: 8 / -1; margin-top: clamp(0px, 6.5vw, 88px); }
+  .film:nth-child(6n+4) { grid-column: 4 / -1; }
+  .film:nth-child(6n+5) { grid-column: 1 / 7; }
+  .film:nth-child(6n+6) { grid-column: 7 / -1; margin-top: clamp(0px, 4vw, 54px); }
+
+  .film-frame {
+    position: relative; overflow: hidden; border-radius: var(--r-media); cursor: pointer;
+    background: #0E0B08; aspect-ratio: 16 / 9;
+    transition: transform .4s cubic-bezier(.2,.7,.2,1), box-shadow .4s ease;
+  }
+  .film:nth-child(6n+1) .film-frame { aspect-ratio: 2 / 1; }
+  .film-frame video, .film-frame img {
+    width: 100%; height: 100%; object-fit: cover;
+    transition: transform .7s cubic-bezier(.2,.7,.2,1);
+  }
+  .film-frame:hover { transform: translateY(-4px); box-shadow: 0 30px 70px -30px rgba(0,0,0,.85); }
+  .film-frame:hover video, .film-frame:hover img { transform: scale(1.035); }
+  .play {
+    position: absolute; left: 17px; bottom: 17px; z-index: 2; pointer-events: none;
+    width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(255,255,255,.92); color: var(--ink);
+    transition: transform .3s cubic-bezier(.2,.7,.2,1), background .3s ease, color .3s ease;
+  }
+  .play svg { width: 15px; height: 15px; margin-left: 2px; }
+  .film-frame:hover .play { transform: scale(1.12); background: var(--coral); color: #fff; }
+  .film-cap { margin-top: 15px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .film-title { font-family: var(--display); font-weight: 600; font-size: clamp(1.08rem, 1.6vw, 1.38rem); letter-spacing: -.015em; color: var(--night-2); }
+  .film-note { font-size: .93rem; color: var(--night-3); }
+
+  /* ── contact: a paper card at the end of the screening room ── */
+  .close-card {
+    margin-top: clamp(64px, 9vw, 120px);
+    background: var(--paper); color: var(--ink); border-radius: var(--r-card);
+    padding: clamp(26px, 4.4vw, 60px);
+    display: grid; grid-template-columns: .88fr 1.12fr; gap: clamp(28px, 5vw, 72px); align-items: center;
+  }
+  .contact-copy p { margin-top: 16px; color: var(--ink-2); font-size: 1.06rem; max-width: 34ch; text-wrap: pretty; }
+  .wa {
+    margin-top: 26px; display: inline-flex; align-items: center; gap: 10px;
+    font-size: 1rem; font-weight: 500; color: var(--ink-2); transition: color .2s ease;
+  }
+  .wa:hover { color: var(--coral-2); }
+  .wa svg { width: 19px; height: 19px; color: var(--wa); }
+
+  form { display: grid; gap: 16px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  label, .lab { display: block; margin-bottom: 8px; font-size: .93rem; font-weight: 500; color: var(--ink-2); }
+  .lab-opt { color: var(--ink-3); font-weight: 400; }
+  input, textarea {
+    width: 100%; font-family: var(--sans); font-size: 1rem; color: var(--ink);
+    background: #FCFAF6; border: 1px solid var(--hair); border-radius: var(--r-btn);
+    padding: 14px 16px; transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  }
+  textarea { resize: vertical; min-height: 100px; line-height: 1.55; }
+  input::placeholder, textarea::placeholder { color: var(--ink-3); }
+  input:focus, textarea:focus {
+    outline: none; border-color: var(--ink); background: #fff;
+    box-shadow: 0 0 0 3px rgba(27,22,16,.06);
+  }
+  .pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .pick input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .pick label {
+    margin: 0; text-align: center; cursor: pointer; font-weight: 500; color: var(--ink-2);
+    background: #FCFAF6; border: 1px solid var(--hair); border-radius: var(--r-btn); padding: 13px 10px;
+    transition: background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+  }
+  .pick label:hover { border-color: var(--ink-3); transform: translateY(-1px); }
+  .pick input:checked + label { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .pick input:focus-visible + label { outline: 2px solid var(--coral-2); outline-offset: 2px; }
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .send { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 4px; }
+  .send .by { margin-top: 0; }
+  .send .by span { max-width: 22ch; }
+  .msg { font-size: .95rem; color: var(--coral-2); }
+  .thanks { background: var(--sand); border-radius: var(--r-card); padding: clamp(26px, 3.2vw, 40px); }
+  .thanks h3 { font-size: clamp(1.5rem, 2.8vw, 2rem); }
+  .thanks p { margin-top: 14px; color: var(--ink-2); max-width: 40ch; }
+  .thanks .wa { margin-top: 22px; }
+
+  /* ── footer, continuing the dark band ── */
+  footer { background: var(--night); color: var(--night-3); padding: clamp(44px, 6vw, 76px) 0 clamp(32px, 4vw, 50px); }
+  .foot { border-top: 1px solid var(--night-hair); padding-top: 28px; display: flex; align-items: center; justify-content: space-between; gap: 22px; flex-wrap: wrap; }
+  .foot .brand { color: var(--night-2); }
+  .foot .wordmark { height: 27px; width: auto; opacity: .9; }
+  .foot-links { display: flex; gap: 24px; font-size: .95rem; flex-wrap: wrap; }
+  .foot-links a { color: var(--night-3); transition: color .2s ease; }
+  .foot-links a:hover { color: var(--night-2); }
+  .foot-cr { width: 100%; margin-top: 22px; font-size: .88rem; color: #756B60; }
+
+  /* ── the start-a-project sheet (as on /commercials) ── */
+  .sheet {
+    margin: auto;
+    width: min(520px, calc(100vw - 28px)); max-height: min(88vh, 780px);
+    padding: clamp(26px, 3.4vw, 40px); border: 0; border-radius: var(--r-card);
+    background: var(--paper); color: var(--ink); overflow-y: auto;
+    box-shadow: 0 40px 100px -30px rgba(59,38,18,.55);
+  }
+  .sheet::backdrop { background: rgba(27,22,16,.5); backdrop-filter: blur(4px); }
+  .sheet[open] { animation: sheetIn .26s cubic-bezier(.2,.7,.2,1); }
+  @keyframes sheetIn { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+  .sheet h2 { font-size: clamp(1.55rem, 3.2vw, 2.05rem); padding-right: 34px; }
+  .sheet-sub { margin-top: 12px; color: var(--ink-2); font-size: 1.02rem; }
+  .sheet-x {
+    position: absolute; top: 15px; right: 16px; width: 34px; height: 34px; padding: 0;
+    border: 0; border-radius: 50%; background: transparent; color: var(--ink-3);
+    font-family: var(--sans); font-size: 1.45rem; line-height: 1; cursor: pointer;
+    transition: background .2s ease, color .2s ease;
+  }
+  .sheet-x:hover { background: var(--sand); color: var(--ink); }
+  .big-pick { display: grid; gap: 9px; margin-top: 22px; }
+  .big-pick input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .big-pick label {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0;
+    padding: 16px 18px; border: 1px solid var(--hair); border-radius: var(--r-btn);
+    background: #FCFAF6; font-size: 1.02rem; font-weight: 500; color: var(--ink); cursor: pointer;
+    transition: background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+  }
+  .big-pick label::after {
+    content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%;
+    border: 1px solid var(--ink-3); transition: background .2s ease, border-color .2s ease;
+  }
+  .big-pick label:hover { border-color: var(--ink-3); transform: translateY(-1px); }
+  .big-pick input:checked + label { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .big-pick input:checked + label::after { background: var(--coral); border-color: var(--coral); }
+  .big-pick input:focus-visible + label { outline: 2px solid var(--coral-2); outline-offset: 2px; }
+  .sheet-rest { display: grid; gap: 14px; margin-top: 20px; }
+  .sheet-rest .btn { width: 100%; margin-top: 4px; }
+  .sheet-wa { margin-top: 18px; font-size: .95rem; color: var(--ink-3); }
+  .sheet-wa a { font-weight: 500; color: var(--ink-2); border-bottom: 1px solid var(--hair); }
+  .sheet-wa a:hover { color: var(--coral-2); border-color: currentColor; }
+  .sheet-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+
+  /* ── sticky WhatsApp on wide screens ── */
+  .wa-fab {
+    position: fixed; z-index: 50;
+    right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--wa); color: #fff;
+    box-shadow: 0 14px 30px -10px rgba(18,120,64,.55), 0 2px 6px rgba(27,22,16,.12);
+    transition: transform .2s cubic-bezier(.2,.7,.2,1), background .2s ease, box-shadow .2s ease;
+    animation: fabIn .5s cubic-bezier(.2,.7,.2,1) .6s backwards;
+  }
+  .wa-fab svg { width: 30px; height: 30px; }
+  .wa-fab:hover { background: #1FBE5B; transform: translateY(-2px); box-shadow: 0 18px 36px -12px rgba(18,120,64,.6), 0 2px 6px rgba(27,22,16,.12); }
+  .wa-fab:focus-visible { outline-offset: 4px; border-radius: 50%; }
+  @keyframes fabIn { from { opacity: 0; transform: translateY(12px) scale(.9); } }
+
+  /* ── on phones both asks ride along the bottom instead, whenever neither the
+     hero's buttons nor the contact card is on screen ── */
+  .cta-bar { display: none; }
+
+  /* ── responsive ── */
+  @media (max-width: 1080px) {
+    .close-card { grid-template-columns: 1fr; }
+    .contact-copy p { max-width: 52ch; }
+  }
+  @media (max-width: 860px) {
+    .nav { height: 66px; }
+    .brand .wordmark { height: 24px; }
+    .nav-end .nav-link, .nav-end .btn-solid { display: none; }
+    .nav-end .nav-work-sm { display: inline-flex; }
+    .hero { padding-top: 90px; }
+    .hero-inner { width: auto; }
+    .hero h1 { width: auto; min-width: 0; }
+    .stage { grid-template-columns: minmax(0, 1fr); gap: 30px; }
+    .player { width: 100%; max-width: 540px; }
+    .panel { max-width: 540px; }
+    .films { gap: 30px 0; }
+    .film, .film:nth-child(n) { grid-column: 1 / -1; margin-top: 0; }
+    .film:nth-child(6n+1) .film-frame { aspect-ratio: 16 / 9; }
+
+    .wa-fab { display: none; }
+    .js .cta-bar {
+      display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px;
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
+      padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      background: rgba(246,242,235,.92); backdrop-filter: blur(14px) saturate(120%);
+      box-shadow: 0 -1px 0 var(--hair-2), 0 -12px 30px -18px rgba(59,38,18,.3);
+      transform: translateY(110%); visibility: hidden;
+      transition: transform .3s cubic-bezier(.2,.7,.2,1), visibility 0s linear .3s;
+    }
+    .js .cta-bar.on { transform: none; visibility: visible; transition: transform .3s cubic-bezier(.2,.7,.2,1); }
+    .cta-bar .btn { padding: 14px 18px; }
+    footer { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+  }
+  @media (max-width: 620px) {
+    .row2, .pick { grid-template-columns: 1fr; }
+    .panel h2 { font-size: 1.6rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+    .roll-track { animation: none; width: auto; flex-wrap: wrap; justify-content: center; }
+    .roll-track [data-dup] { display: none; }
+    .film-frame:hover { transform: none; }
+    .film-frame:hover video, .film-frame:hover img { transform: none; }
+  }
+</style>
+<!-- Meta pixel - Shyow Studio Website dataset (the same one /commercials reports to) -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1619487023147325');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none" alt=""
+src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /></noscript>
+</head>
+<body>
+<svg width="0" height="0" aria-hidden="true" style="position:absolute;overflow:hidden">
+  <symbol id="shyow-wordmark" viewBox="-12 -11 706 122">
+    <path fill="currentColor" d="M54 3.63A36 27.13 0 1 0 36 54.25L36 45.75A27.5 18.63 0 1 1 49.75 11ZM18 96.37A36 27.13 0 1 0 36 45.75L36 54.25A27.5 18.63 0 1 1 22.25 89Z"/>
+    <path fill="currentColor" d="M112 0h8.5v100h-8.5zM183.5 0h8.5v100h-8.5zM112 45.75h80v8.5h-80z"/>
+    <path fill="currentColor" d="M270.75 46h8.5v54h-8.5zM228.9 2.9L271.9 48.9L278.1 43.1L235.1 -2.9zM314.9 -2.9L271.9 43.1L278.1 48.9L321.1 2.9z"/>
+    <path fill="currentColor" d="M419.47 2.99A53 53 0 1 1 406.47 -1.74L404.42 7.53A43.5 43.5 0 1 0 415.09 11.42z"/>
+    <path fill="currentColor" d="M376.5 41a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0 -11 0z"/>
+    <path fill="currentColor" d="M402.5 41a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0 -11 0z"/>
+    <path fill="currentColor" d="M387 63a8 8 0 1 0 16 0a8 8 0 1 0 -16 0z"/>
+    <path fill="currentColor" d="M470.01 1.46L506.61 101.46L514.59 98.54L477.99 -1.46zM514.73 101.01L539.13 1.01L530.87 -1.01L506.47 98.99zM530.87 1.01L555.27 101.01L563.53 98.99L539.13 -1.01zM563.39 101.46L599.99 1.46L592.01 -1.46L555.41 98.54z"/>
+    <path fill="currentColor" d="M631 60h8v40h-8zM630.5 51.5a4.5 4.5 0 1 0 9 0a4.5 4.5 0 1 0 -9 0z"/>
+    <path fill="currentColor" d="M614 95a5 5 0 1 0 10 0a5 5 0 1 0 -10 0z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M642 80a20 20 0 1 0 40 0a20 20 0 1 0 -40 0zM650 80a12 12 0 1 0 24 0a12 12 0 1 0 -24 0z"/>
+  </symbol>
+  <symbol id="i-wa" viewBox="0 0 24 24"><path fill="currentColor" d="M.06 24l1.69-6.16A11.87 11.87 0 010 11.9C0 5.33 5.36 0 11.95 0a11.9 11.9 0 018.46 3.5 11.74 11.74 0 013.5 8.4c0 6.57-5.36 11.9-11.96 11.9a12 12 0 01-5.72-1.45L.06 24zM6.6 20.2l.36.22a9.9 9.9 0 005.04 1.38c5.48 0 9.95-4.43 9.95-9.9a9.8 9.8 0 00-2.9-7A9.85 9.85 0 0011.95 2C6.47 2 2 6.43 2 11.9c0 1.88.53 3.7 1.52 5.28l.24.38-1 3.64 3.84-1zm11.43-5.55c-.07-.12-.27-.2-.57-.35-.3-.15-1.76-.86-2.03-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.26-.46-2.4-1.47-.88-.78-1.48-1.76-1.65-2.05-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.53.15-.18.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.67-1.6-.92-2.2-.24-.58-.49-.5-.67-.5l-.57-.01c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.22 3.08.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.69.63.71.22 1.36.2 1.87.12.57-.08 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41z"/></symbol>
+  <symbol id="i-arr" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 12h15M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-replay" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 2.64-6.36M3 4v5h5"/></symbol>
+</svg>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SHYOW - /pandora   Paid-traffic page for the PANDORA behind-the-scenes film.
+     headline → film + ask → made for → more work → contact → footer
+     • Film: /landing/media/pandora-bts(-mobile).mp4, the phone cut on narrow screens.
+     • Films: GET /api/showcase, rendered exactly as /commercials renders them.
+     • Inquiry: POST /api/lead (+ /api/lead-note), the same path as /commercials,
+       so the CRM, the lead email and Meta CAPI all see page = /pandora.
+   ═══════════════════════════════════════════════════════════════════════ -->
+
+<header id="hdr">
+  <div class="wrap nav">
+    <a class="brand" href="#top" aria-label="Shyow"><svg class="wordmark" viewBox="-12 -11 706 122" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
+    <div class="nav-end">
+      <a class="nav-link" href="#work" data-cta="nav-work">See more work</a>
+      <a class="btn btn-line btn-sm nav-work-sm" href="#work" data-cta="nav-work">See more work</a>
+      <a class="btn btn-solid btn-sm" href="#contact" data-cta="nav" data-open-sheet>Let&rsquo;s talk</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-inner">
+      <h1>Behind the scenes of one of the world&rsquo;s most ambitious AI productions <span class="nowrap">for PANDORA</span></h1>
+
+      <div class="stage">
+        <div class="player" id="player" data-mode="loading">
+          <video id="btsVid" playsinline preload="auto"
+                 aria-label="Behind the scenes of the PANDORA film, narrated in Hebrew with Hebrew captions"></video>
+          <script>
+            /* The phone cut on narrow screens, the full one elsewhere; only the
+               chosen file downloads. Buffering starts here, as early as possible;
+               the script at the end of the page decides how playback starts.
+               Reduced motion and data saver get the still until someone presses play. */
+            (function () {
+              var v = document.getElementById('btsVid'); if (!v) return;
+              var small = matchMedia('(max-width: 860px)').matches;
+              v.poster = small ? '/landing/media/pandora-bts-poster-mobile.jpg' : '/landing/media/pandora-bts-poster.jpg';
+              v.dataset.src = small ? '/landing/media/pandora-bts-mobile.mp4' : '/landing/media/pandora-bts.mp4';
+              var calm = matchMedia('(prefers-reduced-motion: reduce)').matches ||
+                         !!(navigator.connection && navigator.connection.saveData);
+              if (calm) { v.dataset.calm = '1'; return; }
+              var s = document.createElement('source'); s.type = 'video/mp4'; s.src = v.dataset.src;
+              v.appendChild(s); v.load();
+            })();
+          </script>
+
+          <div class="seek ctl" id="seek" role="slider" tabindex="0" aria-label="Seek"
+               aria-valuemin="0" aria-valuemax="85" aria-valuenow="0" aria-valuetext="0:00"><i id="seekFill"></i></div>
+          <span class="muted-badge ctl" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>
+          </span>
+          <span class="bigplay ctl" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+
+          <div class="endcard ctl" id="endCard">
+            <h2>Want something like this for your brand?</h2>
+            <div class="endcard-cta">
+              <a class="btn btn-coral" href="#contact" data-open-sheet data-cta="endcard">Leave your details</a>
+              <a class="btn btn-glass btn-wa" data-wa href="https://wa.me/972523993994" data-cta="endcard-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>Chat on WhatsApp</a>
+            </div>
+            <button class="replay" id="replayBtn" type="button"><svg aria-hidden="true"><use href="#i-replay"/></svg>Watch again</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Want something like this for your brand?</h2>
+          <p class="panel-sub">Tell us what you&rsquo;re making. We&rsquo;ll come back with an approach and a range.</p>
+          <div class="panel-cta" id="panelCta">
+            <a class="btn btn-coral btn-lg" href="#contact" data-open-sheet data-cta="panel">Leave your details <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
+            <a class="btn btn-line btn-lg btn-wa" data-wa href="https://wa.me/972523993994" data-cta="panel-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>Chat on WhatsApp</a>
+          </div>
+          <p class="by">
+            <span class="faces" aria-hidden="true">
+              <img src="/landing/team/liran-segal.jpg" alt="" />
+              <img src="/landing/team/yossi-bozo.jpg" alt="" />
+              <img src="/landing/team/itzik-mizruhin.jpg" alt="" />
+            </span>
+            <span>Goes straight to the people who made this film.</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap"><p class="madefor">Made for</p></div>
+  <div class="roll" role="group" aria-label="Selected clients">
+    <div class="roll-track">
+        <span class="roll-item"><img class="l-pandora" src="/landing/logos/pandora.svg" alt="Pandora" loading="lazy" /></span>
+        <span class="roll-item"><img class="l-opel" src="/landing/logos/opel.svg" alt="Opel" loading="lazy" /></span>
+        <span class="roll-item"><img class="l-clalit" src="/landing/logos/clalit.png" alt="Clalit" loading="lazy" /></span>
+        <span class="roll-item"><img class="l-tomix" src="/landing/logos/tomix-ink.png" alt="toMix" loading="lazy" /></span>
+        <span class="roll-item"><img class="l-leumit" src="/landing/logos/leumit.png" alt="Leumit" loading="lazy" /></span>
+        <span class="roll-item"><img class="l-yoch" src="/landing/logos/yochananof.png" alt="Yochananof" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-pandora" src="/landing/logos/pandora.svg" alt="" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-opel" src="/landing/logos/opel.svg" alt="" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-clalit" src="/landing/logos/clalit.png" alt="" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-tomix" src="/landing/logos/tomix-ink.png" alt="" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-leumit" src="/landing/logos/leumit.png" alt="" loading="lazy" /></span>
+        <span class="roll-item" aria-hidden="true" data-dup><img class="l-yoch" src="/landing/logos/yochananof.png" alt="" loading="lazy" /></span>
+    </div>
+  </div>
+
+  <!-- ── more work, then the contact card, all in the screening room ── -->
+  <section class="screen" id="work">
+    <div class="wrap">
+      <h2 class="lede">More of our work</h2>
+      <p class="screen-note" id="workNote">Commercials, brand films and campaign work. Hover to preview, click to watch.</p>
+      <div class="films" id="films">
+        <!-- Real films load here from /api/showcase. These frames stand in if it's
+             unreachable, so the section is never empty. -->
+        <article class="film">
+          <div class="film-frame">
+            <img src="/landing/media/still-01.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+          </div>
+          <div class="film-cap"><h3 class="film-title">Brand film</h3></div>
+        </article>
+        <article class="film">
+          <div class="film-frame">
+            <img src="/landing/media/still-02.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+          </div>
+          <div class="film-cap"><h3 class="film-title">Product film</h3></div>
+        </article>
+        <article class="film">
+          <div class="film-frame">
+            <img src="/landing/media/still-03.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+          </div>
+          <div class="film-cap"><h3 class="film-title">Campaign film</h3></div>
+        </article>
+        <article class="film">
+          <div class="film-frame">
+            <img src="/landing/media/still-04.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+          </div>
+          <div class="film-cap"><h3 class="film-title">Commercial</h3></div>
+        </article>
+      </div>
+
+      <div class="close-card" id="contact">
+        <div class="contact-copy">
+          <h2 class="lede">So, what are you making?</h2>
+          <p>A line or two is enough. We&rsquo;ll come back with an approach and a range.</p>
+          <a class="wa" data-wa href="https://wa.me/972523993994" data-cta="contact-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>Or message us on WhatsApp</a>
+        </div>
+
+        <div class="contact-form">
+          <form id="leadForm" novalidate>
+            <div class="row2">
+              <div>
+                <label for="f-name">Name</label>
+                <input id="f-name" name="name" type="text" autocomplete="name" required placeholder="Your name" />
+              </div>
+              <div>
+                <label for="f-company">Company</label>
+                <input id="f-company" name="company" type="text" autocomplete="organization" required placeholder="Brand or agency" />
+              </div>
+            </div>
+            <div>
+              <label for="f-email">Work email</label>
+              <input id="f-email" name="email" type="email" autocomplete="email" required placeholder="you@company.com" />
+            </div>
+            <div>
+              <span class="lab" id="lab-interest">What are you after?</span>
+              <div class="pick" role="radiogroup" aria-labelledby="lab-interest">
+                <input type="radio" id="i-one" name="interest" value="One project" required />
+                <label for="i-one">One project</label>
+                <input type="radio" id="i-ongoing" name="interest" value="Ongoing production" />
+                <label for="i-ongoing">Ongoing</label>
+                <input type="radio" id="i-unsure" name="interest" value="Not sure yet" />
+                <label for="i-unsure">Not sure</label>
+              </div>
+            </div>
+            <div>
+              <label for="f-brief">A short brief <span class="lab-opt">(optional)</span></label>
+              <textarea id="f-brief" name="brief" rows="3" placeholder="What you're making, roughly when, and anything we should know."></textarea>
+            </div>
+            <div class="hp" aria-hidden="true"><label for="f-website">Website</label><input id="f-website" name="website" type="text" tabindex="-1" autocomplete="off" /></div>
+            <div class="send">
+              <button class="btn btn-solid btn-lg" type="submit" id="submitBtn">Let&rsquo;s talk <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></button>
+              <span class="by">
+                <span class="faces" aria-hidden="true">
+                  <img src="/landing/team/liran-segal.jpg" alt="" loading="lazy" />
+                  <img src="/landing/team/yossi-bozo.jpg" alt="" loading="lazy" />
+                  <img src="/landing/team/itzik-mizruhin.jpg" alt="" loading="lazy" />
+                </span>
+                <span>Goes straight to the people making the work.</span>
+              </span>
+            </div>
+            <p class="msg" id="formMsg" role="alert" hidden></p>
+          </form>
+
+          <div class="thanks" id="thanks" hidden>
+            <h3>Got it, thank you.</h3>
+            <p>Your note is with us. We&rsquo;ll come back with an approach and a range. If it&rsquo;s urgent, WhatsApp is the fastest way to reach us.</p>
+            <a class="wa" data-wa href="https://wa.me/972523993994" data-cta="thanks-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>Message us on WhatsApp</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Opened by every primary CTA. The contact card stays for anyone who scrolls. -->
+<dialog class="sheet" id="startSheet" aria-labelledby="sheetTitle">
+  <button class="sheet-x" type="button" data-close aria-label="Close">&times;</button>
+
+  <div id="sheetPane">
+    <h2 id="sheetTitle">Let&rsquo;s make something.</h2>
+    <p class="sheet-sub">Tell us where to reach you. We&rsquo;ll take it from there.</p>
+    <form id="sheetLead" novalidate>
+      <span class="lab" id="sheetPickLab" style="margin-top:22px">What are you looking to make?</span>
+      <div class="big-pick" role="radiogroup" aria-labelledby="sheetPickLab">
+        <input type="radio" id="s-one" name="interest" value="One project" required autofocus />
+        <label for="s-one">One project</label>
+        <input type="radio" id="s-ongoing" name="interest" value="Ongoing production" />
+        <label for="s-ongoing">Ongoing production</label>
+        <input type="radio" id="s-unsure" name="interest" value="Not sure yet" />
+        <label for="s-unsure">Not sure yet</label>
+      </div>
+      <div class="sheet-rest" id="sheetRest" hidden>
+        <div><label for="s-name">Name</label><input id="s-name" name="name" type="text" autocomplete="name" required placeholder="Your name" /></div>
+        <div><label for="s-company">Company</label><input id="s-company" name="company" type="text" autocomplete="organization" required placeholder="Brand or agency" /></div>
+        <div><label for="s-email">Work email</label><input id="s-email" name="email" type="email" autocomplete="email" required placeholder="you@company.com" /></div>
+        <div class="hp" aria-hidden="true"><label for="s-website">Website</label><input id="s-website" name="website" type="text" tabindex="-1" autocomplete="off" /></div>
+        <button class="btn btn-solid btn-lg" type="submit" id="sheetSubmit">Let&rsquo;s talk</button>
+        <p class="msg" id="sheetMsg" role="alert" hidden></p>
+      </div>
+    </form>
+    <p class="sheet-wa">Prefer WhatsApp? <a data-wa href="https://wa.me/972523993994" data-cta="sheet-whatsapp">Message us &rarr;</a></p>
+  </div>
+
+  <div id="sheetThanks" hidden>
+    <h2>Got it.</h2>
+    <p class="sheet-sub">We&rsquo;ll come back with an approach and a range. Anything else you want us to know?</p>
+    <form id="sheetNote" style="margin-top:18px">
+      <textarea id="s-note" rows="3" placeholder="What you're making, roughly when, anything useful. Optional."></textarea>
+      <div class="sheet-actions">
+        <button class="btn btn-solid" type="submit" id="noteSubmit">Send</button>
+        <button class="btn btn-line" type="button" data-close>No thanks</button>
+      </div>
+      <p class="msg" id="noteMsg" role="alert" hidden></p>
+    </form>
+    <p class="sheet-wa">Or <a data-wa href="https://wa.me/972523993994" data-cta="sheet-thanks-whatsapp">message us on WhatsApp &rarr;</a></p>
+  </div>
+</dialog>
+
+<footer>
+  <div class="wrap foot">
+    <a class="brand" href="#top" aria-label="Shyow"><svg class="wordmark" viewBox="-12 -11 706 122" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
+    <div class="foot-links">
+      <a href="#work">Work</a><a href="#contact">Contact</a><a data-wa href="https://wa.me/972523993994" data-cta="footer-whatsapp">WhatsApp</a><a href="/">shyow.io</a><a href="/privacy">Privacy</a>
+    </div>
+    <div class="foot-cr">&copy; 2026 Shyow &middot; Working worldwide</div>
+  </div>
+</footer>
+
+<!-- wide screens: the green bubble. phones: the bar below, which carries both asks. -->
+<a class="wa-fab" data-wa href="https://wa.me/972523993994" data-cta="sticky-whatsapp" aria-label="Chat with Shyow on WhatsApp" title="Chat on WhatsApp"><svg aria-hidden="true"><use href="#i-wa"/></svg></a>
+<div class="cta-bar" id="ctaBar">
+  <a class="btn btn-line btn-wa" data-wa href="https://wa.me/972523993994" data-cta="bar-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>WhatsApp</a>
+  <a class="btn btn-coral" href="#contact" data-open-sheet data-cta="bar">Leave your details</a>
+</div>
+
+<script>
+  // ── the studio's contact channel, in one place ─────────────────────────────
+  // The prefill names this page, so a WhatsApp conversation says where it came from
+  // (WhatsApp chats never pass through the CRM, so this is their only attribution).
+  const WA_NUMBER = "972523993994";          // Shyow - +972 52-399-3994
+  const WA_TEXT = "Hi Shyow, I watched the PANDORA behind the scenes and I'd like to talk about a project.";
+  const waHref = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(WA_TEXT)}`;
+  document.querySelectorAll('[data-wa]').forEach(a => { a.href = waHref; a.target = "_blank"; a.rel = "noopener"; });
+
+  // ── analytics (same contract as /commercials) ──────────────────────────────
+  // Only the two events that represent a real enquiry map to Meta standard events.
+  // Custom events never steer optimisation on their own; they are here so the ad
+  // account can build audiences, e.g. everyone who watched the film to the end.
+  const FB_STANDARD = { form_submit: 'Lead', whatsapp_click: 'Contact' };
+  const FB_CUSTOM = { form_start: 'FormStart', video_progress: 'VideoProgress' };
+  function track(event, props, eventId) {
+    try {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push(Object.assign({ event }, props || {}));
+      if (typeof window.gtag === 'function') window.gtag('event', event, props || {});
+      if (typeof window.plausible === 'function') window.plausible(event, { props: props || {} });
+      if (typeof window.fbq === 'function') {
+        if (FB_STANDARD[event]) fbq('track', FB_STANDARD[event], props || {}, eventId ? { eventID: eventId } : undefined);
+        else if (FB_CUSTOM[event]) fbq('trackCustom', FB_CUSTOM[event], props || {});
+      }
+    } catch (e) { /* analytics must never break the page */ }
+  }
+  document.querySelectorAll('[data-cta]').forEach(el => {
+    el.addEventListener('click', () => {
+      const name = el.getAttribute('data-cta');
+      track(name.indexOf('whatsapp') > -1 ? 'whatsapp_click' : 'cta_click', { location: name });
+    });
+  });
+
+  // ── nav ────────────────────────────────────────────────────────────────────
+  const hdr = document.getElementById('hdr');
+  const onScroll = () => hdr.classList.toggle('scrolled', window.scrollY > 8);
+  onScroll(); addEventListener('scroll', onScroll, { passive: true });
+
+  // ── the film ───────────────────────────────────────────────────────────────
+  // Sound is on, and there is no sound button. The page asks the browser to play
+  // with sound. Chrome, Safari and the Facebook / Instagram in-app browsers refuse
+  // that on a first visit, until the visitor has touched the page, so there the film
+  // runs silently and the first tap or click turns the sound on and starts the story
+  // again from the top. Modes on the frame:
+  //   loading → watch (with sound) | muted (the browser said no) | idle (reduced motion, data saver)
+  //   watch → ended (the ask) → watch
+  const film = (() => {
+    const frame = document.getElementById('player');
+    const v = document.getElementById('btsVid');
+    const seek = document.getElementById('seek');
+    const fill = document.getElementById('seekFill');
+    if (!frame || !v) return null;
+
+    let raf = 0, dragging = false, gen = 0, inView = true;
+    const hit = {};
+    const mode = (m) => { frame.dataset.mode = m; };
+    const is = (m) => frame.dataset.mode === m;
+    const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+    const ensureSrc = () => {
+      if (v.querySelector('source')) return;
+      const s = document.createElement('source'); s.type = 'video/mp4'; s.src = v.dataset.src;
+      v.appendChild(s); v.load();
+    };
+
+    const paint = () => {
+      const d = v.duration || 0;
+      fill.style.transform = 'scaleX(' + (d ? Math.min(1, v.currentTime / d) : 0) + ')';
+      seek.setAttribute('aria-valuenow', String(Math.round(v.currentTime)));
+      seek.setAttribute('aria-valuetext', fmt(v.currentTime) + ' of ' + fmt(d));
+    };
+    const tick = () => { paint(); raf = requestAnimationFrame(tick); };
+    v.addEventListener('loadedmetadata', () => { seek.setAttribute('aria-valuemax', String(Math.round(v.duration))); paint(); });
+    v.addEventListener('play', () => { frame.classList.remove('paused'); cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); });
+    v.addEventListener('pause', () => { frame.classList.add('paused'); cancelAnimationFrame(raf); paint(); });
+
+    // Silent, looping, while the browser holds the sound back.
+    const silently = () => {
+      const mine = gen;
+      v.defaultMuted = true; v.muted = true; v.loop = true;   // iOS reads the attribute
+      mode('muted');
+      armGesture();
+      const p = v.play();
+      if (p && p.catch) p.catch(() => { if (mine === gen) mode('idle'); });
+    };
+
+    // With sound. `fromTop` restarts the story, which is what a visitor who only
+    // just got the sound wants: it's narrated, and they missed the opening.
+    const withSound = (fromTop, why) => {
+      const mine = ++gen;
+      ensureSrc();
+      v.controls = false;
+      v.loop = false; v.defaultMuted = false; v.muted = false;
+      if (fromTop) { try { v.currentTime = 0; } catch (e) {} }
+      mode('watch');
+      let p;
+      try { p = v.play(); } catch (e) { p = Promise.reject(e); }
+      return Promise.resolve(p).then(() => {
+        if (mine === gen) track('video_sound', { how: why });
+      }, (err) => {
+        if (mine !== gen) return;
+        if (why === 'autoplay') return silently();
+        // a webview that refuses sound even on a tap still gets a player that works
+        v.muted = true; v.controls = true; mode('native');
+        v.play().catch(() => {});
+      });
+    };
+
+    // The first real gesture anywhere else on the page brings the sound in, as long as
+    // the film is on screen: sound from a film nobody can see would just be confusing.
+    // Links, buttons, fields and the other films do their own job and don't count.
+    const onGesture = (e) => {
+      if (!is('muted')) return disarm();
+      if (!inView || frame.contains(e.target)) return;         // the frame's own click handles it
+      if (e.target.closest && e.target.closest('a, button, input, textarea, select, label, dialog, video, .film-frame')) return;
+      if (navigator.userActivation && !navigator.userActivation.isActive) return;
+      disarm();
+      withSound(true, 'page-tap');
+    };
+    const armGesture = () => {
+      document.addEventListener('pointerup', onGesture, true);
+      document.addEventListener('keydown', onGesture, true);
+    };
+    const disarm = () => {
+      document.removeEventListener('pointerup', onGesture, true);
+      document.removeEventListener('keydown', onGesture, true);
+    };
+
+    frame.addEventListener('click', (e) => {
+      if (e.target.closest('a, button, .seek, .endcard')) return;
+      if (is('muted') || is('idle') || is('loading')) { disarm(); withSound(true, 'film-tap'); return; }
+      if (is('watch')) { if (v.paused) v.play().catch(() => {}); else v.pause(); }
+    });
+    document.getElementById('replayBtn').addEventListener('click', () => {
+      withSound(true, 'replay');
+      track('video_replay', {});
+    });
+
+    // seeking: drag along the line, or arrow keys once it has focus
+    const seekTo = (x) => {
+      const r = seek.getBoundingClientRect();
+      const f = Math.min(1, Math.max(0, (x - r.left) / r.width));
+      if (v.duration) { v.currentTime = f * v.duration; paint(); }
+    };
+    seek.addEventListener('pointerdown', (e) => { dragging = true; seek.setPointerCapture(e.pointerId); seekTo(e.clientX); });
+    seek.addEventListener('pointermove', (e) => { if (dragging) seekTo(e.clientX); });
+    const release = () => { dragging = false; };
+    seek.addEventListener('pointerup', release);
+    seek.addEventListener('pointercancel', release);
+    seek.addEventListener('keydown', (e) => {
+      const d = v.duration || 0; if (!d) return;
+      const step = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5 }[e.key];
+      if (step) v.currentTime = Math.min(d, Math.max(0, v.currentTime + step));
+      else if (e.key === 'Home') v.currentTime = 0;
+      else if (e.key === 'End') v.currentTime = d - .1;
+      else if (e.key === ' ' || e.key === 'Enter') { if (v.paused) v.play().catch(() => {}); else v.pause(); }
+      else return;
+      e.preventDefault(); paint();
+    });
+
+    // how far people get, counted only while they can hear it
+    v.addEventListener('timeupdate', () => {
+      if (v.muted || !v.duration) return;
+      const pct = v.currentTime / v.duration * 100;
+      [25, 50, 75].forEach((m) => { if (pct >= m && !hit[m]) { hit[m] = true; track('video_progress', { percent: m }); } });
+    });
+    v.addEventListener('ended', () => {
+      if (v.muted) return;
+      if (!hit[100]) { hit[100] = true; track('video_progress', { percent: 100 }); }
+      if (!is('watch')) return;
+      mode('ended');
+      const first = frame.querySelector('.endcard .btn');
+      // only move focus if it was already inside the player, never pull it from elsewhere
+      if (first && frame.contains(document.activeElement)) first.focus({ preventScroll: true });
+    });
+
+    // the silent loop rests while it's off screen; a film with sound carries on
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(([e]) => {
+        inView = e.isIntersecting;
+        if (!is('muted')) return;
+        if (e.isIntersecting) v.play().catch(() => {}); else v.pause();
+      }, { threshold: .15 }).observe(frame);
+    }
+
+    if (v.dataset.calm) mode('idle');
+    else withSound(false, 'autoplay');
+
+    return { pause: () => { if (is('watch') && !v.paused) v.pause(); } };
+  })();
+
+  // ── one path that posts a lead (identical to /commercials) ─────────────────
+  async function postLead(form) {
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.page = location.pathname;
+    data.referrer = document.referrer || '';
+    // keep campaign parameters with the lead so paid traffic stays attributable
+    new URLSearchParams(location.search).forEach((v, k) => { if (/^(utm_|gclid|fbclid|msclkid)/i.test(k)) data[k] = v; });
+    // shared id so the pixel Lead and the server-side Lead collapse into one conversion
+    const eventId = (window.crypto && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : 'lead-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+    data.event_id = eventId;
+    const res = await fetch('/api/lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('failed');
+    track('form_submit', { interest: data.interest || '' }, eventId);
+    return (await res.json().catch(() => ({}))).id || null;
+  }
+
+  // ── the start-a-project sheet (identical to /commercials) ──────────────────
+  (() => {
+    const dlg = document.getElementById('startSheet');
+    if (!dlg || typeof dlg.showModal !== 'function') return;
+    const form = document.getElementById('sheetLead');
+    const rest = document.getElementById('sheetRest');
+    const msg = document.getElementById('sheetMsg');
+    const submit = document.getElementById('sheetSubmit');
+    const pane = document.getElementById('sheetPane');
+    const thanks = document.getElementById('sheetThanks');
+    const noteForm = document.getElementById('sheetNote');
+    const noteMsg = document.getElementById('noteMsg');
+    const noteBtn = document.getElementById('noteSubmit');
+    const submitLabel = submit.innerHTML;
+    let started = false, leadId = null;
+
+    const say = (el, t) => { el.textContent = t; el.hidden = false; };
+    const reveal = (focusName) => {
+      rest.hidden = false;
+      if (!started) { started = true; track('form_start', { where: 'sheet' }); }
+      if (focusName) document.getElementById('s-name').focus();
+    };
+
+    form.querySelectorAll('input[name="interest"]').forEach((r) =>
+      r.addEventListener('change', () => reveal(true)));
+
+    const open = (preset) => {
+      pane.hidden = false; thanks.hidden = true;
+      msg.hidden = true; noteMsg.hidden = true;
+      form.reset(); rest.hidden = true;
+      submit.disabled = false; submit.innerHTML = submitLabel;
+      noteBtn.disabled = false; noteBtn.textContent = 'Send';
+      leadId = null;
+      const r = preset && form.querySelector('input[name="interest"][value="' + preset + '"]');
+      if (r) r.checked = true;
+      // nobody fills in a form over a narrator
+      if (film) film.pause();
+      dlg.showModal();
+      if (r) reveal(true);
+    };
+
+    document.querySelectorAll('[data-open-sheet]').forEach((el) =>
+      el.addEventListener('click', (e) => { e.preventDefault(); open(el.dataset.preset || ''); }));
+
+    dlg.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => dlg.close()));
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });   // backdrop
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.hidden = true;
+      if (!form.checkValidity()) {
+        say(msg, 'Please add your name, company and work email.');
+        const bad = form.querySelector(':invalid'); if (bad) bad.focus();
+        track('form_error', { reason: 'validation', where: 'sheet' });
+        return;
+      }
+      submit.disabled = true;
+      submit.textContent = 'Sending…';
+      try {
+        leadId = await postLead(form);
+        pane.hidden = true; thanks.hidden = false;
+        document.getElementById('s-note').focus();
+      } catch (err) {
+        submit.disabled = false; submit.innerHTML = submitLabel;
+        say(msg, 'That didn’t go through. Please try again, or message us on WhatsApp.');
+        track('form_error', { reason: 'network', where: 'sheet' });
+      }
+    });
+
+    // The brief is asked for only now, with the lead already stored, so closing
+    // the window at this point still leaves us a lead.
+    noteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const brief = document.getElementById('s-note').value.trim();
+      if (!brief || !leadId) { dlg.close(); return; }
+      noteBtn.disabled = true; noteBtn.textContent = 'Sending…';
+      try {
+        const r = await fetch('/api/lead-note', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: leadId, brief }),
+        });
+        if (!r.ok) throw new Error('failed');
+        track('lead_note', {});
+        dlg.close();
+      } catch (err) {
+        noteBtn.disabled = false; noteBtn.textContent = 'Send';
+        say(noteMsg, 'That didn’t send, but your enquiry is already with us.');
+      }
+    });
+  })();
+
+  // ── the contact card's form (identical to /commercials) ────────────────────
+  (() => {
+    const form = document.getElementById('leadForm');
+    const btn = document.getElementById('submitBtn');
+    const msg = document.getElementById('formMsg');
+    const thanks = document.getElementById('thanks');
+    let started = false;
+
+    form.addEventListener('input', () => { if (!started) { started = true; track('form_start', { where: 'page' }); } });
+    const show = (t) => { msg.textContent = t; msg.hidden = false; };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.hidden = true;
+
+      if (!form.checkValidity()) {
+        show('Please add your name, company, work email and what you’re after.');
+        const bad = form.querySelector(':invalid'); if (bad) bad.focus();
+        track('form_error', { reason: 'validation' });
+        return;
+      }
+
+      btn.disabled = true;
+      const label = btn.innerHTML;
+      btn.textContent = 'Sending…';
+      try {
+        await postLead(form);
+        form.hidden = true;
+        thanks.hidden = false;
+        thanks.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = label;
+        show('That didn’t go through. Please try again, or message us on WhatsApp and we’ll pick it up straight away.');
+        track('form_error', { reason: 'network' });
+      }
+    });
+  })();
+
+  // ── phones: the bottom bar shows whenever no other ask is on screen ─────────
+  (() => {
+    const bar = document.getElementById('ctaBar');
+    const watched = [document.getElementById('panelCta'), document.getElementById('contact')].filter(Boolean);
+    if (!bar || !('IntersectionObserver' in window)) return;
+    const visible = new Map();
+    const io = new IntersectionObserver((es) => {
+      es.forEach((e) => visible.set(e.target, e.isIntersecting));
+      bar.classList.toggle('on', ![...visible.values()].some(Boolean));
+    });
+    watched.forEach((el) => io.observe(el));
+  })();
+
+  // ── more work: real films replace the standby frames (as on /commercials) ──
+  (async () => {
+    const isTouch = matchMedia('(hover: none)').matches;
+    if (isTouch) document.getElementById('workNote').textContent = 'Commercials, brand films and campaign work. Tap any film to watch.';
+    let items = [];
+    try { items = await (await fetch('/api/showcase')).json(); } catch { return; }
+    if (!Array.isArray(items) || !items.length) return;
+    const grid = document.getElementById('films');
+    grid.innerHTML = '';
+
+    items.forEach((it, i) => {
+      const card = document.createElement('article');
+      card.className = 'film';
+
+      const frame = document.createElement('div');
+      frame.className = 'film-frame';
+
+      const v = document.createElement('video');
+      Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none' });
+      if (it.poster) v.poster = it.poster;
+      const ensureSrc = () => { if (!v.getAttribute('src')) v.setAttribute('src', it.url); };
+      if (isTouch) { Object.assign(v, { controls: true, muted: false, preload: 'metadata' }); ensureSrc(); }
+
+      const play = document.createElement('span');
+      play.className = 'play';
+      play.setAttribute('aria-hidden', 'true');
+      play.innerHTML = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>';
+      frame.append(v, play);
+
+      const cap = document.createElement('div');
+      cap.className = 'film-cap';
+      const h3 = document.createElement('h3');
+      h3.className = 'film-title';
+      h3.textContent = it.title || 'Selected film';
+      cap.append(h3);
+      if (it.caption) {
+        const note = document.createElement('span');
+        note.className = 'film-note';
+        note.textContent = it.caption;
+        cap.append(note);
+      }
+
+      card.append(frame, cap);
+
+      const played = () => {
+        track('work_play', { title: h3.textContent, position: i + 1 });
+        if (film) film.pause();   // one soundtrack at a time
+      };
+      if (isTouch) {
+        play.style.display = 'none';
+        v.addEventListener('play', played, { once: true });
+      } else {
+        frame.addEventListener('mouseenter', () => { ensureSrc(); v.play().catch(() => {}); });
+        frame.addEventListener('mouseleave', () => { v.pause(); });
+        frame.addEventListener('click', () => {
+          ensureSrc();
+          v.muted = false;
+          v.play().catch(() => {});
+          played();
+          if (v.requestFullscreen) v.requestFullscreen().catch(() => {});
+          else if (v.webkitRequestFullscreen) v.webkitRequestFullscreen();
+          else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+        });
+      }
+
+      grid.appendChild(card);
+    });
+  })();
+</script>
+</body>
+</html>

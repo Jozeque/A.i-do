@@ -106,7 +106,7 @@ export function createCrm({ $, api, escapeHtml: esc, toast, firestore }) {
       <div class="crm-head">
         <div class="crm-title">
           <h1>CRM</h1>
-          <p>Every inquiry from <a href="https://shyow.io/commercials" target="_blank" rel="noopener">shyow.io/commercials</a> lands here the moment it’s sent. Add WhatsApp and referral leads by hand.</p>
+          <p>Every inquiry from <a href="https://shyow.io/commercials" target="_blank" rel="noopener">shyow.io/commercials</a> and <a href="https://shyow.io/pandora" target="_blank" rel="noopener">shyow.io/pandora</a> lands here the moment it’s sent. Add WhatsApp and referral leads by hand.</p>
         </div>
         <div class="crm-tools">
           <input type="search" class="crm-search" id="crmSearch" placeholder="Search name, company, email…" />
