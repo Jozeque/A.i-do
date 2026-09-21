@@ -1,18 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Behind the scenes: our AI production for PANDORA &middot; Shyow</title>
-<meta name="description" content="Watch how Shyow made one of the world's most ambitious AI productions for PANDORA, then tell us what you're making." />
+<title>מאחורי הקלעים: הפקת ה-AI שלנו ל-PANDORA &middot; Shyow</title>
+<meta name="description" content="צפו איך Shyow יצרה אחת מהפקות ה-AI השאפתניות בעולם עבור PANDORA, וספרו לנו מה אתם יוצרים." />
 <meta name="theme-color" content="#F6F2EB" />
 <link rel="canonical" href="https://shyow.io/pandora" />
 <link rel="icon" type="image/png" href="/landing/favicon.png" />
 <link rel="apple-touch-icon" href="/landing/apple-touch-icon.png" />
-<meta property="og:title" content="Behind the scenes of our AI production for PANDORA" />
-<meta property="og:description" content="How Shyow made one of the world's most ambitious AI productions for PANDORA." />
+<meta property="og:title" content="מאחורי הקלעים של הפקת ה-AI שלנו ל-PANDORA" />
+<meta property="og:description" content="איך Shyow יצרה אחת מהפקות ה-AI השאפתניות בעולם עבור PANDORA." />
 <meta property="og:type" content="video.other" />
 <meta property="og:site_name" content="Shyow" />
+<meta property="og:locale" content="he_IL" />
 <meta property="og:url" content="https://shyow.io/pandora" />
 <meta property="og:image" content="https://shyow.io/landing/media/pandora-bts-og.jpg" />
 <meta property="og:image:width" content="1200" />
@@ -23,7 +24,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="image" href="/landing/media/pandora-bts-poster.jpg" media="(min-width: 861px)">
 <link rel="preload" as="image" href="/landing/media/pandora-bts-poster-mobile.jpg" media="(max-width: 860px)">
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..700,100,1&display=swap" rel="stylesheet">
+<!-- Hebrew type: Fraunces and Figtree carry no Hebrew, so the page keeps the same
+     pairing in spirit. Frank Ruhl Libre is the classic Hebrew text serif, warm and
+     editorial where Fraunces was; Assistant does the reading and every label. Both
+     cover Latin too, so PANDORA and Shyow stay in the same voice. -->
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600&family=Frank+Ruhl+Libre:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   /* ══════════════════════════════════════════════════════════════════════════
      SHYOW - /pandora
@@ -63,8 +68,8 @@
     --shadow:    0 18px 48px -22px rgba(59,38,18,.34);
     --shadow-lg: 0 40px 90px -34px rgba(59,38,18,.42);
 
-    --display: 'Fraunces', Georgia, 'Times New Roman', serif;
-    --sans: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --display: 'Frank Ruhl Libre', 'Times New Roman', Georgia, serif;
+    --sans: 'Assistant', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
     --maxw: 1360px;
     --pad: clamp(20px, 5vw, 60px);
@@ -91,12 +96,18 @@
   :focus-visible { outline: 2px solid var(--coral-2); outline-offset: 3px; border-radius: 4px; }
   [id] { scroll-margin-top: 96px; }
 
+  /* Hebrew has no ascenders or descenders to speak of, so the headline sets tighter
+     than a Latin one at the same size but wants a touch more leading, and none of
+     the negative tracking Fraunces was given. */
   h1, h2, h3 {
-    font-family: var(--display); font-weight: 600; letter-spacing: -.022em;
-    line-height: 1.04; text-wrap: balance;
-    font-variation-settings: 'SOFT' 100, 'WONK' 1;
+    font-family: var(--display); font-weight: 600; letter-spacing: 0;
+    line-height: 1.16; text-wrap: balance;
   }
   .nowrap { white-space: nowrap; }
+  /* Latin in a Hebrew sentence (an email, a URL) reads correctly only as its own run.
+     A field still sits against the right edge with the rest of the form. */
+  .ltr { direction: ltr; unicode-bidi: isolate; }
+  input.ltr { text-align: right; }
 
   .wrap { max-width: var(--maxw); margin-inline: auto; padding-inline: var(--pad); }
 
@@ -117,8 +128,9 @@
   .btn-line:hover { border-color: var(--ink); transform: translateY(-1px); }
   .btn-sm { padding: 11px 19px; font-size: .94rem; border-radius: 14px; }
   .btn-lg { padding: 17px 30px; font-size: 1.06rem; }
-  .btn .arr { transition: transform .2s ease; }
-  .btn:hover .arr { transform: translateX(3px); }
+  /* the arrow points the way the language runs, and nudges that way on hover */
+  .btn .arr { scale: -1 1; transition: translate .2s ease; }
+  .btn:hover .arr { translate: -3px; }
   /* WhatsApp keeps the studio's quiet button and borrows only the glyph's green */
   .btn-wa svg { width: 20px; height: 20px; color: var(--wa); }
 
@@ -140,11 +152,11 @@
     transition: color .2s ease;
   }
   .nav-link::after {
-    content: ""; position: absolute; left: 0; right: 100%; bottom: 0; height: 1.5px;
-    background: var(--coral); border-radius: 2px; transition: right .25s ease;
+    content: ""; position: absolute; inset-inline: 0 100%; bottom: 0; height: 1.5px;
+    background: var(--coral); border-radius: 2px; transition: inset-inline-end .25s ease;
   }
   .nav-link:hover { color: var(--ink); }
-  .nav-link:hover::after { right: 0; }
+  .nav-link:hover::after { inset-inline-end: 0; }
   .nav-work-sm { display: none; }
 
   /* ── hero: the headline over the film and the ask ── */
@@ -186,7 +198,7 @@
   /* shown only while the browser is holding the sound back, the way Instagram marks a
      silent video. It isn't a control: the whole frame is, and it never comes back. */
   .muted-badge {
-    position: absolute; right: 14px; bottom: 14px; z-index: 3; pointer-events: none;
+    position: absolute; inset-inline-end: 14px; bottom: 14px; z-index: 3; pointer-events: none;
     width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
     background: rgba(23,19,14,.55); backdrop-filter: blur(10px); color: #fff;
   }
@@ -243,7 +255,7 @@
     width: 38px; height: 38px; border-radius: 50%; object-fit: cover; object-position: 50% 22%;
     border: 2.5px solid var(--paper);
   }
-  .faces img + img { margin-left: -12px; }
+  .faces img + img { margin-inline-start: -12px; }
   .by span { font-size: .9rem; color: var(--ink-3); line-height: 1.4; }
 
   /* ── made for: the same roller as /commercials ── */
@@ -255,7 +267,10 @@
   }
   .roll-track { display: flex; align-items: center; width: max-content; animation: roll 46s linear infinite; }
   .roll:hover .roll-track { animation-play-state: paused; }
-  @keyframes roll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  /* RTL: the track hangs from the right edge, so it travels right to bring the second
+     set into the same place the first started. (Travelling left would drag the whole
+     strip off screen and leave an empty band.) */
+  @keyframes roll { from { transform: translateX(0); } to { transform: translateX(50%); } }
   .roll-item { flex: none; padding-inline: clamp(22px, 3vw, 46px); display: flex; align-items: center; }
   .roll-item img {
     filter: grayscale(1) brightness(.88) contrast(1.08); opacity: .72;
@@ -306,7 +321,7 @@
   .film-frame:hover { transform: translateY(-4px); box-shadow: 0 30px 70px -30px rgba(0,0,0,.85); }
   .film-frame:hover video, .film-frame:hover img { transform: scale(1.035); }
   .play {
-    position: absolute; left: 17px; bottom: 17px; z-index: 2; pointer-events: none;
+    position: absolute; inset-inline-start: 17px; bottom: 17px; z-index: 2; pointer-events: none;
     width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
     background: rgba(255,255,255,.92); color: var(--ink);
     transition: transform .3s cubic-bezier(.2,.7,.2,1), background .3s ease, color .3s ease;
@@ -314,7 +329,13 @@
   .play svg { width: 15px; height: 15px; margin-left: 2px; }
   .film-frame:hover .play { transform: scale(1.12); background: var(--coral); color: #fff; }
   .film-cap { margin-top: 15px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-  .film-title { font-family: var(--display); font-weight: 600; font-size: clamp(1.08rem, 1.6vw, 1.38rem); letter-spacing: -.015em; color: var(--night-2); }
+  /* Film titles come from the studio's Showcase and are mostly Latin ("Opel - Ibiza
+     Vibes"). Left to the page's RTL they'd have their punctuation thrown to the wrong
+     end, so each title runs as its own LTR line, still set against the right edge. */
+  .film-title {
+    font-family: var(--display); font-weight: 600; font-size: clamp(1.08rem, 1.6vw, 1.38rem);
+    color: var(--night-2); direction: ltr; text-align: right;
+  }
   .film-note { font-size: .93rem; color: var(--night-3); }
 
   /* ── contact: a paper card at the end of the screening room ── */
@@ -357,7 +378,10 @@
   .pick label:hover { border-color: var(--ink-3); transform: translateY(-1px); }
   .pick input:checked + label { background: var(--ink); border-color: var(--ink); color: var(--paper); }
   .pick input:focus-visible + label { outline: 2px solid var(--coral-2); outline-offset: 2px; }
-  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  /* the spam honeypot, hidden by clipping rather than by being parked off to one side:
+     in RTL an element at left:-9999px is real scrollable overflow and drags the whole
+     page sideways */
+  .hp { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .send { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 4px; }
   .send .by { margin-top: 0; }
   .send .by span { max-width: 22ch; }
@@ -388,10 +412,10 @@
   .sheet::backdrop { background: rgba(27,22,16,.5); backdrop-filter: blur(4px); }
   .sheet[open] { animation: sheetIn .26s cubic-bezier(.2,.7,.2,1); }
   @keyframes sheetIn { from { opacity: 0; transform: translateY(10px) scale(.985); } }
-  .sheet h2 { font-size: clamp(1.55rem, 3.2vw, 2.05rem); padding-right: 34px; }
+  .sheet h2 { font-size: clamp(1.55rem, 3.2vw, 2.05rem); padding-inline-end: 34px; }
   .sheet-sub { margin-top: 12px; color: var(--ink-2); font-size: 1.02rem; }
   .sheet-x {
-    position: absolute; top: 15px; right: 16px; width: 34px; height: 34px; padding: 0;
+    position: absolute; top: 15px; inset-inline-end: 16px; width: 34px; height: 34px; padding: 0;
     border: 0; border-radius: 50%; background: transparent; color: var(--ink-3);
     font-family: var(--sans); font-size: 1.45rem; line-height: 1; cursor: pointer;
     transition: background .2s ease, color .2s ease;
@@ -423,7 +447,7 @@
   /* ── sticky WhatsApp on wide screens ── */
   .wa-fab {
     position: fixed; z-index: 50;
-    right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    inset-inline-end: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
     width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center;
     background: var(--wa); color: #fff;
     box-shadow: 0 14px 30px -10px rgba(18,120,64,.55), 0 2px 6px rgba(27,22,16,.12);
@@ -461,7 +485,7 @@
 
     .wa-fab { display: none; }
     .js .cta-bar {
-      display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px;
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px;
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
       padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
       background: rgba(246,242,235,.92); backdrop-filter: blur(14px) saturate(120%);
@@ -533,9 +557,9 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
   <div class="wrap nav">
     <a class="brand" href="#top" aria-label="Shyow"><svg class="wordmark" viewBox="-12 -11 706 122" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
     <div class="nav-end">
-      <a class="nav-link" href="#work" data-cta="nav-work">See more work</a>
-      <a class="btn btn-line btn-sm nav-work-sm" href="#work" data-cta="nav-work">See more work</a>
-      <a class="btn btn-solid btn-sm" href="#contact" data-cta="nav" data-open-sheet>Let&rsquo;s talk</a>
+      <a class="nav-link" href="#work" data-cta="nav-work">לעבודות נוספות</a>
+      <a class="btn btn-line btn-sm nav-work-sm" href="#work" data-cta="nav-work">לעבודות נוספות</a>
+      <a class="btn btn-solid btn-sm" href="#contact" data-cta="nav" data-open-sheet>בואו נדבר</a>
     </div>
   </div>
 </header>
@@ -543,12 +567,12 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
 <main id="top">
   <section class="hero">
     <div class="wrap hero-inner">
-      <h1>Behind the scenes of one of the world&rsquo;s most ambitious AI productions <span class="nowrap">for PANDORA</span></h1>
+      <h1>מאחורי הקלעים של אחת <span class="nowrap">מהפקות ה-AI</span> השאפתניות בעולם, <span class="nowrap">עבור PANDORA</span></h1>
 
       <div class="stage">
         <div class="player" id="player" data-mode="loading">
           <video id="btsVid" playsinline preload="auto"
-                 aria-label="Behind the scenes of the PANDORA film, narrated in Hebrew with Hebrew captions"></video>
+                 aria-label="מאחורי הקלעים של הסרט ל-PANDORA"></video>
           <script>
             /* The phone cut on narrow screens, the full one elsewhere; only the
                chosen file downloads. Buffering starts here, as early as possible;
@@ -567,7 +591,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
             })();
           </script>
 
-          <div class="seek ctl" id="seek" role="slider" tabindex="0" aria-label="Seek"
+          <div class="seek ctl" id="seek" role="slider" tabindex="0" aria-label="מיקום בסרטון"
                aria-valuemin="0" aria-valuemax="85" aria-valuenow="0" aria-valuetext="0:00"><i id="seekFill"></i></div>
           <span class="muted-badge ctl" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>
@@ -575,21 +599,21 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
           <span class="bigplay ctl" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
 
           <div class="endcard ctl" id="endCard">
-            <h2>Want something like this for your brand?</h2>
+            <h2>רוצים משהו כזה למותג שלכם?</h2>
             <div class="endcard-cta">
-              <a class="btn btn-coral" href="#contact" data-open-sheet data-cta="endcard">Leave your details</a>
-              <a class="btn btn-glass btn-wa" data-wa href="https://wa.me/972523993994" data-cta="endcard-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>Chat on WhatsApp</a>
+              <a class="btn btn-coral" href="#contact" data-open-sheet data-cta="endcard">השאירו פרטים</a>
+              <a class="btn btn-glass btn-wa" data-wa href="https://wa.me/972523993994" data-cta="endcard-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>דברו איתנו בוואטסאפ</a>
             </div>
-            <button class="replay" id="replayBtn" type="button"><svg aria-hidden="true"><use href="#i-replay"/></svg>Watch again</button>
+            <button class="replay" id="replayBtn" type="button"><svg aria-hidden="true"><use href="#i-replay"/></svg>לצפייה שוב</button>
           </div>
         </div>
 
         <div class="panel">
-          <h2>Want something like this for your brand?</h2>
-          <p class="panel-sub">Tell us what you&rsquo;re making. We&rsquo;ll come back with an approach and a range.</p>
+          <h2>רוצים משהו כזה למותג שלכם?</h2>
+          <p class="panel-sub">ספרו לנו מה אתם יוצרים, ונחזור אליכם עם גישה וטווח מחירים.</p>
           <div class="panel-cta" id="panelCta">
-            <a class="btn btn-coral btn-lg" href="#contact" data-open-sheet data-cta="panel">Leave your details <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
-            <a class="btn btn-line btn-lg btn-wa" data-wa href="https://wa.me/972523993994" data-cta="panel-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>Chat on WhatsApp</a>
+            <a class="btn btn-coral btn-lg" href="#contact" data-open-sheet data-cta="panel">השאירו פרטים <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></a>
+            <a class="btn btn-line btn-lg btn-wa" data-wa href="https://wa.me/972523993994" data-cta="panel-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>דברו איתנו בוואטסאפ</a>
           </div>
           <p class="by">
             <span class="faces" aria-hidden="true">
@@ -597,15 +621,15 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
               <img src="/landing/team/yossi-bozo.jpg" alt="" />
               <img src="/landing/team/itzik-mizruhin.jpg" alt="" />
             </span>
-            <span>Goes straight to the people who made this film.</span>
+            <span>מגיע ישירות לאנשים שיצרו את הסרט הזה.</span>
           </p>
         </div>
       </div>
     </div>
   </section>
 
-  <div class="wrap"><p class="madefor">Made for</p></div>
-  <div class="roll" role="group" aria-label="Selected clients">
+  <div class="wrap"><p class="madefor">עבדנו עם</p></div>
+  <div class="roll" role="group" aria-label="לקוחות נבחרים">
     <div class="roll-track">
         <span class="roll-item"><img class="l-pandora" src="/landing/logos/pandora.svg" alt="Pandora" loading="lazy" /></span>
         <span class="roll-item"><img class="l-opel" src="/landing/logos/opel.svg" alt="Opel" loading="lazy" /></span>
@@ -625,98 +649,98 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
   <!-- ── more work, then the contact card, all in the screening room ── -->
   <section class="screen" id="work">
     <div class="wrap">
-      <h2 class="lede">More of our work</h2>
-      <p class="screen-note" id="workNote">Commercials, brand films and campaign work. Hover to preview, click to watch.</p>
+      <h2 class="lede">עוד מהעבודות שלנו</h2>
+      <p class="screen-note" id="workNote">פרסומות, סרטי מותג ועבודות קמפיין. העבירו עכבר לתצוגה מקדימה, לחצו לצפייה.</p>
       <div class="films" id="films">
         <!-- Real films load here from /api/showcase. These frames stand in if it's
              unreachable, so the section is never empty. -->
         <article class="film">
           <div class="film-frame">
-            <img src="/landing/media/still-01.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <img src="/landing/media/still-01.jpg" alt="פריים מתוך סרט של Shyow" loading="lazy" decoding="async" />
             <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
           </div>
-          <div class="film-cap"><h3 class="film-title">Brand film</h3></div>
+          <div class="film-cap"><h3 class="film-title">סרט מותג</h3></div>
         </article>
         <article class="film">
           <div class="film-frame">
-            <img src="/landing/media/still-02.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <img src="/landing/media/still-02.jpg" alt="פריים מתוך סרט של Shyow" loading="lazy" decoding="async" />
             <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
           </div>
-          <div class="film-cap"><h3 class="film-title">Product film</h3></div>
+          <div class="film-cap"><h3 class="film-title">סרט מוצר</h3></div>
         </article>
         <article class="film">
           <div class="film-frame">
-            <img src="/landing/media/still-03.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <img src="/landing/media/still-03.jpg" alt="פריים מתוך סרט של Shyow" loading="lazy" decoding="async" />
             <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
           </div>
-          <div class="film-cap"><h3 class="film-title">Campaign film</h3></div>
+          <div class="film-cap"><h3 class="film-title">סרט קמפיין</h3></div>
         </article>
         <article class="film">
           <div class="film-frame">
-            <img src="/landing/media/still-04.jpg" alt="Frame from a Shyow film" loading="lazy" decoding="async" />
+            <img src="/landing/media/still-04.jpg" alt="פריים מתוך סרט של Shyow" loading="lazy" decoding="async" />
             <span class="play" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
           </div>
-          <div class="film-cap"><h3 class="film-title">Commercial</h3></div>
+          <div class="film-cap"><h3 class="film-title">פרסומת</h3></div>
         </article>
       </div>
 
       <div class="close-card" id="contact">
         <div class="contact-copy">
-          <h2 class="lede">So, what are you making?</h2>
-          <p>A line or two is enough. We&rsquo;ll come back with an approach and a range.</p>
-          <a class="wa" data-wa href="https://wa.me/972523993994" data-cta="contact-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>Or message us on WhatsApp</a>
+          <h2 class="lede">אז מה אתם יוצרים?</h2>
+          <p>שורה או שתיים מספיקות. נחזור אליכם עם גישה וטווח מחירים.</p>
+          <a class="wa" data-wa href="https://wa.me/972523993994" data-cta="contact-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>או שלחו לנו הודעה בוואטסאפ</a>
         </div>
 
         <div class="contact-form">
           <form id="leadForm" novalidate>
             <div class="row2">
               <div>
-                <label for="f-name">Name</label>
-                <input id="f-name" name="name" type="text" autocomplete="name" required placeholder="Your name" />
+                <label for="f-name">שם</label>
+                <input id="f-name" name="name" type="text" autocomplete="name" required placeholder="השם שלכם" />
               </div>
               <div>
-                <label for="f-company">Company</label>
-                <input id="f-company" name="company" type="text" autocomplete="organization" required placeholder="Brand or agency" />
+                <label for="f-company">חברה</label>
+                <input id="f-company" name="company" type="text" autocomplete="organization" required placeholder="מותג או משרד פרסום" />
               </div>
             </div>
             <div>
-              <label for="f-email">Work email</label>
-              <input id="f-email" name="email" type="email" autocomplete="email" required placeholder="you@company.com" />
+              <label for="f-email">אימייל</label>
+              <input id="f-email" name="email" type="email" autocomplete="email" required class="ltr" placeholder="you@company.com" />
             </div>
             <div>
-              <span class="lab" id="lab-interest">What are you after?</span>
+              <span class="lab" id="lab-interest">מה אתם מחפשים?</span>
               <div class="pick" role="radiogroup" aria-labelledby="lab-interest">
                 <input type="radio" id="i-one" name="interest" value="One project" required />
-                <label for="i-one">One project</label>
+                <label for="i-one">פרויקט אחד</label>
                 <input type="radio" id="i-ongoing" name="interest" value="Ongoing production" />
-                <label for="i-ongoing">Ongoing</label>
+                <label for="i-ongoing">עבודה שוטפת</label>
                 <input type="radio" id="i-unsure" name="interest" value="Not sure yet" />
-                <label for="i-unsure">Not sure</label>
+                <label for="i-unsure">עוד לא בטוחים</label>
               </div>
             </div>
             <div>
-              <label for="f-brief">A short brief <span class="lab-opt">(optional)</span></label>
-              <textarea id="f-brief" name="brief" rows="3" placeholder="What you're making, roughly when, and anything we should know."></textarea>
+              <label for="f-brief">בריף קצר <span class="lab-opt">(לא חובה)</span></label>
+              <textarea id="f-brief" name="brief" rows="3" placeholder="מה אתם יוצרים, מתי בערך, וכל דבר שכדאי שנדע."></textarea>
             </div>
-            <div class="hp" aria-hidden="true"><label for="f-website">Website</label><input id="f-website" name="website" type="text" tabindex="-1" autocomplete="off" /></div>
+            <div class="hp" aria-hidden="true"><label for="f-website">אתר</label><input id="f-website" name="website" type="text" tabindex="-1" autocomplete="off" /></div>
             <div class="send">
-              <button class="btn btn-solid btn-lg" type="submit" id="submitBtn">Let&rsquo;s talk <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></button>
+              <button class="btn btn-solid btn-lg" type="submit" id="submitBtn">בואו נדבר <svg class="arr" aria-hidden="true"><use href="#i-arr"/></svg></button>
               <span class="by">
                 <span class="faces" aria-hidden="true">
                   <img src="/landing/team/liran-segal.jpg" alt="" loading="lazy" />
                   <img src="/landing/team/yossi-bozo.jpg" alt="" loading="lazy" />
                   <img src="/landing/team/itzik-mizruhin.jpg" alt="" loading="lazy" />
                 </span>
-                <span>Goes straight to the people making the work.</span>
+                <span>מגיע ישירות לאנשים שעושים את העבודה.</span>
               </span>
             </div>
             <p class="msg" id="formMsg" role="alert" hidden></p>
           </form>
 
           <div class="thanks" id="thanks" hidden>
-            <h3>Got it, thank you.</h3>
-            <p>Your note is with us. We&rsquo;ll come back with an approach and a range. If it&rsquo;s urgent, WhatsApp is the fastest way to reach us.</p>
-            <a class="wa" data-wa href="https://wa.me/972523993994" data-cta="thanks-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>Message us on WhatsApp</a>
+            <h3>קיבלנו, תודה.</h3>
+            <p>ההודעה שלכם אצלנו. נחזור אליכם עם גישה וטווח מחירים. אם זה דחוף, וואטסאפ היא הדרך המהירה ביותר להשיג אותנו.</p>
+            <a class="wa" data-wa href="https://wa.me/972523993994" data-cta="thanks-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>שלחו לנו הודעה בוואטסאפ</a>
           </div>
         </div>
       </div>
@@ -726,45 +750,45 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
 
 <!-- Opened by every primary CTA. The contact card stays for anyone who scrolls. -->
 <dialog class="sheet" id="startSheet" aria-labelledby="sheetTitle">
-  <button class="sheet-x" type="button" data-close aria-label="Close">&times;</button>
+  <button class="sheet-x" type="button" data-close aria-label="סגירה">&times;</button>
 
   <div id="sheetPane">
-    <h2 id="sheetTitle">Let&rsquo;s make something.</h2>
-    <p class="sheet-sub">Tell us where to reach you. We&rsquo;ll take it from there.</p>
+    <h2 id="sheetTitle">בואו ניצור משהו.</h2>
+    <p class="sheet-sub">השאירו פרטים ואנחנו ניקח מכאן.</p>
     <form id="sheetLead" novalidate>
-      <span class="lab" id="sheetPickLab" style="margin-top:22px">What are you looking to make?</span>
+      <span class="lab" id="sheetPickLab" style="margin-top:22px">מה תרצו ליצור?</span>
       <div class="big-pick" role="radiogroup" aria-labelledby="sheetPickLab">
         <input type="radio" id="s-one" name="interest" value="One project" required autofocus />
-        <label for="s-one">One project</label>
+        <label for="s-one">פרויקט אחד</label>
         <input type="radio" id="s-ongoing" name="interest" value="Ongoing production" />
-        <label for="s-ongoing">Ongoing production</label>
+        <label for="s-ongoing">עבודה שוטפת</label>
         <input type="radio" id="s-unsure" name="interest" value="Not sure yet" />
-        <label for="s-unsure">Not sure yet</label>
+        <label for="s-unsure">עוד לא בטוחים</label>
       </div>
       <div class="sheet-rest" id="sheetRest" hidden>
-        <div><label for="s-name">Name</label><input id="s-name" name="name" type="text" autocomplete="name" required placeholder="Your name" /></div>
-        <div><label for="s-company">Company</label><input id="s-company" name="company" type="text" autocomplete="organization" required placeholder="Brand or agency" /></div>
-        <div><label for="s-email">Work email</label><input id="s-email" name="email" type="email" autocomplete="email" required placeholder="you@company.com" /></div>
-        <div class="hp" aria-hidden="true"><label for="s-website">Website</label><input id="s-website" name="website" type="text" tabindex="-1" autocomplete="off" /></div>
-        <button class="btn btn-solid btn-lg" type="submit" id="sheetSubmit">Let&rsquo;s talk</button>
+        <div><label for="s-name">שם</label><input id="s-name" name="name" type="text" autocomplete="name" required placeholder="השם שלכם" /></div>
+        <div><label for="s-company">חברה</label><input id="s-company" name="company" type="text" autocomplete="organization" required placeholder="מותג או משרד פרסום" /></div>
+        <div><label for="s-email">אימייל</label><input id="s-email" name="email" type="email" autocomplete="email" required class="ltr" placeholder="you@company.com" /></div>
+        <div class="hp" aria-hidden="true"><label for="s-website">אתר</label><input id="s-website" name="website" type="text" tabindex="-1" autocomplete="off" /></div>
+        <button class="btn btn-solid btn-lg" type="submit" id="sheetSubmit">בואו נדבר</button>
         <p class="msg" id="sheetMsg" role="alert" hidden></p>
       </div>
     </form>
-    <p class="sheet-wa">Prefer WhatsApp? <a data-wa href="https://wa.me/972523993994" data-cta="sheet-whatsapp">Message us &rarr;</a></p>
+    <p class="sheet-wa">מעדיפים וואטסאפ? <a data-wa href="https://wa.me/972523993994" data-cta="sheet-whatsapp">שלחו לנו הודעה &larr;</a></p>
   </div>
 
   <div id="sheetThanks" hidden>
-    <h2>Got it.</h2>
-    <p class="sheet-sub">We&rsquo;ll come back with an approach and a range. Anything else you want us to know?</p>
+    <h2>קיבלנו.</h2>
+    <p class="sheet-sub">נחזור אליכם עם גישה וטווח מחירים. יש עוד משהו שכדאי שנדע?</p>
     <form id="sheetNote" style="margin-top:18px">
-      <textarea id="s-note" rows="3" placeholder="What you're making, roughly when, anything useful. Optional."></textarea>
+      <textarea id="s-note" rows="3" placeholder="מה אתם יוצרים, מתי בערך, וכל דבר שיעזור. לא חובה."></textarea>
       <div class="sheet-actions">
-        <button class="btn btn-solid" type="submit" id="noteSubmit">Send</button>
-        <button class="btn btn-line" type="button" data-close>No thanks</button>
+        <button class="btn btn-solid" type="submit" id="noteSubmit">שליחה</button>
+        <button class="btn btn-line" type="button" data-close>לא תודה</button>
       </div>
       <p class="msg" id="noteMsg" role="alert" hidden></p>
     </form>
-    <p class="sheet-wa">Or <a data-wa href="https://wa.me/972523993994" data-cta="sheet-thanks-whatsapp">message us on WhatsApp &rarr;</a></p>
+    <p class="sheet-wa">או <a data-wa href="https://wa.me/972523993994" data-cta="sheet-thanks-whatsapp">שלחו לנו הודעה בוואטסאפ &larr;</a></p>
   </div>
 </dialog>
 
@@ -772,17 +796,17 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
   <div class="wrap foot">
     <a class="brand" href="#top" aria-label="Shyow"><svg class="wordmark" viewBox="-12 -11 706 122" aria-hidden="true"><use href="#shyow-wordmark"/></svg></a>
     <div class="foot-links">
-      <a href="#work">Work</a><a href="#contact">Contact</a><a data-wa href="https://wa.me/972523993994" data-cta="footer-whatsapp">WhatsApp</a><a href="/">shyow.io</a><a href="/privacy">Privacy</a>
+      <a href="#work">עבודות</a><a href="#contact">צרו קשר</a><a data-wa href="https://wa.me/972523993994" data-cta="footer-whatsapp">וואטסאפ</a><a class="ltr" href="/">shyow.io</a><a href="/privacy">פרטיות</a>
     </div>
-    <div class="foot-cr">&copy; 2026 Shyow &middot; Working worldwide</div>
+    <div class="foot-cr">&copy; 2026 Shyow &middot; עובדים בכל העולם</div>
   </div>
 </footer>
 
 <!-- wide screens: the green bubble. phones: the bar below, which carries both asks. -->
-<a class="wa-fab" data-wa href="https://wa.me/972523993994" data-cta="sticky-whatsapp" aria-label="Chat with Shyow on WhatsApp" title="Chat on WhatsApp"><svg aria-hidden="true"><use href="#i-wa"/></svg></a>
+<a class="wa-fab" data-wa href="https://wa.me/972523993994" data-cta="sticky-whatsapp" aria-label="שיחה עם Shyow בוואטסאפ" title="דברו איתנו בוואטסאפ"><svg aria-hidden="true"><use href="#i-wa"/></svg></a>
 <div class="cta-bar" id="ctaBar">
-  <a class="btn btn-line btn-wa" data-wa href="https://wa.me/972523993994" data-cta="bar-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>WhatsApp</a>
-  <a class="btn btn-coral" href="#contact" data-open-sheet data-cta="bar">Leave your details</a>
+  <a class="btn btn-coral" href="#contact" data-open-sheet data-cta="bar">השאירו פרטים</a>
+  <a class="btn btn-line btn-wa" data-wa href="https://wa.me/972523993994" data-cta="bar-whatsapp"><svg aria-hidden="true"><use href="#i-wa"/></svg>וואטסאפ</a>
 </div>
 
 <script>
@@ -790,7 +814,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
   // The prefill names this page, so a WhatsApp conversation says where it came from
   // (WhatsApp chats never pass through the CRM, so this is their only attribution).
   const WA_NUMBER = "972523993994";          // Shyow - +972 52-399-3994
-  const WA_TEXT = "Hi Shyow, I watched the PANDORA behind the scenes and I'd like to talk about a project.";
+  const WA_TEXT = "היי Shyow, ראיתי את מאחורי הקלעים של PANDORA ואשמח לדבר על פרויקט.";
   const waHref = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(WA_TEXT)}`;
   document.querySelectorAll('[data-wa]').forEach(a => { a.href = waHref; a.target = "_blank"; a.rel = "noopener"; });
 
@@ -854,7 +878,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
       const d = v.duration || 0;
       fill.style.transform = 'scaleX(' + (d ? Math.min(1, v.currentTime / d) : 0) + ')';
       seek.setAttribute('aria-valuenow', String(Math.round(v.currentTime)));
-      seek.setAttribute('aria-valuetext', fmt(v.currentTime) + ' of ' + fmt(d));
+      seek.setAttribute('aria-valuetext', fmt(v.currentTime) + ' מתוך ' + fmt(d));
     };
     const tick = () => { paint(); raf = requestAnimationFrame(tick); };
     v.addEventListener('loadedmetadata', () => { seek.setAttribute('aria-valuemax', String(Math.round(v.duration))); paint(); });
@@ -1029,7 +1053,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
       msg.hidden = true; noteMsg.hidden = true;
       form.reset(); rest.hidden = true;
       submit.disabled = false; submit.innerHTML = submitLabel;
-      noteBtn.disabled = false; noteBtn.textContent = 'Send';
+      noteBtn.disabled = false; noteBtn.textContent = 'שליחה';
       leadId = null;
       const r = preset && form.querySelector('input[name="interest"][value="' + preset + '"]');
       if (r) r.checked = true;
@@ -1049,20 +1073,20 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
       e.preventDefault();
       msg.hidden = true;
       if (!form.checkValidity()) {
-        say(msg, 'Please add your name, company and work email.');
+        say(msg, 'נא למלא שם, חברה ואימייל.');
         const bad = form.querySelector(':invalid'); if (bad) bad.focus();
         track('form_error', { reason: 'validation', where: 'sheet' });
         return;
       }
       submit.disabled = true;
-      submit.textContent = 'Sending…';
+      submit.textContent = 'שולח…';
       try {
         leadId = await postLead(form);
         pane.hidden = true; thanks.hidden = false;
         document.getElementById('s-note').focus();
       } catch (err) {
         submit.disabled = false; submit.innerHTML = submitLabel;
-        say(msg, 'That didn’t go through. Please try again, or message us on WhatsApp.');
+        say(msg, 'השליחה לא עברה. נסו שוב, או שלחו לנו הודעה בוואטסאפ.');
         track('form_error', { reason: 'network', where: 'sheet' });
       }
     });
@@ -1073,7 +1097,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
       e.preventDefault();
       const brief = document.getElementById('s-note').value.trim();
       if (!brief || !leadId) { dlg.close(); return; }
-      noteBtn.disabled = true; noteBtn.textContent = 'Sending…';
+      noteBtn.disabled = true; noteBtn.textContent = 'שולח…';
       try {
         const r = await fetch('/api/lead-note', {
           method: 'POST',
@@ -1084,8 +1108,8 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
         track('lead_note', {});
         dlg.close();
       } catch (err) {
-        noteBtn.disabled = false; noteBtn.textContent = 'Send';
-        say(noteMsg, 'That didn’t send, but your enquiry is already with us.');
+        noteBtn.disabled = false; noteBtn.textContent = 'שליחה';
+        say(noteMsg, 'ההערה לא נשלחה, אבל הפנייה שלכם כבר אצלנו.');
       }
     });
   })();
@@ -1106,7 +1130,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
       msg.hidden = true;
 
       if (!form.checkValidity()) {
-        show('Please add your name, company, work email and what you’re after.');
+        show('נא למלא שם, חברה, אימייל ומה אתם מחפשים.');
         const bad = form.querySelector(':invalid'); if (bad) bad.focus();
         track('form_error', { reason: 'validation' });
         return;
@@ -1114,7 +1138,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
 
       btn.disabled = true;
       const label = btn.innerHTML;
-      btn.textContent = 'Sending…';
+      btn.textContent = 'שולח…';
       try {
         await postLead(form);
         form.hidden = true;
@@ -1123,7 +1147,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
       } catch (err) {
         btn.disabled = false;
         btn.innerHTML = label;
-        show('That didn’t go through. Please try again, or message us on WhatsApp and we’ll pick it up straight away.');
+        show('השליחה לא עברה. נסו שוב, או שלחו לנו הודעה בוואטסאפ ונחזור אליכם מיד.');
         track('form_error', { reason: 'network' });
       }
     });
@@ -1145,7 +1169,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
   // ── more work: real films replace the standby frames (as on /commercials) ──
   (async () => {
     const isTouch = matchMedia('(hover: none)').matches;
-    if (isTouch) document.getElementById('workNote').textContent = 'Commercials, brand films and campaign work. Tap any film to watch.';
+    if (isTouch) document.getElementById('workNote').textContent = 'פרסומות, סרטי מותג ועבודות קמפיין. הקישו על כל סרט לצפייה.';
     let items = [];
     try { items = await (await fetch('/api/showcase')).json(); } catch { return; }
     if (!Array.isArray(items) || !items.length) return;
@@ -1175,7 +1199,7 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
       cap.className = 'film-cap';
       const h3 = document.createElement('h3');
       h3.className = 'film-title';
-      h3.textContent = it.title || 'Selected film';
+      h3.textContent = it.title || 'סרט נבחר';
       cap.append(h3);
       if (it.caption) {
         const note = document.createElement('span');
