@@ -24,11 +24,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="image" href="/landing/media/pandora-bts-poster.jpg" media="(min-width: 861px)">
 <link rel="preload" as="image" href="/landing/media/pandora-bts-poster-mobile.jpg" media="(max-width: 860px)">
-<!-- Hebrew type: Fraunces and Figtree carry no Hebrew, so the page keeps the same
-     pairing in spirit. Frank Ruhl Libre is the classic Hebrew text serif, warm and
-     editorial where Fraunces was; Assistant does the reading and every label. Both
-     cover Latin too, so PANDORA and Shyow stay in the same voice. -->
-<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600&family=Frank+Ruhl+Libre:wght@500;600;700&display=swap" rel="stylesheet">
+<!-- Hebrew type: Fraunces and Figtree carry no Hebrew. Frank Ruhl Libre stood in at
+     first and read as a book serif, too old for this page, so the whole page is now
+     Noto Sans Hebrew: 700 carries the headlines, 400 does the reading, and the
+     difference between them is weight rather than a second family. It covers Latin
+     too, so PANDORA, Shyow and the film titles stay in the same voice. -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   /* ══════════════════════════════════════════════════════════════════════════
      SHYOW - /pandora
@@ -68,8 +69,8 @@
     --shadow:    0 18px 48px -22px rgba(59,38,18,.34);
     --shadow-lg: 0 40px 90px -34px rgba(59,38,18,.42);
 
-    --display: 'Frank Ruhl Libre', 'Times New Roman', Georgia, serif;
-    --sans: 'Assistant', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --display: 'Noto Sans Hebrew', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --sans: 'Noto Sans Hebrew', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
     --maxw: 1360px;
     --pad: clamp(20px, 5vw, 60px);
@@ -100,8 +101,8 @@
      than a Latin one at the same size but wants a touch more leading, and none of
      the negative tracking Fraunces was given. */
   h1, h2, h3 {
-    font-family: var(--display); font-weight: 600; letter-spacing: 0;
-    line-height: 1.16; text-wrap: balance;
+    font-family: var(--display); font-weight: 700; letter-spacing: -.01em;
+    line-height: 1.15; text-wrap: balance;
   }
   .nowrap { white-space: nowrap; }
   /* Latin in a Hebrew sentence (an email, a URL) reads correctly only as its own run.
