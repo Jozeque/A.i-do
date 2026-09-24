@@ -20,6 +20,14 @@
 <meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
 <script>document.documentElement.className += ' js';</script>
+<script>
+  /* Paid traffic must start on the film. A hash left over from an earlier visit
+     (#contact, from the footer link) or a scroll position the browser restored
+     would otherwise drop someone straight into the form. In-page anchors still
+     work; only the landing itself is pinned to the top. */
+  history.scrollRestoration = 'manual';
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="image" href="/landing/media/pandora-bts-poster.jpg" media="(min-width: 861px)">
