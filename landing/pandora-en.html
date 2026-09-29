@@ -32,8 +32,8 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="image" href="/landing/media/pandora-bts-poster.jpg" media="(min-width: 861px)">
-<link rel="preload" as="image" href="/landing/media/pandora-bts-poster-mobile.jpg" media="(max-width: 860px)">
+<link rel="preload" as="image" href="/landing/media/pandora-bts-poster-en.jpg" media="(min-width: 861px)">
+<link rel="preload" as="image" href="/landing/media/pandora-bts-poster-mobile-en.jpg" media="(max-width: 860px)">
 <!-- Back on the pair the homepage and /commercials use: Fraunces on its SOFT and
      WONK axes for the headlines, Figtree for everything that gets read. -->
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..700,100,1&display=swap" rel="stylesheet">
@@ -585,8 +585,8 @@ src="https://www.facebook.com/tr?id=1619487023147325&ev=PageView&noscript=1" /><
             (function () {
               var v = document.getElementById('btsVid'); if (!v) return;
               var small = matchMedia('(max-width: 860px)').matches;
-              v.poster = small ? '/landing/media/pandora-bts-poster-mobile.jpg' : '/landing/media/pandora-bts-poster.jpg';
-              v.dataset.src = small ? '/landing/media/pandora-bts-mobile.mp4' : '/landing/media/pandora-bts.mp4';
+              v.poster = small ? '/landing/media/pandora-bts-poster-mobile-en.jpg' : '/landing/media/pandora-bts-poster-en.jpg';
+              v.dataset.src = small ? '/landing/media/pandora-bts-mobile-en.mp4' : '/landing/media/pandora-bts-en.mp4';
               var calm = matchMedia('(prefers-reduced-motion: reduce)').matches ||
                          !!(navigator.connection && navigator.connection.saveData);
               if (calm) { v.dataset.calm = '1'; return; }
