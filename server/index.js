@@ -436,6 +436,9 @@ app.get('/commercial', (req, res) => res.redirect(301, '/commercials'));
 // A second campaign page: the PANDORA behind-the-scenes film, with the same lead form,
 // WhatsApp and Meta tracking as /commercials. Leads from it arrive with page = /pandora.
 app.get('/pandora', (req, res) => res.sendFile(path.join(LANDING_DIR, 'pandora.html')));
+// The English sibling, for the US and EU ad sets: same film, same lead plumbing.
+// Leads arrive with page = /pandora-en, so the two audiences stay apart in the CRM.
+app.get('/pandora-en', (req, res) => res.sendFile(path.join(LANDING_DIR, 'pandora-en.html')));
 // The privacy policy every landing footer links to. Meta's app settings point here too:
 // the policy itself, and /privacy#delete as the data deletion instructions.
 app.get('/privacy', (req, res) => res.sendFile(path.join(LANDING_DIR, 'privacy.html')));
