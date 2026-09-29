@@ -308,21 +308,19 @@
   .films {
     margin-top: clamp(34px, 5vw, 58px);
     display: grid; grid-template-columns: repeat(12, 1fr);
-    gap: clamp(30px, 3.6vw, 56px) clamp(20px, 2.6vw, 38px); align-items: start;
+    gap: clamp(16px, 1.7vw, 24px); align-items: start;
   }
-  .film { grid-column: 1 / -1; }
-  .film:nth-child(6n+2) { grid-column: 1 / 8; }
-  .film:nth-child(6n+3) { grid-column: 8 / -1; margin-top: clamp(0px, 6.5vw, 88px); }
-  .film:nth-child(6n+4) { grid-column: 4 / -1; }
-  .film:nth-child(6n+5) { grid-column: 1 / 7; }
-  .film:nth-child(6n+6) { grid-column: 7 / -1; margin-top: clamp(0px, 4vw, 54px); }
+  /* One block of work, not a scrapbook: every tile the same width, every row on
+     the same baseline. The first film runs full width as the section's own hero. */
+  .film { grid-column: span 4; }
+  .film:first-child { grid-column: 1 / -1; }
 
   .film-frame {
     position: relative; overflow: hidden; border-radius: var(--r-media); cursor: pointer;
     background: #0E0B08; aspect-ratio: 16 / 9;
     transition: transform .4s cubic-bezier(.2,.7,.2,1), box-shadow .4s ease;
   }
-  .film:nth-child(6n+1) .film-frame { aspect-ratio: 2 / 1; }
+  .film:first-child .film-frame { aspect-ratio: 2 / 1; }
   .film-frame video, .film-frame img {
     width: 100%; height: 100%; object-fit: cover;
     transition: transform .7s cubic-bezier(.2,.7,.2,1);
@@ -344,6 +342,7 @@
   .film-title {
     font-family: var(--display); font-weight: 600; font-size: clamp(1.08rem, 1.6vw, 1.38rem);
     color: var(--night-2); direction: ltr; text-align: right;
+    min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .film-note { font-size: .93rem; color: var(--night-3); }
 
@@ -474,6 +473,7 @@
 
   /* ── responsive ── */
   @media (max-width: 1080px) {
+    .film { grid-column: span 6; }
     .close-card { grid-template-columns: 1fr; }
     .contact-copy p { max-width: 52ch; }
   }
@@ -488,9 +488,9 @@
     .stage { grid-template-columns: minmax(0, 1fr); gap: 30px; }
     .player { width: 100%; max-width: 540px; }
     .panel { max-width: 540px; }
-    .films { gap: 30px 0; }
+    .films { gap: 16px; }
     .film, .film:nth-child(n) { grid-column: 1 / -1; margin-top: 0; }
-    .film:nth-child(6n+1) .film-frame { aspect-ratio: 16 / 9; }
+    .film:first-child .film-frame { aspect-ratio: 16 / 9; }
 
     .wa-fab { display: none; }
     .js .cta-bar {
