@@ -3,8 +3,16 @@
 _Verified 2026-07-09. Sources at bottom._
 
 Used for turning frames / references into motion. **The app does NOT call Kling's API yet** —
-today it only writes Kling *prompts* (the Kling + Kling Advisor gems) that you paste into
-Kling's own UI or OpenArt. API-driven generation is roadmap Phase 2, via **fal.ai**.
+today it only writes Kling *prompts* that you paste into Kling's own UI, OpenArt or Higgsfield:
+**Kling 3.0** is one of the three models of the Video tab's brief (see [seedance.md](seedance.md) →
+In this app), and **Kling V2V** has its own tab. API-driven generation is roadmap Phase 2, via **fal.ai**.
+
+In the Video tab, Kling 3.0 gets the Kling gem (`gems/kling.txt`) plus the brief's pinned direction
+(`klingBriefDirection` in `server/seedance.js`): references bound by `@image1…` tags in upload order
+(look first), at most **4** images, clips **3–15s**, a director shot list as Kling multi-shot (≤ 6 shots
+of ≥ 3s, each shot's block capped at 512 characters by `capKlingShots()`), or a start + end frame as
+one continuous shot (multi-shot and start/end frames can't combine). One paste-ready result, never the
+three archetype variations.
 
 ## Versions (2026)
 - **Kling 2.6** (released 2025-12-03) and **Kling 3.0 (VIDEO 3.0)** are current. **O3 (3.0 Omni)** = multi-shot storyboarding + native audio.

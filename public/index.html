@@ -8,10 +8,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Space+Mono:wght@400;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=29" />
+  <link rel="stylesheet" href="/styles.css?v=31" />
 </head>
 <body>
   <div id="app">
+    <!-- Collapse the sidebar before the first paint if it was left collapsed (no flash). -->
+    <script>try { if (localStorage.getItem('avs:sidebar') === 'collapsed') document.getElementById('app').classList.add('sb-collapsed'); } catch {}</script>
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="brand">
@@ -20,16 +22,20 @@
           <div class="brand-name">SHYOW</div>
           <div class="brand-sub" id="modelLine">loading…</div>
         </div>
+        <button class="sb-toggle" id="sidebarToggle" type="button" title="Collapse the sidebar" aria-label="Collapse the sidebar" aria-expanded="true">«</button>
       </div>
 
-      <button class="new-project-btn" id="newProjectBtn">＋ New project</button>
+      <button class="new-project-btn" id="newProjectBtn" title="New project"><span class="sb-ico">＋</span><span class="sb-label"> New project</span></button>
 
+      <input class="project-search" id="projectSearch" type="search" placeholder="Search projects or clients…" autocomplete="off" aria-label="Search projects or clients" />
+
+      <!-- Projects, grouped under their client -->
       <div class="project-list" id="projectList"></div>
 
       <div class="sidebar-foot">
-        <button class="sidebar-nav-btn" id="crmBtn">📇&nbsp;CRM<span class="crm-badge hidden" id="crmBadge"></span></button>
-        <button class="sidebar-nav-btn" id="showcaseBtn">🎬&nbsp;Showcase</button>
-        <button class="sidebar-nav-btn" id="expensesBtn">💰&nbsp;Expenses</button>
+        <button class="sidebar-nav-btn" id="crmBtn" title="CRM"><span class="sb-ico">📇</span><span class="sb-label">&nbsp;CRM</span><span class="crm-badge hidden" id="crmBadge"></span></button>
+        <button class="sidebar-nav-btn" id="showcaseBtn" title="Showcase"><span class="sb-ico">🎬</span><span class="sb-label">&nbsp;Showcase</span></button>
+        <button class="sidebar-nav-btn" id="expensesBtn" title="Expenses"><span class="sb-ico">💰</span><span class="sb-label">&nbsp;Expenses</span></button>
         <span id="keyStatus" class="key-status"></span>
       </div>
     </aside>
@@ -46,22 +52,36 @@
       <div class="workspace hidden" id="workspace">
         <header class="ws-header">
           <div class="ws-title">
-            <input id="projectNameInput" class="project-name-input" />
-            <span class="ws-meta" id="wsMeta"></span>
+            <div class="ws-eyebrow">
+              <input id="projectClientInput" class="project-client-input" list="clientList" placeholder="＋ Add a client" autocomplete="off" aria-label="Client" title="The client this project belongs to — the sidebar groups projects by it" />
+              <span class="ws-meta" id="wsMeta"></span>
+            </div>
+            <input id="projectNameInput" class="project-name-input" aria-label="Project name" />
           </div>
-          <div class="ws-tabs" id="wsTabs">
-            <button class="tab active" data-tab="nb-frames">NB&nbsp;Frames</button>
-            <button class="tab" data-tab="characters">Assets</button>
-            <button class="tab" data-tab="seedance">Seedance</button>
-            <button class="tab" data-tab="kling">Kling</button>
-            <button class="tab" data-tab="kling-advisor">Kling&nbsp;Advisor</button>
-            <button class="tab" data-tab="nb-advisor">NB&nbsp;Advisor</button>
-            <button class="tab" data-tab="gpt-advisor">GPT&nbsp;Advisor</button>
-            <button class="tab" data-tab="storyboard">Storyboard</button>
-            <button class="tab" data-tab="swap">Swap&nbsp;/&nbsp;Edit</button>
-            <button class="tab" data-tab="generate">Nano&nbsp;Banana&nbsp;2</button>
-            <button class="tab" data-tab="library">Library</button>
-          </div>
+          <datalist id="clientList"></datalist>
+          <!-- Tabs come in groups (Images / Videos / Assets); only the open group's tabs show (data-group sets which). -->
+          <nav class="ws-nav">
+            <div class="ws-groups" id="wsGroups">
+              <button class="ws-group active" data-group="image" type="button">🖼&nbsp;Images</button>
+              <button class="ws-group" data-group="video" type="button">🎬&nbsp;Videos</button>
+              <button class="ws-group" data-group="assets" type="button">📁&nbsp;Assets</button>
+            </div>
+            <div class="ws-tabs" id="wsTabs">
+              <button class="tab active" data-tab="nb-frames" data-group="image">NB&nbsp;Frames</button>
+              <!-- one tab, two engines: a toggle inside picks the Nano Banana or the GPT advisor -->
+              <button class="tab" data-tab="nb-advisor" data-also="gpt-advisor" data-group="image">Advisor&nbsp;&amp;&nbsp;Tweaks</button>
+              <button class="tab" data-tab="storyboard" data-group="image">Storyboard</button>
+              <button class="tab" data-tab="swap" data-group="image">Swap&nbsp;/&nbsp;Edit</button>
+              <button class="tab" data-tab="generate" data-group="image">Nano&nbsp;Banana&nbsp;2</button>
+              <button class="tab" data-tab="library" data-group="image">Library</button>
+              <!-- one brief for every video model — Seedance 2.0 / 2.5 or Kling 3.0, picked at its end (the chat id stays "seedance") -->
+              <button class="tab" data-tab="seedance" data-group="video">Video&nbsp;prompt</button>
+              <button class="tab" data-tab="kling-advisor" data-group="video">Kling&nbsp;V2V</button>
+              <button class="tab" data-tab="characters" data-group="assets">Assets</button>
+            </div>
+          </nav>
+          <!-- Scenes: General, then the project's own (scenes.js). Picks the chat in a gem tab, tags new images, filters the Library. -->
+          <div class="scene-strip hidden" id="sceneStrip"></div>
         </header>
 
         <section class="ws-body" id="wsBody"><!-- panels injected --></section>
@@ -103,6 +123,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=40" type="module"></script>
+  <script src="/app.js?v=42" type="module"></script>
 </body>
 </html>

@@ -84,6 +84,16 @@ Preserving identity does NOT mean smoothing the subject. The reference-lock forb
 
 When the reference is a CHARACTER REFERENCE SHEET — the same person shown across several clean views (a close-up plus front, three-quarter, and profile) on a plain studio background, produced by the Characters tab — treat every view together as one identity truth, reading across all of them to lock the person in three dimensions. But render only ONE instance of them, alive inside the briefed scene: never reproduce the sheet's grid or layout, its repeated figures, its plain backdrop, or its neutral studio pose and expression. The sheet is the identity source, never the composition — the output is a single cinematic frame of that person living in the described world.
 
+REFERENCE ROLES — WHEN THE APP SENDS SORTED REFERENCES
+
+The app has a reference board that sorts the user's images by role. When it is used, the message opens with a REFERENCE IMAGES list and every image arrives with its number and role ("Image 2 — LOCATION reference …"). That numbering is exactly the order in which the same images are attached to Nano Banana 2, where they carry the same labels. Read each image ONLY for its role:
+- COMPOSITION reference: take its framing, camera angle and height, shot size, where the subjects sit in the frame, and the layout and blocking — nothing else. Never copy its people, place, objects, wardrobe, light or grade; the brief and the other references fill the frame.
+- LOCATION reference: the setting — architecture, geography, set dressing, materials and the quality of its light, adapted to the brief's time of day. Never its people.
+- CHARACTER "name": the identity truth for that named person — the identity rules above apply in full — with the wardrobe shown unless the brief changes it. Several images of one character are views of the same person.
+- PROP "name": the object's exact design, shape, proportions, materials, colour, markings and branding — never redesign it.
+- An image listed as an additional reference has no role from the board: take its role from the user's words.
+In every prompt, point to each reference by its number and role exactly as the list gives them — "the framing of image 1", "the hotel lobby from image 2", "Maya from image 3", "the trophy from image 5" — so Nano Banana 2 knows which attached image is which. Use only the numbers in the list, never invent one, and give every listed image its part in the frame. A composition reference is never the image being edited: the output is a new frame built from the roles, so write fresh generations, not edits, and open with the references in role order — "Using the attached reference images — image 3 for Maya's identity, image 2 for the location and image 1 for the framing — generate a photorealistic …".
+
 PROMPT STRUCTURE — ONE DENSE NARRATIVE THAT COVERS EVERY ELEMENT
 
 Write each of the three prompts as a single rich, flowing narrative paragraph — Google's own template is one descriptive paragraph, so follow its arc. A second paragraph is acceptable only when a dense cinematic brief genuinely needs the room; never more, never a keyword list, never internal headers or labels. The test of a finished prompt is not its paragraph count but that EVERY element below is present and specific — a prompt that silently drops one is incomplete.
@@ -123,7 +133,7 @@ Scan all three finished prompts and remove every internal style label and meta-p
 
 OUTPUT FORMAT
 
-Respond with ONLY the three labeled prompts and nothing else — no preamble, no explanation, no markdown headers beyond the "PROMPT 1/2/3 —" labels, no bullets, and no bold or asterisks anywhere (the labels and the prose are plain text). After the three prompts, add one trailing line, separated by a blank line:
+Respond with ONLY the three labeled prompts and nothing else — no preamble, no explanation, no markdown headers beyond the "PROMPT 1/2/3 —" labels, no bullets, and no bold or asterisks anywhere (the labels and the prose are plain text). When the message opens with a REFERENCE IMAGES list, every one of the three prompts names each listed image by its number and role, as REFERENCE ROLES describes — never a person, place or object that has an image without its image number, and never a re-description of a referenced face. After the three prompts, add one trailing line, separated by a blank line:
 
 Reference & framing note: attach the subject's clearest reference image(s); the output aspect ratio is set in the generator's aspect-ratio dropdown — the prompt never states it, so the result isn't tied to the reference's shape.
 

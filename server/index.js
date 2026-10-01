@@ -17,7 +17,11 @@ import { createShowcase } from './showcase.js';
 import { createLeads, validId as validLeadId } from './leads.js';
 import { sendLead } from './meta-capi.js';
 import { notifyNewLead, notifyLeadBrief, leadEmailEnabled } from './notify.js';
-import { seedanceBriefDirection } from './seedance.js';
+import { seedanceBriefDirection, klingBriefDirection, cleanVideoModel, VIDEO_MODELS, VIDEO_GENS } from './seedance.js';
+import { MORE_LIKE_THIS, storyboardScriptDirection } from './turn-modes.js';
+import { newSceneId, cleanSceneId, chatKey, sortScenes, nextOrder, cleanTitle, cleanBrief, sceneBriefBlock } from './scenes.js';
+import { refMeta, refCaption } from './ref-labels.js';
+import { changedTunes, tuneRef, findReply, cleanFrom, TRY_MAX } from './recipes.js';
 import { Jimp } from 'jimp';   // resize swap outputs to the input image's exact pixel dimensions
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -685,6 +689,11 @@ app.get('/api/projects', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Projects sit under a client (a plain name, shared by the projects that carry it); the sidebar
+// groups by it. A project without one lists under "No client". Ids and media paths don't
+// involve the client, so assigning or renaming one never moves anything.
+const cleanClient = (v) => String(v || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+
 app.post('/api/projects', async (req, res) => {
   try {
     const name = (req.body?.name || '').trim() || 'Untitled Project';
@@ -693,6 +702,7 @@ app.post('/api/projects', async (req, res) => {
     const project = {
       id: pid,
       name,
+      client: cleanClient(req.body?.client),
       createdAt: now,
       updatedAt: now,
       // per-project gem overrides (start from defaults; editable in UI)
@@ -709,31 +719,61 @@ app.post('/api/projects', async (req, res) => {
 
 app.get('/api/projects/:pid', async (req, res) => {
   // ?light=1 skips the images subcollection (loaded lazily by the client) — fast project open.
-  try { res.json(await (req.query.light ? data.getProjectLight(req.params.pid) : loadProject(req.params.pid))); }
+  try {
+    const p = await (req.query.light ? data.getProjectLight(req.params.pid) : loadProject(req.params.pid));
+    res.json({ ...p, scenes: sortScenes(p.scenes) });   // a project from before scenes has none
+  }
   catch (e) { res.status(404).json({ error: 'Project not found' }); }
 });
 
 app.patch('/api/projects/:pid', async (req, res) => {
   try {
+    const tuneSnaps = [];   // each gem whose Tune this save changed gets a new, kept version
     const p = await updateProject(req.params.pid, (p) => {
-      if (typeof req.body.name === 'string') p.name = req.body.name.trim() || p.name;
-      if (req.body.gemOverrides) p.gemOverrides = { ...p.gemOverrides, ...req.body.gemOverrides };
-      if (req.body.gemBuilders) {
-        p.gemBuilders = { ...(p.gemBuilders || {}), ...req.body.gemBuilders };
-        // NB Frames / Seedance directions are derived from their structured builders
-        if (req.body.gemBuilders['nb-frames']) {
-          p.gemOverrides = p.gemOverrides || {};
-          p.gemOverrides['nb-frames'] = compileNbFramesDirection(p.gemBuilders['nb-frames']);
-        }
-        if (req.body.gemBuilders['seedance']) {
-          p.gemOverrides = p.gemOverrides || {};
-          p.gemOverrides['seedance'] = compileSeedanceDirection(p.gemBuilders['seedance']);
+      const before = { ...(p.gemOverrides || {}) };
+      tuneSnaps.length = 0;   // (a retried mutator starts over)
+      applyProjectPatch(p);
+      const changed = changedTunes(before, p.gemOverrides || {});
+      if (changed.length) {
+        p.tuneVersions = { ...(p.tuneVersions || {}) };
+        for (const g of changed) {
+          const v = (Number(p.tuneVersions[g]) || 0) + 1;
+          p.tuneVersions[g] = v;
+          tuneSnaps.push({ id: `${g}@${v}`, gemId: g, v, text: String(p.gemOverrides?.[g] || ''), builder: p.gemBuilders?.[g] || null, at: Date.now() });
         }
       }
-      p.updatedAt = Date.now();
     });
+    for (const s of tuneSnaps) await data.addTune(req.params.pid, s);
     res.json(p);
   } catch (e) { res.status(500).json({ error: e.message }); }
+
+  function applyProjectPatch(p) {
+    if (typeof req.body.name === 'string') p.name = req.body.name.trim() || p.name;
+    if (typeof req.body.client === 'string') p.client = cleanClient(req.body.client);
+    if (req.body.gemOverrides) p.gemOverrides = { ...p.gemOverrides, ...req.body.gemOverrides };
+    if (req.body.gemBuilders) {
+      p.gemBuilders = { ...(p.gemBuilders || {}), ...req.body.gemBuilders };
+      // NB Frames / Seedance directions are derived from their structured builders
+      if (req.body.gemBuilders['nb-frames']) {
+        p.gemOverrides = p.gemOverrides || {};
+        p.gemOverrides['nb-frames'] = compileNbFramesDirection(p.gemBuilders['nb-frames']);
+      }
+      if (req.body.gemBuilders['seedance']) {
+        p.gemOverrides = p.gemOverrides || {};
+        p.gemOverrides['seedance'] = compileSeedanceDirection(p.gemBuilders['seedance']);
+      }
+    }
+    p.updatedAt = Date.now();
+  }
+});
+
+// One version of a gem's Tune, as a recipe names it ("NB Frames · Tune v3").
+app.get('/api/projects/:pid/tunes/:gemId/:v', async (req, res) => {
+  try {
+    const tune = await data.getTune(req.params.pid, `${req.params.gemId}@${Number(req.params.v) || 0}`);
+    if (!tune) return res.status(404).json({ error: 'That Tune version isn\'t kept — it was set before versions were.' });
+    res.json(tune);
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
 });
 
 app.delete('/api/projects/:pid', async (req, res) => {
@@ -741,6 +781,51 @@ app.delete('/api/projects/:pid', async (req, res) => {
     await data.deleteProject(req.params.pid);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── SCENES (see SCENES.md) ─────────────────────────────────────────────────────
+// General isn't stored anywhere: it is every chat doc without a `~` and every image without a
+// sceneId — which is why a project from before scenes opens exactly as it did.
+// body: { title, brief? } — the new scene goes at the end of the strip.
+app.post('/api/projects/:pid/scenes', async (req, res) => {
+  try {
+    const title = cleanTitle(req.body?.title);
+    if (!title) return res.status(400).json({ error: 'Give the scene a name.' });
+    const scenes = await data.getScenes(req.params.pid);
+    const now = Date.now();
+    const scene = { id: newSceneId(id()), title, brief: cleanBrief(req.body?.brief), order: nextOrder(scenes), createdAt: now, updatedAt: now };
+    res.json({ scene: await data.addScene(req.params.pid, scene) });
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
+});
+
+// body: { title?, brief?, order? } — a reorder sends only the moved scene's new order.
+app.patch('/api/projects/:pid/scenes/:sceneId', async (req, res) => {
+  try {
+    const sid = cleanSceneId(req.params.sceneId);
+    if (!sid) return res.status(400).json({ error: 'General is fixed — it can\'t be renamed or moved.' });
+    const patch = {};
+    if (req.body?.title !== undefined) {
+      patch.title = cleanTitle(req.body.title);
+      if (!patch.title) return res.status(400).json({ error: 'A scene needs a name.' });
+    }
+    if (req.body?.brief !== undefined) patch.brief = cleanBrief(req.body.brief);
+    if (req.body?.order !== undefined) {
+      patch.order = Number(req.body.order);
+      if (!Number.isFinite(patch.order)) return res.status(400).json({ error: 'Bad scene order.' });
+    }
+    const scene = await data.patchScene(req.params.pid, sid, patch);
+    if (!scene) return res.status(404).json({ error: 'Scene not found' });
+    res.json({ scene });
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
+});
+
+// Deletes the scene and its chats; its images move to General — never deleted.
+app.delete('/api/projects/:pid/scenes/:sceneId', async (req, res) => {
+  try {
+    const sid = cleanSceneId(req.params.sceneId);
+    if (!sid) return res.status(400).json({ error: 'General can\'t be deleted.' });
+    res.json({ ok: true, ...(await data.deleteScene(req.params.pid, sid)) });
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
 });
 
 // ── return effective gem prompt (default + project override) ───────────────────
@@ -1058,11 +1143,25 @@ app.delete('/api/projects/:pid/references/:refId', async (req, res) => {
 app.post('/api/projects/:pid/chat', async (req, res) => {
   if (!anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
   try {
-    const { gemId, userText, images = [], history = [], klingMode, seedanceVersion, seedanceMode, seedanceLength, seedanceAspect } = req.body;
-    const base = await readGemWithKit(gemId);
+    const { gemId, userText, images = [], history = [], klingMode, seedanceMode, seedanceLength, seedanceAspect,
+      moreLike, storyboardFrames, historyText, keepHistory } = req.body;
+    // The Video tab (chat id 'seedance') writes for the model picked at its end: Seedance 2.0 / 2.5
+    // on the Seedance gem, or Kling 3.0 on the Kling gem — with the tab's own Tune either way, and
+    // into the one chat. A request without a model is a Seedance one, on its version toggle.
+    const videoModel = gemId === 'seedance' ? cleanVideoModel(req.body.videoModel) : '';
+    const videoKling = VIDEO_MODELS[videoModel]?.family === 'kling';
+    const videoGen = VIDEO_GENS.includes(req.body.videoGen) ? req.body.videoGen : 'refs';
+    const seedanceVersion = VIDEO_MODELS[videoModel]?.version || req.body.seedanceVersion;
+    const base = await readGemWithKit(videoKling ? 'kling' : gemId);
     const p = await loadProject(req.params.pid);
+    // The scene this turn belongs to (none = General): its own chat, and its brief as context.
+    const sceneId = cleanSceneId(req.body.sceneId);
+    if (sceneId && !(p.scenes || []).some(s => s.id === sceneId)) {
+      return res.status(404).json({ error: 'This scene was deleted — pick another scene in the strip.' });
+    }
     const override = (p.gemOverrides?.[gemId] || '').trim();
     let system = override ? `${base}\n\n--- PROJECT-SPECIFIC DIRECTION (overrides/extends the above) ---\n${override}` : base;
+    system += sceneBriefBlock(p.scenes, sceneId);
 
     // Kling: the app's mode toggle forces single (Mode A) vs multi-shot (Mode B),
     // so the user doesn't have to phrase it in the prompt.
@@ -1072,14 +1171,24 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
         : '\n\n--- ACTIVE MODE: SINGLE SHOT (set by the app toggle — this OVERRIDES the user\'s wording) ---\nProduce MODE A (exactly three archetype variations of ONE single shot) for this message. Even if the user mentions multiple shots, a sequence, a storyboard, or a specific number of shots, IGNORE that and still return the three single-shot archetype variations. Never output a numbered "Shot 1 / Shot 2" sequence in this mode.';
     }
 
+    // Video tab on Kling 3.0: the brief's mode, length and aspect pinned for Kling — one paste-ready
+    // result on @image tags instead of the Kling gem's three variations.
+    if (videoKling) {
+      system += klingBriefDirection({ mode: seedanceMode, length: seedanceLength, aspect: seedanceAspect, gen: videoGen });
+    }
     // Seedance: the app's version toggle pins which platform budget/grammar to write for.
-    if (gemId === 'seedance') {
+    else if (gemId === 'seedance') {
       system += seedanceVersion === '2.0'
         ? '\n\n--- ACTIVE VERSION: SEEDANCE 2.0 (set by the app toggle — this OVERRIDES the user\'s wording) ---\nWrite for Seedance 2.0: max 15s per clip; at most 12 reference files (9 images, 3 videos ≤15s combined, 3 audio ≤15s combined); NO bracket audio grammar — direct sound in prose plus a trailing "SFX only:" list; no staged [Stage N] structure (a 2.0 clip is one continuous choreography). State "Seedance 2.0" in the settings line.'
         : '\n\n--- ACTIVE VERSION: SEEDANCE 2.5 (set by the app toggle — this OVERRIDES the user\'s wording) ---\nWrite for Seedance 2.5: up to 30s per clip; up to 50 reference files (30 images, 10 videos ≤30s combined, 10 audio ≤30s combined); the bracket audio grammar applies — ( ) music, < > SFX, { } dialogue, 【 】 subtitles; use the staged [Generation Goal]/[Stage N]/[Maintain Consistency] structure for clips over 15s or with 3+ distinct beats. State "Seedance 2.5" in the settings line.';
       // The tab's brief mode, length slider and aspect pick, pinned the same way.
-      system += seedanceBriefDirection({ mode: seedanceMode, length: seedanceLength, aspect: seedanceAspect, version: seedanceVersion });
+      system += seedanceBriefDirection({ mode: seedanceMode, length: seedanceLength, aspect: seedanceAspect, version: seedanceVersion, gen: videoGen });
     }
+    // Storyboard: a whole script in, exactly N titled frames out.
+    const scriptMode = gemId === 'storyboard' ? storyboardScriptDirection(storyboardFrames) : '';
+    system += scriptMode;
+    // "More like this" on any prompt card: fresh directions built on the one the user liked.
+    if (moreLike === true) system += `\n\n${MORE_LIKE_THIS}`;
 
     // Last in the system prompt so it wins over any gem's own wording — English replies
     // always, with the user's quoted dialogue preserved verbatim.
@@ -1088,18 +1197,23 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
     // Build the Anthropic message array from prior history + the new user turn.
     // If this turn includes image(s), treat it as a fresh brief and IGNORE prior history —
     // an earlier scene/reference must never bleed into prompts for a newly attached image.
+    // The one exception is keepHistory: NB Frames' reference board resends the same references
+    // with every message, and while the board hasn't changed the conversation about them goes on.
     // Blank turns are dropped: a truncated reply used to be persisted as empty content, and the
     // API rejects an empty content block — so one bad reply would 400 every text-only follow-up
     // on that tab until the chat was cleared.
-    const messages = (images.length > 0 ? [] : history)
+    const keptHistory = images.length > 0 && keepHistory === true && history.length > 0;
+    const messages = (images.length > 0 && !keptHistory ? [] : history)
       .filter(m => String(m.content || '').trim())
       .map(m => ({ role: m.role, content: m.content }));
     const userContent = [];
     // Label each attached image ("Image 1:", "Image 2:", …) so the gem knows which one the
     // user means by "image 1" / "image 2" — essential for swaps/composites where direction
-    // matters — instead of leaving it to infer from order.
+    // matters — instead of leaving it to infer from order. A board image's label also names its
+    // role ("Image 2 — LOCATION reference …:").
     images.forEach((img, i) => {
-      if (images.length > 1) userContent.push({ type: 'text', text: `Image ${i + 1}:` });
+      const caption = refCaption(i, images.length, img.label);
+      if (caption) userContent.push({ type: 'text', text: caption });
       userContent.push({
         type: 'image',
         source: { type: 'base64', media_type: sniffImageMime(img.data, img.mimeType), data: img.data },
@@ -1118,7 +1232,9 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
 
     const callArgs = {
       // Images attached → the stronger vision model (see VISION_MODEL); text-only stays on the default.
-      model: images.length > 0 ? VISION_MODEL : CLAUDE_MODEL,
+      // A script storyboard is text, but reading a whole script into its key beats is the kind of
+      // judgment call the stronger model is for — and it's one call per board.
+      model: images.length > 0 || scriptMode ? VISION_MODEL : CLAUDE_MODEL,
       // NB Frames returns 3 prompts × 4 dense DOP-grade paragraphs; 2048 truncated the
       // later prompts down to fewer paragraphs. On Sonnet 5 adaptive thinking is on by
       // default and thinking + visible text SHARE this cap — at 4096, a hard multi-image
@@ -1155,16 +1271,20 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
     if (!text.trim()) throw new Error(`The gem returned an empty reply (stop reason: ${resp.stop_reason || 'unknown'}). Please send the message again.`);
     // Restore any Hebrew dialogue the model re-typed in reversed character order.
     text = fixReversedHebrew(text, userText || '');
+    // Video prompts are pasted straight into OpenArt / Higgsfield — every @tag must end on a space.
+    if (gemId === 'seedance') text = spaceAfterTags(text);
     // Kling multi-shot: guarantee every shot fits OpenArt's 512-char field (the gem aims for it,
     // this enforces it) — trim any over-length shot at a clean boundary, mandatory suffix intact.
+    // On the Video tab that's a Kling 3.0 reply with two or more shots (capped after the tag
+    // spacing above, which can lengthen a shot).
     if (gemId === 'kling' && klingMode === 'multi') text = capKlingShots(text);
-    // Seedance prompts are pasted straight into OpenArt — every @tag must end on a space.
-    if (gemId === 'seedance') text = spaceAfterTags(text);
+    if (videoKling && /(^|\n)\W*Shot\s*2\b/i.test(text)) text = capKlingShots(text);
 
-    // persist any attached images to disk so they survive reloads
+    // persist any attached images to disk so they survive reloads — each with its board role, if
+    // it has one, so "Send to Nano Banana" labels it the same way
     const savedImgs = [];
     for (const img of images) {
-      savedImgs.push(await storage.saveUpload(p.id, img.data, img.mimeType));
+      savedImgs.push({ ...(await storage.saveUpload(p.id, img.data, img.mimeType)), ...refMeta(img) });
     }
     // Keep every attached image as a reusable reference so the same file never has to be
     // hunted down and re-uploaded. Deduped on the bytes, so re-attaching one you already
@@ -1173,9 +1293,15 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
 
     // Append via a targeted chat-doc write (reads only THIS gem's chat doc, not the whole
     // project) — the old updateProject re-read every image doc twice per message.
-    await data.appendChat(req.params.pid, gemId, [
-      { role: 'user', content: userText || '(image)', hadImages: images.length > 0, images: savedImgs, at: Date.now() },
-      { role: 'assistant', content: text, at: Date.now() },
+    // historyText, when sent, is what the chat keeps instead of the full turn: a whole script, or
+    // a "more like this" instruction wrapped around a prompt that's already in the chat. One chat
+    // doc holds every message of the tab, so a full script per turn would crowd its size limit.
+    const savedText = typeof historyText === 'string' && historyText.trim() ? historyText.trim().slice(0, 2000) : (userText || '(image)');
+    // The reply remembers which version of the project's Tune wrote it (part of its recipe).
+    const tune = tuneRef(p, gemId);
+    await data.appendChat(req.params.pid, chatKey(gemId, sceneId), [
+      { role: 'user', content: savedText, hadImages: images.length > 0, images: savedImgs, ...(keptHistory ? { keptHistory: true } : {}), at: Date.now() },
+      { role: 'assistant', content: text, at: Date.now(), ...(tune && (tune.v || tune.pre) ? { tune } : {}), ...(videoModel ? { videoModel } : {}) },
     ]);
 
     res.json({ text, images: savedImgs });
@@ -1187,88 +1313,205 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
 app.post('/api/projects/:pid/chat/clear', async (req, res) => {
   try {
     const { gemId } = req.body;
+    const key = chatKey(gemId, req.body.sceneId);   // only this scene's chat with the gem
     await updateProject(req.params.pid, (p) => {
-      if (gemId && p.chats[gemId]) p.chats[gemId] = [];
+      if (gemId && p.chats[key]) p.chats[key] = [];
       p.updatedAt = Date.now();
     });
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── "Try it here" — an Advisor & Tweaks prompt, run inside its own chat ─────────────────────
+// The options stay on the reply they came from, not in the Library, until one is kept — so a run
+// of tries doesn't fill the Library with near-copies, and a different one can still be kept later.
+// The turn's attached image(s) — its source — go along as the references, image 1 first; Nano
+// Banana keeps the source's shape. Every option keeps its recipe.
+// body: { gemId: 'nb-advisor' | 'gpt-advisor', sceneId?, index, head, prompt, count, model?: 'nb2' | 'pro' }
+const ADVISORS = ['nb-advisor', 'gpt-advisor'];
+const NB_ARS = Object.keys(AR_WORDS);
+function nearestNbAR(w, h) {
+  let best = '1:1', d = Infinity;
+  for (const a of NB_ARS) { const [x, y] = a.split(':').map(Number); const dd = Math.abs(Math.log((w / h) / (x / y))); if (dd < d) { d = dd; best = a; } }
+  return best;
+}
+app.post('/api/projects/:pid/chat/try', async (req, res) => {
+  try {
+    const { gemId } = req.body;
+    const prompt = String(req.body.prompt || '').trim();
+    if (!ADVISORS.includes(gemId)) return res.status(400).json({ error: 'Try it here works in Advisor & Tweaks.' });
+    if (!prompt) return res.status(400).json({ error: 'There\'s no prompt to try.' });
+    const gpt = gemId === 'gpt-advisor';
+    if (gpt ? !OPENAI_API_KEY : !genai) return res.status(400).json({ error: gpt ? 'OPENAI_API_KEY is not set — GPT Image can\'t run here.' : 'GEMINI_API_KEY is not set. Add it to your .env file.' });
+    const pid = req.params.pid;
+    const key = chatKey(gemId, req.body.sceneId);
+    const n = Math.min(Math.max(parseInt(req.body.count, 10) || 1, 1), TRY_MAX);
+    const p = await data.getProjectLight(pid);   // the chats and the Tune — not the image library
+    const msgs = p.chats?.[key] || [];
+    const index = findReply(msgs, Number(req.body.index), req.body.head);
+    if (index < 0) return res.status(404).json({ error: 'That reply isn\'t in this chat any more.' });
+    let turn = null;
+    for (let i = index - 1; i >= 0 && !turn; i--) if (msgs[i].role === 'user') turn = msgs[i];
+    const sources = (turn?.images || []).slice(0, 8);
+    const refs = [];
+    for (const s of sources) refs.push({ mimeType: s.mimeType || 'image/jpeg', data: (await readStoredImage(pid, 'uploads', s.file)).toString('base64'), label: s.label });
+    if (gpt && !refs.length) return res.status(400).json({ error: 'GPT Image edits an image — this turn has none attached.' });
+    const dim = refs[0] ? imageSize(Buffer.from(refs[0].data, 'base64')) : null;
+    const aspectRatio = !gpt && dim ? nearestNbAR(dim.w, dim.h) : null;
+    const model = gpt ? 'gpt-image-2' : (NB_MODELS[req.body.model] || NB2_MODEL);
+    let outputs = [], errors = [];
+    if (gpt) {
+      const settled = await Promise.allSettled(Array.from({ length: n }, () => gptImageEdit(refs, prompt)));
+      for (const s of settled) {
+        if (s.status === 'fulfilled') outputs.push({ data: s.value.buf.toString('base64'), mimeType: s.value.mime });
+        else errors.push(s.reason?.message || String(s.reason));
+      }
+    } else {
+      ({ outputs, errors } = await runNanoBanana({ model, contents: nbContents(refs, prompt, aspectRatio), aspectRatio, n }));
+    }
+    if (!outputs.length) return res.status(502).json({ error: `Nothing came back — ${[...new Set(errors)].join(' · ') || 'no image'}` });
+    const tune = tuneRef(p, gemId);
+    const made = [];
+    for (const out of outputs) {
+      const cid = id();
+      const { file } = await storage.saveImage(pid, cid, Buffer.from(out.data, 'base64'), out.mimeType);
+      made.push({
+        id: cid, file, prompt, model, size: gpt ? (dim ? `${dim.w}x${dim.h}` : null) : NB2_IMAGE_SIZE, aspectRatio, createdAt: Date.now(),
+        refs: sources.map(s => ({ file: s.file, mimeType: s.mimeType, ...(s.label ? { label: s.label } : {}) })),
+        ...(tune && (tune.v || tune.pre) ? { tune } : {}),
+      });
+    }
+    const stored = await data.updateChatMessage(pid, key, (list) => findReply(list, index, req.body.head), (m) => { m.candidates = [...(m.candidates || []), ...made]; return true; });
+    if (!stored) return res.status(409).json({ error: 'The chat changed while these were being made — try again.' });
+    res.json({ candidates: made.map(c => ({ ...c, url: `/media/${pid}/images/${c.file}` })), errors, index });
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
+});
+
+// Keep one option: it becomes a Library image — in the chat's scene, with its recipe — the only one
+// of the tries that does. Keeping it twice changes nothing; again: true re-adds one whose Library
+// image was deleted. body: { gemId, sceneId?, index, head, candidateId, again? }
+app.post('/api/projects/:pid/chat/keep', async (req, res) => {
+  try {
+    const { gemId, candidateId } = req.body;
+    if (!ADVISORS.includes(gemId)) return res.status(400).json({ error: 'Keep works in Advisor & Tweaks.' });
+    const pid = req.params.pid;
+    const sceneId = cleanSceneId(req.body.sceneId);
+    const key = chatKey(gemId, sceneId);
+    let index = -1, already = false;
+    const c = await data.updateChatMessage(pid, key, (list) => (index = findReply(list, Number(req.body.index), req.body.head)), (m) => {
+      const cand = (m.candidates || []).find(x => x.id === candidateId);
+      if (!cand) return null;
+      if (cand.savedImageId && req.body.again !== true) already = true;
+      else { cand.savedImageId = cand.id; cand.savedAt = Date.now(); }
+      return { ...cand };
+    });
+    if (!c) return res.status(404).json({ error: 'That option isn\'t on this reply any more.' });
+    const rec = {
+      id: c.id, prompt: c.prompt, file: c.file, createdAt: Date.now(), favorite: false, note: '', ...(sceneId ? { sceneId } : {}),
+      aspectRatio: c.aspectRatio || null, size: c.size || null, model: c.model,
+      refs: (c.refs || []).map(r => ({ ...r, url: `/media/${pid}/uploads/${r.file}` })),
+      recipe: { tool: 'try', from: { gem: gemId, chat: key, index }, ...(c.tune ? { tune: c.tune } : { tune: { gem: gemId, v: 0 } }), triedAt: c.createdAt },
+    };
+    if (!already) {
+      try { await data.addImage(pid, rec); }
+      catch (e) {   // take the mark back off, so it can be kept again
+        await data.updateChatMessage(pid, key, (list) => findReply(list, index, req.body.head), (m) => { const x = (m.candidates || []).find(y => y.id === candidateId); if (x) { delete x.savedImageId; delete x.savedAt; } return true; }).catch(() => {});
+        throw e;
+      }
+    }
+    res.json({ image: { ...rec, url: `/media/${pid}/images/${c.file}` }, already });
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
+});
+
+// ── NANO BANANA — the call itself, shared by the generator and "Try it here" ─────────────────
+// Label each reference explicitly ("Image 1:", "Image 2:", …) so Nano Banana knows which is which —
+// critical for edits/swaps where the prompt says "the face from image 2" and the direction matters
+// (otherwise it has to guess the order). A reference with a role (NB Frames' board) also says what
+// it's for ("Image 1 — COMPOSITION reference …:") — even a lone one, or a composition reference
+// would be taken for the image to edit. refs: [{ mimeType, data, label? }]
+function nbContents(refs, prompt, aspectRatio) {
+  const contents = [];
+  refs.forEach((r, i) => {
+    const caption = refCaption(i, refs.length, r.label);
+    if (caption) contents.push({ text: caption });
+    contents.push({ inlineData: { mimeType: sniffImageMime(r.data, r.mimeType), data: r.data } });
+  });
+  // Reinforce the target aspect ratio in the prompt text. With a reference image the model
+  // otherwise tends to copy the reference's shape and ignore the requested ratio.
+  let promptText = prompt;
+  if (aspectRatio) {
+    promptText += `\n\nFrame the final image as a ${AR_WORDS[aspectRatio] || aspectRatio} (${aspectRatio}) composition.`;
+    if (refs.length) promptText += ` Recompose to fill the full ${aspectRatio} frame; do not keep the reference image's aspect ratio.`;
+  }
+  contents.push({ text: promptText });
+  return contents;
+}
+// Fire n independent generations so each is a distinct variation. Returns the images that came
+// back ({ data, mimeType }) and, for the ones that didn't, why.
+async function runNanoBanana({ model, contents, aspectRatio, n }) {
+  const imageConfig = { imageSize: NB2_IMAGE_SIZE };
+  if (aspectRatio) imageConfig.aspectRatio = aspectRatio;
+  const settled = await Promise.allSettled(Array.from({ length: n }, () =>
+    genai.models.generateContent({ model, contents, config: { responseModalities: ['IMAGE'], imageConfig } })));
+  const outputs = [], errors = [];
+  for (const s of settled) {
+    if (s.status !== 'fulfilled') { errors.push(s.reason?.message || String(s.reason)); continue; }
+    const cand = s.value?.candidates?.[0];
+    const parts = cand?.content?.parts || [];
+    const imgPart = parts.find(pt => pt.inlineData);
+    if (!imgPart) {
+      // Surface WHY no image came back — most often Gemini's safety filter blocked it
+      // (e.g. depictions of children), which otherwise reads as a generic failure.
+      const block = s.value?.promptFeedback?.blockReason;
+      const finish = cand?.finishReason;
+      const textPart = parts.find(pt => pt.text)?.text;
+      errors.push(
+        block ? `blocked by Gemini safety filter (${block})`
+        : (finish && !['STOP', 'MAX_TOKENS'].includes(finish)) ? `no image (finishReason: ${finish}${/SAFETY|PROHIBIT|RECITATION|IMAGE|BLOCK/i.test(finish) ? ' — content-policy block' : ''})`
+        : textPart ? `model returned text instead of an image: "${textPart.slice(0, 160)}"`
+        : 'no image returned (empty response)'
+      );
+      continue;
+    }
+    outputs.push({ data: imgPart.inlineData.data, mimeType: imgPart.inlineData.mimeType });
+  }
+  return { outputs, errors };
+}
+
 // ── NANO BANANA 2 — generate N images from one prompt ──────────────────────────
-// body: { prompt, count=3, aspectRatio?, refImages?: [{mimeType, data}] }
+// body: { prompt, count=3, aspectRatio?, refImages?: [{mimeType, data, label?}], model?, title?, sceneId?,
+//         from?: { gem, chat, index } — the gem chat the prompt was sent from, for the recipe }
 app.post('/api/projects/:pid/generate', async (req, res) => {
   if (!genai) return res.status(400).json({ error: 'GEMINI_API_KEY is not set. Add it to your .env file.' });
   try {
     const { prompt, count = 1, aspectRatio, refImages = [] } = req.body;
+    const title = String(req.body.title || '').trim().slice(0, 120);   // e.g. a storyboard frame's title
+    const sceneId = cleanSceneId(req.body.sceneId);                     // the scene it's made in (none = General)
     if (!prompt || !prompt.trim()) return res.status(400).json({ error: 'Prompt is empty.' });
     // Resolve the model from the UI toggle (allowlisted); fall back to the .env default.
     const model = NB_MODELS[req.body.model] || NB2_MODEL;
     const p = { id: req.params.pid };   // just the id — never read the whole project (all images) to generate
 
-    const contents = [];
     const savedRefs = [];
-    // Label each reference explicitly ("Image 1:", "Image 2:", …) so Nano Banana knows which
-    // is which — critical for edits/swaps where the prompt says "the face from image 2" and
-    // the direction matters (otherwise it has to guess the order).
-    for (let i = 0; i < refImages.length; i++) {
-      const r = refImages[i];
-      if (refImages.length > 1) contents.push({ text: `Image ${i + 1}:` });
-      contents.push({ inlineData: { mimeType: sniffImageMime(r.data, r.mimeType), data: r.data } });
-      savedRefs.push(await storage.saveUpload(p.id, r.data, r.mimeType));
-    }
-    // Reinforce the target aspect ratio in the prompt text. With a reference image the model
-    // otherwise tends to copy the reference's shape and ignore the requested ratio.
-    let promptText = prompt;
-    if (aspectRatio) {
-      promptText += `\n\nFrame the final image as a ${AR_WORDS[aspectRatio] || aspectRatio} (${aspectRatio}) composition.`;
-      if (refImages.length) promptText += ` Recompose to fill the full ${aspectRatio} frame; do not keep the reference image's aspect ratio.`;
-    }
-    contents.push({ text: promptText });
-
-    const imageConfig = { imageSize: NB2_IMAGE_SIZE };
-    if (aspectRatio) imageConfig.aspectRatio = aspectRatio;
-
-    // Fire N independent generations so each is a distinct variation.
+    for (const r of refImages) savedRefs.push({ ...(await storage.saveUpload(p.id, r.data, r.mimeType)), ...refMeta(r) });
     const n = Math.min(Math.max(parseInt(count, 10) || 1, 1), 4);
-    const jobs = Array.from({ length: n }, () =>
-      genai.models.generateContent({
-        model,
-        contents,
-        config: { responseModalities: ['IMAGE'], imageConfig },
-      })
-    );
+    // The recipe: the gem the prompt came from and the version of the project's Tune for it then
+    // (one read of the project's meta doc — only when there is such a gem).
+    const from = cleanFrom(req.body.from);
+    const meta = from?.gem ? await data.getMeta(p.id).catch(() => null) : null;
+    const recipe = { tool: 'generate', count: n, ...(from ? { from } : {}), ...(from?.gem ? { tune: tuneRef(meta, from.gem) } : {}) };
 
-    const settled = await Promise.allSettled(jobs);
+    const { outputs, errors } = await runNanoBanana({ model, contents: nbContents(refImages, prompt, aspectRatio), aspectRatio, n });
     const saved = [];
     const recs = [];
-    const errors = [];
-    for (const s of settled) {
-      if (s.status !== 'fulfilled') { errors.push(s.reason?.message || String(s.reason)); continue; }
-      const cand = s.value?.candidates?.[0];
-      const parts = cand?.content?.parts || [];
-      const imgPart = parts.find(pt => pt.inlineData);
-      if (!imgPart) {
-        // Surface WHY no image came back — most often Gemini's safety filter blocked it
-        // (e.g. depictions of children), which otherwise reads as a generic failure.
-        const block = s.value?.promptFeedback?.blockReason;
-        const finish = cand?.finishReason;
-        const textPart = parts.find(pt => pt.text)?.text;
-        errors.push(
-          block ? `blocked by Gemini safety filter (${block})`
-          : (finish && !['STOP', 'MAX_TOKENS'].includes(finish)) ? `no image (finishReason: ${finish}${/SAFETY|PROHIBIT|RECITATION|IMAGE|BLOCK/i.test(finish) ? ' — content-policy block' : ''})`
-          : textPart ? `model returned text instead of an image: "${textPart.slice(0, 160)}"`
-          : 'no image returned (empty response)'
-        );
-        continue;
-      }
+    for (const out of outputs) {
       const imgId = id();
-      const buf = Buffer.from(imgPart.inlineData.data, 'base64');
-      const { file: fname } = await storage.saveImage(p.id, imgId, buf, imgPart.inlineData.mimeType);
+      const { file: fname } = await storage.saveImage(p.id, imgId, Buffer.from(out.data, 'base64'), out.mimeType);
       const rec = {
-        id: imgId, prompt, file: fname, createdAt: Date.now(), favorite: false, note: '',
+        id: imgId, prompt, file: fname, createdAt: Date.now(), favorite: false, note: '', ...(title ? { title } : {}), ...(sceneId ? { sceneId } : {}),
         aspectRatio: aspectRatio || null, size: NB2_IMAGE_SIZE, model,
         refs: savedRefs.map(r => ({ ...r, url: `/media/${p.id}/uploads/${r.file}` })),
+        recipe,
       };
       recs.push(rec);
       saved.push({ ...rec, url: `/media/${p.id}/images/${fname}` });
@@ -1296,6 +1539,7 @@ app.post('/api/projects/:pid/images/upload', async (req, res) => {
     const { images = [], note = '' } = req.body;
     if (!images.length) return res.status(400).json({ error: 'No image to upload.' });
     const pid = req.params.pid;
+    const sceneId = cleanSceneId(req.body.sceneId);   // lands in the scene it was uploaded in
     const saved = [];
     for (const im of images) {
       if (!im?.data) continue;
@@ -1304,7 +1548,7 @@ app.post('/api/projects/:pid/images/upload', async (req, res) => {
       const dim = imageSize(buf);
       const imgId = id();
       const { file: fname } = await storage.saveImage(pid, imgId, buf, mime);
-      const rec = { id: imgId, prompt: note || 'Uploaded image', file: fname, createdAt: Date.now(), favorite: false, note: note || '', model: 'upload', size: dim ? `${dim.w}x${dim.h}` : null, refs: [] };
+      const rec = { id: imgId, prompt: note || 'Uploaded image', file: fname, createdAt: Date.now(), favorite: false, note: note || '', model: 'upload', size: dim ? `${dim.w}x${dim.h}` : null, refs: [], ...(sceneId ? { sceneId } : {}) };
       await data.addImage(pid, rec);
       saved.push({ ...rec, url: `/media/${pid}/images/${fname}` });
     }
@@ -1321,12 +1565,35 @@ app.post('/api/projects/:pid/images/upload', async (req, res) => {
 // own prompt always leads; the server wraps it with a preservation "enhancement".
 // A/B (ab=true, GPT Image + swap): runs TWO enhancement strategies on the same prompt+images and
 // returns both, so we can compare which wrapper produces better swaps.
+// GPT Image 2 edit (ChatGPT Images 2.0): the instruction applied to the images, image 1 first.
+// Returns { buf, mime }; throws with OpenAI's own message when it fails.
+async function gptImageEdit(images, instruction) {
+  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not set. Add it to use GPT Image.');
+  const form = new FormData();
+  form.append('model', 'gpt-image-2');          // ChatGPT Images 2.0 — the model the web uses
+  form.append('prompt', instruction);
+  form.append('quality', 'high');
+  form.append('size', 'auto');                  // gpt-image-2 natively matches the input's aspect
+  images.forEach((im, i) => form.append('image[]', new Blob([Buffer.from(im.data, 'base64')], { type: sniffImageMime(im.data, im.mimeType) }), `image${i}.png`));
+  const r = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}` }, body: form });
+  const out = await r.json().catch(() => ({}));
+  const b64 = out?.data?.[0]?.b64_json;
+  if (!r.ok || !b64) throw new Error(`GPT Image failed: ${out?.error?.message || JSON.stringify(out).slice(0, 200)}`);
+  return { buf: Buffer.from(b64, 'base64'), mime: 'image/png' };
+}
+
 // body: { prompt?, images:[{mimeType,data}], model?: 'gptimage'|'flux', ab?: bool }
 app.post('/api/projects/:pid/swap', async (req, res) => {
   try {
     const { prompt, images = [], model = 'gptimage', ab = false } = req.body;
     if (!images.length) return res.status(400).json({ error: 'Attach at least image 1 (the base to edit).' });
     const pid = req.params.pid;
+    const sceneId = cleanSceneId(req.body.sceneId);   // results land in the scene it ran in
+    // The inputs are kept with every result (its recipe): re-use puts them straight back in the slots.
+    const savedInputs = [];
+    for (const [i, im] of images.entries()) {
+      savedInputs.push({ ...(await storage.saveUpload(pid, im.data, im.mimeType)), label: i === 0 ? 'Image 1 — the base, kept' : 'Image 2 — the new character' });
+    }
     const isSwap = images.length >= 2;
     const up = (prompt || '').trim();               // the user's own prompt — always the core
     if (!up && !isSwap) return res.status(400).json({ error: 'For a single-image adjustment, describe the change you want in the prompt.' });
@@ -1344,20 +1611,7 @@ app.post('/api/projects/:pid/swap', async (req, res) => {
     const dim = imageSize(Buffer.from(images[0].data, 'base64'));
 
     // Engine calls return { buf, mime } and throw on failure (caught below).
-    const runGpt = async (instruction) => {
-      if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not set. Add it to use GPT Image.');
-      const form = new FormData();
-      form.append('model', 'gpt-image-2');          // ChatGPT Images 2.0 — the model the web uses
-      form.append('prompt', instruction);
-      form.append('quality', 'high');
-      form.append('size', 'auto');                  // gpt-image-2 natively matches the input's aspect
-      images.forEach((im, i) => form.append('image[]', new Blob([Buffer.from(im.data, 'base64')], { type: sniffImageMime(im.data, im.mimeType) }), `image${i}.png`));
-      const r = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}` }, body: form });
-      const out = await r.json().catch(() => ({}));
-      const b64 = out?.data?.[0]?.b64_json;
-      if (!r.ok || !b64) throw new Error(`GPT Image failed: ${out?.error?.message || JSON.stringify(out).slice(0, 200)}`);
-      return { buf: Buffer.from(b64, 'base64'), mime: 'image/png' };
-    };
+    const runGpt = (instruction) => gptImageEdit(images, instruction);
     const runFlux = async (instruction) => {
       if (!FAL_KEY) throw new Error('FAL_KEY is not set. Add your fal.ai API key to enable Flux Kontext.');
       const image_urls = images.map(im => `data:${sniffImageMime(im.data, im.mimeType)};base64,${im.data}`);
@@ -1384,10 +1638,13 @@ app.post('/api/projects/:pid/swap', async (req, res) => {
       } catch { /* keep the engine's own output if the resize fails */ }
       return { buf, mime };
     };
-    const saveResult = async ({ buf, mime }, instruction, usedModel, note) => {
+    const saveResult = async ({ buf, mime }, instruction, usedModel, note, variant) => {
       const imgId = id();
       const { file: fname } = await storage.saveImage(pid, imgId, buf, mime);
-      const rec = { id: imgId, prompt: instruction, file: fname, createdAt: Date.now(), favorite: false, note: note || '', model: usedModel, size: null, refs: [] };
+      const rec = { id: imgId, prompt: instruction, file: fname, createdAt: Date.now(), favorite: false, note: note || '', model: usedModel, size: dim ? `${dim.w}x${dim.h}` : null,
+        refs: savedInputs.map(r => ({ ...r, url: `/media/${pid}/uploads/${r.file}` })), ...(sceneId ? { sceneId } : {}),
+        // the recipe: what was typed (the stored prompt is the wrapped instruction) and the engine settings
+        recipe: { tool: 'swap', userPrompt: up, engine: model, ...(ab ? { ab: true } : {}), ...(variant ? { variant } : {}) } };
       await data.addImage(pid, rec);
       return { ...rec, url: `/media/${pid}/images/${fname}` };
     };
@@ -1395,8 +1652,8 @@ app.post('/api/projects/:pid/swap', async (req, res) => {
     // A/B — two GPT Image enhancement strategies on the same prompt + images (swap only).
     if (model === 'gptimage' && ab && isSwap) {
       const [ra, rb] = await Promise.all([runGpt(ENH.gptA).then(fitExact), runGpt(ENH.gptB).then(fitExact)]);
-      const a = await saveResult(ra, ENH.gptA, 'gpt-image-2', 'A/B · A (concise)');
-      const b = await saveResult(rb, ENH.gptB, 'gpt-image-2', 'A/B · B (explicit)');
+      const a = await saveResult(ra, ENH.gptA, 'gpt-image-2', 'A/B · A (concise)', 'A');
+      const b = await saveResult(rb, ENH.gptB, 'gpt-image-2', 'A/B · B (explicit)', 'B');
       return res.json({ images: [{ ...a, variant: 'A' }, { ...b, variant: 'B' }], ab: true });
     }
 
@@ -1425,23 +1682,28 @@ app.post('/api/projects/:pid/swap', async (req, res) => {
 // frame must stay pixel-exact; re-generating it would drift the grade. Stored in the
 // `characters` collection (kept for back-compat) — never mixed into Library / NB outputs.
 // body: { name, notes?, images:[…], wardrobeImages?:[…], type?, tag? }
-const ASSET_TYPES = ['character', 'mascot', 'vehicle', 'product', 'prop', 'location', 'look'];
-const tagSlug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32);
+// 'frame' is a finished still kept in the project's Assets folder (an approved shot, a keyframe) —
+// always stored as-is, never generated.
+const ASSET_TYPES = ['character', 'mascot', 'vehicle', 'product', 'prop', 'location', 'look', 'frame'];
+// Letters in any script count, so a Hebrew-named asset gets a Hebrew @tag, not the 'asset' fallback.
+const tagSlug = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '').slice(0, 32);
 app.post('/api/projects/:pid/characters', async (req, res) => {
-  if (!anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
-  if (!genai) return res.status(400).json({ error: 'GEMINI_API_KEY is not set. Add it to your .env file.' });
   try {
     const { name, notes = '', images = [], wardrobeImages = [], type = 'character', tag = '', asIs = false } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'Give the asset a name.' });
     if (!ASSET_TYPES.includes(type)) return res.status(400).json({ error: `Unknown asset type: ${type}` });
-    if (asIs && !images.length) return res.status(400).json({ error: 'Attach the image to store as the reference.' });
+    if ((asIs || type === 'frame') && !images.length) return res.status(400).json({ error: 'Attach the image to store as the reference.' });
     if (type === 'character' && !asIs && !images.length) return res.status(400).json({ error: 'Attach at least one clear photo of the person.' });
+    // Keys are only needed to build a sheet; storing an image as-is uses neither model.
+    const keepAsIs = (asIs || type === 'look' || type === 'frame') && images.length > 0;
+    if (!keepAsIs && !anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
+    if (!keepAsIs && !genai) return res.status(400).json({ error: 'GEMINI_API_KEY is not set. Add it to your .env file.' });
     const assetTag = tagSlug(tag) || tagSlug(name) || 'asset';
     const p = await loadProject(req.params.pid);
 
-    // As-is storage (any type, opt-in) and LOOK-with-image (always): the uploaded image
+    // As-is storage (any type, opt-in) and LOOK- or FRAME-with-image (always): the uploaded image
     // itself becomes the reference, pixel-untouched — no builder gem, no generation, no cost.
-    if ((asIs || type === 'look') && images.length) {
+    if (keepAsIs) {
       const charId = id(), refId = id();
       const mime = sniffImageMime(images[0].data, images[0].mimeType);
       const { file: refFile } = await storage.saveImage(p.id, refId, Buffer.from(images[0].data, 'base64'), mime);
@@ -1570,6 +1832,28 @@ app.delete('/api/projects/:pid/characters/:charId', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
 });
 
+// Edit an asset in the Assets folder: its name, @tag, type or notes. The image stays as it is.
+app.patch('/api/projects/:pid/characters/:charId', async (req, res) => {
+  try {
+    const { name, tag, type, notes } = req.body || {};
+    if (type !== undefined && !ASSET_TYPES.includes(type)) return res.status(400).json({ error: `Unknown asset type: ${type}` });
+    if (name !== undefined && !String(name).trim()) return res.status(400).json({ error: 'An asset needs a name.' });
+    let found = null;
+    await updateProject(req.params.pid, (proj) => {
+      const c = (proj.characters || []).find(x => x.id === req.params.charId);
+      if (!c) return;
+      if (typeof name === 'string') c.name = name.trim();
+      if (typeof tag === 'string') c.tag = tagSlug(tag) || tagSlug(c.name) || c.tag;
+      if (typeof type === 'string') c.type = type;
+      if (typeof notes === 'string') c.notes = notes.trim();
+      proj.updatedAt = Date.now();
+      found = c;
+    });
+    if (!found) return res.status(404).json({ error: 'Asset not found' });
+    res.json({ character: found });
+  } catch (e) { res.status(500).json({ error: e?.message || String(e) }); }
+});
+
 // ── image library management ───────────────────────────────────────────────────
 app.get('/api/projects/:pid/images', async (req, res) => {
   try {
@@ -1581,15 +1865,24 @@ app.get('/api/projects/:pid/images', async (req, res) => {
 
 app.patch('/api/projects/:pid/images/:imgId', async (req, res) => {
   try {
-    let result = null;
+    let result = null, noScene = false;
     await updateProject(req.params.pid, (p) => {
       const im = p.images.find(x => x.id === req.params.imgId);
       if (!im) return;
-      if (typeof req.body.favorite === 'boolean') im.favorite = req.body.favorite;
+      // Move it to another scene ('' or 'general' = back to General). Checked before anything changes.
+      if (typeof req.body.sceneId === 'string') {
+        const sid = cleanSceneId(req.body.sceneId);
+        if (sid && !(p.scenes || []).some(s => s.id === sid)) { noScene = true; return; }
+        if (sid) im.sceneId = sid; else delete im.sceneId;
+      }
+      if (typeof req.body.favorite === 'boolean') im.favorite = req.body.favorite;   // "Like" in the app
+      if (typeof req.body.approved === 'boolean') im.approved = req.body.approved;   // signed off by the client
       if (typeof req.body.note === 'string') im.note = req.body.note;
+      if (typeof req.body.title === 'string') im.title = req.body.title.trim().slice(0, 120);
       p.updatedAt = Date.now();
       result = { ...im, url: `/media/${req.params.pid}/images/${im.file}` };
     });
+    if (noScene) return res.status(404).json({ error: 'That scene no longer exists.' });
     if (!result) return res.status(404).json({ error: 'Image not found' });
     res.json(result);
   } catch (e) { res.status(500).json({ error: e.message }); }

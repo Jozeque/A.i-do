@@ -103,14 +103,22 @@ rest of the video; she never moves from it"), and give reflective surfaces expli
 
 - **Assets tab** builds the reference sheets (NB Pro 2K): characters, vehicles, products, props,
   location plates, look frames — each with an `@tag` name.
-- **Seedance tab** (Claude gem → paste into OpenArt) writes the full three-block prompt —
-  REFERENCE DEFINITIONS / TECHNICAL / PROMPT — with `@imageN` tags matching a stated upload order.
-  It builds the brief in two steps (`public/seedance.js`): ① images sorted into Look → Location(s)
-  → Characters (one block each) → Props, which is also the upload order and gives every file its
-  role; ② the brief as **Director / DOP** (numbered shots with size, lens, move and a length
-  slider each — the gem keeps them exactly and times each shot) or **Creative** (a description
-  the gem cuts into shots itself), with the film length on a slider. Mode, length and aspect are
-  pinned in the system prompt (`server/seedance.js`), the same way the version toggle is.
+- **Video tab** ("Video prompt" in the 🎬 Videos group; its chat id stays `seedance`) builds one
+  brief and writes it for the model picked at its end — **Seedance 2.0, Seedance 2.5 or Kling 3.0**
+  (Kling: see [kling.md](kling.md)). Two steps (`public/seedance.js`):
+  ① **References** — sorted into Look → Location(s) → Characters (one block each) → Props. That is
+  the upload order, and each file is tagged by its number: **`@image1` is always the look** (one
+  frame, required — "✦ Use project gem" takes the look frame from the ⚙ Tune), then the location
+  (`@image2` with one location image), the characters, the props. No name tags (`@look`, `@maya`) —
+  OpenArt and Higgsfield only know `@image1, @image2…`; the block chips, the rail and the `@` menu
+  all show the numbers. Or **🎞 Start & End frame** — just the frame the clip opens on (`@image1`)
+  and the one it lands on (`@image2`); the start frame sets the aspect ratio.
+  ② **Prompt** — **Director / DOP** (numbered shots with size, lens, move and a length slider each)
+  or **Creative**, the film length, the aspect ratio, and the model toggle right before Generate.
+  Each model fits the brief to its own limits (length, images, shot floor, frame shapes). Model,
+  generation mode, brief mode, length and aspect are pinned in the system prompt (`server/seedance.js`).
+  Every reply shows **"Upload in this order"** — the files as numbered thumbnails, with a download in
+  that order — and the gem's own `Upload order:` line.
 - **Seedance ⚙ Tune gem** works like NB Frames' tune: attach a graded look frame → Analyze reads it
   into structured VIDEO look fields (locked film/style line, grade, lighting, lens family, movement
   energy) → compiled into the project direction the gem folds into every TECHNICAL block.

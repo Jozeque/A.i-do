@@ -14,6 +14,7 @@
 import fsp from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { parseChatKey } from './scenes.js';
 
 const GEMS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'gems');
 
@@ -107,20 +108,30 @@ export async function computeUsage(data, claudeModel, visionModel = claudeModel)
   const list = await data.listProjects();
   for (const meta of list) {
     let p; try { p = await data.getProject(meta.id); } catch { continue; }
-    // Claude — replay each chat, one cost per assistant reply, dated by the reply's timestamp
-    for (const [gemId, chat] of Object.entries(p.chats || {})) {
+    // Claude — replay each chat, one cost per assistant reply, dated by the reply's timestamp.
+    // A scene's chat is keyed `{sceneId}~{gemId}`; the gem is the part after the `~`.
+    for (const [key, chat] of Object.entries(p.chats || {})) {
+      const gemId = parseChatKey(key).gemId;
       const sys = (sysTok[gemId] ?? 500) + tok(p.gemOverrides?.[gemId] || '');
-      let hist = 0, puText = 0, puImgs = 0;
+      let hist = 0, puText = 0, puImgs = 0, puKept = false;
       for (const msg of chat || []) {
-        if (msg.role === 'user') { puText = tok(msg.content); puImgs = (msg.images && msg.images.length) ? msg.images.length : (msg.hadImages ? 1 : 0); }
+        if (msg.role === 'user') { puText = tok(msg.content); puImgs = (msg.images && msg.images.length) ? msg.images.length : (msg.hadImages ? 1 : 0); puKept = msg.keptHistory === true; }
         else if (msg.role === 'assistant') {
-          // An image turn runs on the vision model (and drops history); text-only stays on the base model.
+          // An image turn runs on the vision model (and drops history — unless NB Frames' reference
+          // board kept it); text-only stays on the base model.
           const isImgTurn = puImgs > 0;
           const r = isImgTurn ? visionRate : rate;
-          const inT = isImgTurn ? sys + puText + puImgs * IMG_IN_TOK_VISION : sys + hist + puText;
+          const inT = isImgTurn ? sys + (puKept ? hist : 0) + puText + puImgs * IMG_IN_TOK_VISION : sys + hist + puText;
           const outT = tok(msg.content);
           spend(msg.at || p.createdAt || Date.now(), { claude: (inT * r.in + outT * r.out) / 1e6, claudeCalls: 1 });
-          hist += puText + outT; puText = 0; puImgs = 0;
+          hist += puText + outT; puText = 0; puImgs = 0; puKept = false;
+          // "Try it here" options on an Advisor reply: each one cost a generation. A kept one is a
+          // Library image now and is counted there, so only the ones not kept are counted here.
+          for (const c of msg.candidates || []) {
+            if (c.savedImageId) continue;
+            const cost = imageCost(c.model, c.size);
+            spend(c.createdAt || msg.at || Date.now(), isSwapModel(c.model) ? { swap: cost, swapImages: 1 } : { nb: cost, nbImages: 1 });
+          }
         }
       }
     }

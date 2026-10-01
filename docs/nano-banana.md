@@ -27,6 +27,9 @@ Two models in one family (Gemini image). The app calls them directly via the Gem
 
 ## Reference-image handling (app)
 - The app prefixes each attachment with `Image 1:` / `Image 2:` so the model knows which is which — critical for swaps and composites where direction matters. **Attach in the order your prompt refers to them** (for a swap: base first, face source second).
+- **NB Frames' reference board** (`public/refboard.js`, the column beside its chat) sorts references by role — composition, location, one block per character, one per prop — and sends them first, in that order. Each carries its role as a label (`Image 3 — CHARACTER 1 "Maya" — this person's identity and wardrobe:`), to the gem and again to Nano Banana when a prompt is sent there; a composition reference is labelled even when it's the only image, or the model would take it for the image to edit. While the board doesn't change, follow-up messages keep the conversation (`keepHistory`).
+- **Advisor & Tweaks → ▶ Try it here** runs a prompt inside its chat (Nano Banana for the NB advisor, GPT Image 2 for the GPT one) on the turn's attached image, in the source's shape. The options stay on the reply, beside the marked source; only the one kept becomes a Library image. Options never kept are still priced in Expenses.
+- **Recipes:** every image keeps how it was made — prompt, references (with their roles), model, size, ratio, the gem and chat its prompt came from, and the version of the project's Tune for that gem (Tunes are versioned: `projects/{pid}/tunes/{gemId}@{v}`). The ⓘ on a card shows it; **Re-use** puts it back in Nano Banana or Swap to edit and run again.
 
 ## Prompting basics (full patterns in [playbook.md](playbook.md))
 - Narrative sentences, not keyword lists. Name your subjects. State what to KEEP, then describe only the CHANGE. Use positive phrasing (describe what you want, not "no X").

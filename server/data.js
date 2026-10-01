@@ -7,11 +7,13 @@
 // Interface:
 //   getProject(pid)    -> project object
 //   saveProject(p)     -> project object (persisted)
-//   listProjects()     -> [{ id, name, createdAt, updatedAt, imageCount, chatCount }]
+//   listProjects()     -> [{ id, name, client, createdAt, updatedAt, imageCount, chatCount }]
 //   deleteProject(pid) -> void
+//   getScenes / addScene / patchScene / deleteScene -> a project's scenes (see SCENES.md)
 import fsp from 'fs/promises';
 import path from 'path';
 import { getAdminApp } from './firebase.js';
+import { sortScenes } from './scenes.js';
 
 function createLocalDataStore(dataDir) {
   const projDir = (pid) => path.join(dataDir, pid);
@@ -73,7 +75,7 @@ function createLocalDataStore(dataDir) {
         const p = JSON.parse(await fsp.readFile(metaPath(e.name), 'utf8'));
         const imageCount = (p.images || []).length;
         const chatCount = Object.values(p.chats || {}).reduce((n, arr) => n + (arr?.length || 0), 0);
-        projects.push({ id: p.id, name: p.name, createdAt: p.createdAt, updatedAt: p.updatedAt, imageCount, chatCount });
+        projects.push({ id: p.id, name: p.name, client: p.client || '', createdAt: p.createdAt, updatedAt: p.updatedAt, imageCount, chatCount });
       } catch { /* skip dirs that aren't projects */ }
     }
     projects.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
@@ -84,8 +86,69 @@ function createLocalDataStore(dataDir) {
     await fsp.rm(projDir(pid), { recursive: true, force: true });
   }
 
+  // Scenes live in project.json's `scenes` list; their chats under `{sceneId}~{gemId}` keys.
+  async function getScenes(pid) { return sortScenes((await getProject(pid)).scenes); }
+  async function addScene(pid, scene) {
+    await update(pid, (p) => { p.scenes = [...(p.scenes || []), scene]; p.updatedAt = Date.now(); });
+    return scene;
+  }
+  async function patchScene(pid, sceneId, patch) {
+    let out = null;
+    await update(pid, (p) => {
+      const s = (p.scenes || []).find(x => x.id === sceneId);
+      if (!s) return;
+      Object.assign(s, patch, { updatedAt: Date.now() });
+      out = { ...s };
+    });
+    return out;
+  }
+  // The scene and its chats go; its images stay, back in General.
+  async function deleteScene(pid, sceneId) {
+    const res = { movedImages: 0, deletedChats: 0 };
+    await update(pid, (p) => {
+      p.scenes = (p.scenes || []).filter(s => s.id !== sceneId);
+      for (const key of Object.keys(p.chats || {})) if (key.startsWith(`${sceneId}~`)) { delete p.chats[key]; res.deletedChats++; }
+      for (const im of p.images || []) if (im.sceneId === sceneId) { delete im.sceneId; res.movedImages++; }
+      p.updatedAt = Date.now();
+    });
+    return res;
+  }
+
+  // The project's own settings, without its content (local reads the whole file anyway).
+  const getMeta = (pid) => getProject(pid);
+  // Every version of a gem's Tune, kept so an image's recipe can show the one it was made with.
+  async function addTune(pid, snap) { await update(pid, (p) => { p.tunes = [...(p.tunes || []), snap]; }); return snap; }
+  async function getTune(pid, tuneId) { return ((await getProject(pid)).tunes || []).find(t => t.id === tuneId) || null; }
+  // Change one message of one chat in place — find(messages) picks it, mutate(message) changes it
+  // and returns the result (undefined when there's no such chat or message).
+  async function updateChatMessage(pid, key, find, mutate) {
+    let out;
+    await update(pid, (p) => {
+      const msgs = p.chats?.[key];
+      const i = msgs ? find(msgs) : -1;
+      if (i < 0) return;
+      out = mutate(msgs[i]);
+      p.updatedAt = Date.now();
+    });
+    return out;
+  }
+
   return { backend: 'local', getProject, getProjectLight, getImages, getCharacters, addImage, appendChat, saveProject, update, listProjects, deleteProject,
-    addReference, findReferenceBySha, deleteReference };
+    addReference, findReferenceBySha, deleteReference, getScenes, addScene, patchScene, deleteScene, getMeta, addTune, getTune, updateChatMessage };
+}
+
+// Runs each write to a project after the earlier ones on that project have finished; different
+// projects don't wait on each other. A failed write doesn't hold up the ones behind it.
+export function createWriteQueue() {
+  const queues = new Map(); // pid -> tail promise
+  return function serialize(pid, fn) {
+    const prev = queues.get(pid) || Promise.resolve();
+    const run = prev.then(fn);
+    const tail = run.catch(() => {});   // keep the chain alive past a failed write
+    queues.set(pid, tail);
+    tail.then(() => { if (queues.get(pid) === tail) queues.delete(pid); });
+    return run;
+  };
 }
 
 // ── Firestore backend (subcollections) ──────────────────────────────────────
@@ -93,7 +156,9 @@ function createLocalDataStore(dataDir) {
 // limit and concurrent writes can't clobber a shared array:
 //   projects/{pid}                — light meta (name, gem settings, timestamps, cached counts)
 //   projects/{pid}/chats/{gemId}  — one doc per tab, holding that tab's message array
+//                                   (a scene's chat: {sceneId}~{gemId})
 //   projects/{pid}/images/{imgId} — one doc per generated image
+//   projects/{pid}/scenes/{sceneId} — one doc per scene (title, brief, order)
 // getProject reassembles the full blob the routes already expect, so route code is
 // unchanged. Writes go through a per-pid queue (single-instance lock, like the local
 // backend); saveProject diffs the image docs so only new/changed ones are written.
@@ -101,6 +166,13 @@ const GEM_TABS = ['nb-frames', 'kling', 'kling-advisor', 'nb-advisor', 'storyboa
 
 function createFirestoreDataStore() {
   let _db = null, _col = null;
+
+  // One write queue per project. update()'s read-modify-write rewrites every chat doc and deletes
+  // any image or reference it didn't read, so the quick writes (addImage, appendChat,
+  // addReference, deleteReference) wait in the same queue: a generation or a chat reply landing
+  // in the middle of a ♥, an approve or a rename used to be erased by it. The quick writes still
+  // read nothing extra — they only wait their turn.
+  const serialize = createWriteQueue();
   async function init() {
     if (_col) return;
     const { getFirestore } = await import('firebase-admin/firestore');
@@ -116,12 +188,13 @@ function createFirestoreDataStore() {
     const ref = _col.doc(pid);
     // Fetch meta + all three subcollections IN PARALLEL — they're independent, and doing them
     // sequentially cost ~4 network round trips per project open (the "switching is slow" lag).
-    const [metaSnap, chatsSnap, imagesSnap, charactersSnap, referencesSnap] = await Promise.all([
+    const [metaSnap, chatsSnap, imagesSnap, charactersSnap, referencesSnap, scenesSnap] = await Promise.all([
       ref.get(),
       ref.collection('chats').get(),
       ref.collection('images').get(),
       ref.collection('characters').get(),
       ref.collection('references').get(),
+      ref.collection('scenes').get(),
     ]);
     if (!metaSnap.exists) throw new Error(`Project not found: ${pid}`);
     const { imageCount, chatCount, ...meta } = metaSnap.data(); // counts are internal cache
@@ -137,7 +210,8 @@ function createFirestoreDataStore() {
     const references = referencesSnap.docs
       .map((d) => d.data())
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    return { ...meta, chats, images, characters, references };
+    const scenes = sortScenes(scenesSnap.docs.map((d) => d.data()));
+    return { ...meta, chats, images, characters, references, scenes };
   }
 
   // Fast open: everything EXCEPT the (potentially huge) images subcollection. The frontend
@@ -145,8 +219,9 @@ function createFirestoreDataStore() {
   async function getProjectLight(pid) {
     await init();
     const ref = _col.doc(pid);
-    const [metaSnap, chatsSnap, charactersSnap, referencesSnap] = await Promise.all([
+    const [metaSnap, chatsSnap, charactersSnap, referencesSnap, scenesSnap] = await Promise.all([
       ref.get(), ref.collection('chats').get(), ref.collection('characters').get(), ref.collection('references').get(),
+      ref.collection('scenes').get(),
     ]);
     if (!metaSnap.exists) throw new Error(`Project not found: ${pid}`);
     const { imageCount, chatCount, ...meta } = metaSnap.data();
@@ -155,7 +230,8 @@ function createFirestoreDataStore() {
     chatsSnap.forEach((d) => { chats[d.id] = d.data().messages || []; });
     const characters = charactersSnap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     const references = referencesSnap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    return { ...meta, chats, images: [], characters, references };
+    const scenes = sortScenes(scenesSnap.docs.map((d) => d.data()));
+    return { ...meta, chats, images: [], characters, references, scenes };
   }
 
   // Just the images subcollection (for the lazy Library / Generate load).
@@ -181,15 +257,17 @@ function createFirestoreDataStore() {
     await init();
     const { FieldValue } = await import('firebase-admin/firestore');
     const ref = _col.doc(pid);
-    await ref.collection('images').doc(String(rec.id)).set(rec);
-    await ref.set({ imageCount: FieldValue.increment(1), updatedAt: rec.createdAt || Date.now() }, { merge: true });
+    return serialize(pid, async () => {
+      await ref.collection('images').doc(String(rec.id)).set(rec);
+      await ref.set({ imageCount: FieldValue.increment(1), updatedAt: rec.createdAt || Date.now() }, { merge: true });
+    });
   }
 
   // References = every image attached in a chat, kept so it never has to be re-uploaded.
   // One targeted doc write (never a full-project read-modify-write), deduped on sha256.
   async function addReference(pid, rec) {
     await init();
-    await _col.doc(pid).collection('references').doc(String(rec.id)).set(rec);
+    return serialize(pid, () => _col.doc(pid).collection('references').doc(String(rec.id)).set(rec));
   }
   async function findReferenceBySha(pid, sha) {
     await init();
@@ -198,7 +276,7 @@ function createFirestoreDataStore() {
   }
   async function deleteReference(pid, refId) {
     await init();
-    await _col.doc(pid).collection('references').doc(String(refId)).delete();
+    return serialize(pid, () => _col.doc(pid).collection('references').doc(String(refId)).delete());
   }
 
   // Append chat message(s) to ONE gem's chat doc via a transaction — reads only that chat doc
@@ -209,13 +287,13 @@ function createFirestoreDataStore() {
     const { FieldValue } = await import('firebase-admin/firestore');
     const ref = _col.doc(pid);
     const chatRef = ref.collection('chats').doc(gemId);
-    await _db.runTransaction(async (tx) => {
+    return serialize(pid, () => _db.runTransaction(async (tx) => {
       const snap = await tx.get(chatRef);
       const msgs = snap.exists ? (snap.data().messages || []) : [];
       msgs.push(...newMsgs);
       tx.set(chatRef, { messages: msgs });
       tx.set(ref, { updatedAt: Date.now(), chatCount: FieldValue.increment(newMsgs.length) }, { merge: true });
-    });
+    }));
   }
 
   // Persist the blob: meta + per-tab chat docs in one batch, then image docs DIFFED
@@ -226,7 +304,9 @@ function createFirestoreDataStore() {
     // `references` is deliberately NOT defaulted to []: diffSub deletes whatever isn't in the
     // list it's handed, so defaulting would let any project object that simply doesn't carry
     // references wipe the whole collection. Absent field => leave the subcollection alone.
-    const { chats = {}, images = [], characters = [], references, ...meta } = p;
+    // `scenes` is never written from here — the scene routes write their own docs — but it must
+    // stay out of `meta`, or every full save would copy the list into the project doc.
+    const { chats = {}, images = [], characters = [], references, scenes, tunes, ...meta } = p;
     meta.imageCount = images.length;
     meta.characterCount = characters.length;
     meta.chatCount = Object.values(chats).reduce((n, a) => n + (a?.length || 0), 0);
@@ -261,20 +341,14 @@ function createFirestoreDataStore() {
   }
 
   // Serialized per-pid read-modify-write — single-instance lock, like the local backend.
-  const queues = new Map();
   async function update(pid, mutator) {
-    const prev = queues.get(pid) || Promise.resolve();
-    const run = prev.then(async () => {
+    return serialize(pid, async () => {
       const p = await getProject(pid);
       const out = await mutator(p);
       const toSave = out || p;
       await saveProject(toSave);
       return toSave;
     });
-    const tail = run.catch(() => {});
-    queues.set(pid, tail);
-    tail.then(() => { if (queues.get(pid) === tail) queues.delete(pid); });
-    return run;
   }
 
   // Fast: reads only the light meta docs (counts are cached on them).
@@ -284,17 +358,108 @@ function createFirestoreDataStore() {
     const projects = [];
     snap.forEach((doc) => {
       const p = doc.data();
-      projects.push({ id: p.id, name: p.name, createdAt: p.createdAt, updatedAt: p.updatedAt, imageCount: p.imageCount || 0, chatCount: p.chatCount || 0 });
+      projects.push({ id: p.id, name: p.name, client: p.client || '', createdAt: p.createdAt, updatedAt: p.updatedAt, imageCount: p.imageCount || 0, chatCount: p.chatCount || 0 });
     });
     projects.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     return projects;
+  }
+
+  // ── Scenes: one doc each, written on their own (never through saveProject) ──
+  async function getScenes(pid) {
+    await init();
+    const snap = await _col.doc(pid).collection('scenes').get();
+    return sortScenes(snap.docs.map((d) => d.data()));
+  }
+  async function addScene(pid, scene) {
+    await init();
+    const ref = _col.doc(pid);
+    return serialize(pid, async () => {
+      // a scene for a project that's gone would bring its meta doc back as a nameless ghost
+      if (!(await ref.get()).exists) throw new Error(`Project not found: ${pid}`);
+      await ref.collection('scenes').doc(scene.id).set(scene);
+      await ref.set({ updatedAt: scene.createdAt || Date.now() }, { merge: true });
+      return scene;
+    });
+  }
+  async function patchScene(pid, sceneId, patch) {
+    await init();
+    const doc = _col.doc(pid).collection('scenes').doc(sceneId);
+    return serialize(pid, async () => {
+      const snap = await doc.get();
+      if (!snap.exists) return null;
+      const next = { ...snap.data(), ...patch, updatedAt: Date.now() };
+      await doc.set(next);
+      return next;
+    });
+  }
+  // The scene doc and its chat docs are deleted; its images stay and return to General (their
+  // sceneId field is removed). One queued job, so no chat reply or save lands half-way through.
+  async function deleteScene(pid, sceneId) {
+    await init();
+    const { FieldValue } = await import('firebase-admin/firestore');
+    const ref = _col.doc(pid);
+    return serialize(pid, async () => {
+      const [chatsSnap, imagesSnap] = await Promise.all([
+        ref.collection('chats').get(),
+        ref.collection('images').where('sceneId', '==', sceneId).get(),
+      ]);
+      const chatDocs = chatsSnap.docs.filter((d) => d.id.startsWith(`${sceneId}~`));
+      const removedMsgs = chatDocs.reduce((n, d) => n + (d.data().messages || []).length, 0);
+      const ops = [
+        ...chatDocs.map((d) => (b) => b.delete(d.ref)),
+        ...imagesSnap.docs.map((d) => (b) => b.update(d.ref, { sceneId: FieldValue.delete() })),
+        (b) => b.delete(ref.collection('scenes').doc(sceneId)),
+        (b) => b.set(ref, { updatedAt: Date.now(), chatCount: FieldValue.increment(-removedMsgs) }, { merge: true }),
+      ];
+      for (let i = 0; i < ops.length; i += 450) {
+        const batch = _db.batch();
+        ops.slice(i, i + 450).forEach((op) => op(batch));
+        await batch.commit();
+      }
+      return { movedImages: imagesSnap.size, deletedChats: chatDocs.length };
+    });
+  }
+
+  // The meta doc alone — one read, for a route that needs a setting but none of the content.
+  async function getMeta(pid) {
+    await init();
+    const snap = await _col.doc(pid).get();
+    if (!snap.exists) throw new Error(`Project not found: ${pid}`);
+    const { imageCount, chatCount, ...meta } = snap.data();
+    return meta;
+  }
+  // Tune versions: projects/{pid}/tunes/{gemId}@{v}, written once each, read on demand.
+  async function addTune(pid, snap) {
+    await init();
+    return serialize(pid, async () => { await _col.doc(pid).collection('tunes').doc(snap.id).set(snap); return snap; });
+  }
+  async function getTune(pid, tuneId) {
+    await init();
+    const snap = await _col.doc(pid).collection('tunes').doc(tuneId).get();
+    return snap.exists ? snap.data() : null;
+  }
+  // Change one message of one chat in place — reads and writes that chat doc only, in the
+  // project's write queue (so a reply landing at the same moment can't be lost).
+  async function updateChatMessage(pid, key, find, mutate) {
+    await init();
+    const chatRef = _col.doc(pid).collection('chats').doc(key);
+    return serialize(pid, () => _db.runTransaction(async (tx) => {
+      const snap = await tx.get(chatRef);
+      if (!snap.exists) return undefined;
+      const msgs = snap.data().messages || [];
+      const i = find(msgs);
+      if (i < 0) return undefined;
+      const out = mutate(msgs[i]);
+      tx.set(chatRef, { messages: msgs });
+      return out;
+    }));
   }
 
   // Delete the meta doc + every chats/images subdoc (chunked).
   async function deleteProject(pid) {
     await init();
     const ref = _col.doc(pid);
-    for (const sub of ['chats', 'images', 'characters', 'references']) {
+    for (const sub of ['chats', 'images', 'characters', 'references', 'scenes', 'tunes']) {
       const docs = (await ref.collection(sub).get()).docs;
       for (let i = 0; i < docs.length; i += 450) {
         const batch = _db.batch();
@@ -306,7 +471,7 @@ function createFirestoreDataStore() {
   }
 
   return { backend: 'firestore', getProject, getProjectLight, getImages, getCharacters, addImage, appendChat, saveProject, update, listProjects, deleteProject,
-    addReference, findReferenceBySha, deleteReference };
+    addReference, findReferenceBySha, deleteReference, getScenes, addScene, patchScene, deleteScene, getMeta, addTune, getTune, updateChatMessage };
 }
 
 export function createDataStore(dataDir, { backend = process.env.DATA_BACKEND || 'local' } = {}) {
