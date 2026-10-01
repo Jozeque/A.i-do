@@ -17,6 +17,7 @@ import { createShowcase } from './showcase.js';
 import { createLeads, validId as validLeadId } from './leads.js';
 import { sendLead } from './meta-capi.js';
 import { notifyNewLead, notifyLeadBrief, leadEmailEnabled } from './notify.js';
+import { seedanceBriefDirection } from './seedance.js';
 import { Jimp } from 'jimp';   // resize swap outputs to the input image's exact pixel dimensions
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1057,7 +1058,7 @@ app.delete('/api/projects/:pid/references/:refId', async (req, res) => {
 app.post('/api/projects/:pid/chat', async (req, res) => {
   if (!anthropic) return res.status(400).json({ error: 'ANTHROPIC_API_KEY is not set. Add it to your .env file.' });
   try {
-    const { gemId, userText, images = [], history = [], klingMode, seedanceVersion } = req.body;
+    const { gemId, userText, images = [], history = [], klingMode, seedanceVersion, seedanceMode, seedanceLength, seedanceAspect } = req.body;
     const base = await readGemWithKit(gemId);
     const p = await loadProject(req.params.pid);
     const override = (p.gemOverrides?.[gemId] || '').trim();
@@ -1076,6 +1077,8 @@ app.post('/api/projects/:pid/chat', async (req, res) => {
       system += seedanceVersion === '2.0'
         ? '\n\n--- ACTIVE VERSION: SEEDANCE 2.0 (set by the app toggle — this OVERRIDES the user\'s wording) ---\nWrite for Seedance 2.0: max 15s per clip; at most 12 reference files (9 images, 3 videos ≤15s combined, 3 audio ≤15s combined); NO bracket audio grammar — direct sound in prose plus a trailing "SFX only:" list; no staged [Stage N] structure (a 2.0 clip is one continuous choreography). State "Seedance 2.0" in the settings line.'
         : '\n\n--- ACTIVE VERSION: SEEDANCE 2.5 (set by the app toggle — this OVERRIDES the user\'s wording) ---\nWrite for Seedance 2.5: up to 30s per clip; up to 50 reference files (30 images, 10 videos ≤30s combined, 10 audio ≤30s combined); the bracket audio grammar applies — ( ) music, < > SFX, { } dialogue, 【 】 subtitles; use the staged [Generation Goal]/[Stage N]/[Maintain Consistency] structure for clips over 15s or with 3+ distinct beats. State "Seedance 2.5" in the settings line.';
+      // The tab's brief mode, length slider and aspect pick, pinned the same way.
+      system += seedanceBriefDirection({ mode: seedanceMode, length: seedanceLength, aspect: seedanceAspect, version: seedanceVersion });
     }
 
     // Last in the system prompt so it wins over any gem's own wording — English replies

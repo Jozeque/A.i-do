@@ -1,5 +1,6 @@
 // ── AI Video Studio — frontend ────────────────────────────────────────────────
 import { createCrm } from './crm.js?v=1';
+import { createSeedance } from './seedance.js?v=1';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -98,7 +99,7 @@ const GEM_META = {
   'nb-advisor': { name: 'NB Advisor', blurb: 'Attach image(s) + say what to change. Returns the best Nano Banana 2 edit prompt with a quick rationale.' },
   'gpt-advisor': { name: 'GPT Advisor', blurb: 'Say what you want — a swap, an edit, or a new image — and attach reference(s). Returns the best <b>GPT Image 2 (ChatGPT)</b> prompt, tuned to keep your frame\'s look &amp; color.' },
   'storyboard': { name: 'Storyboard', blurb: 'Set a storyboard style once (attach a style reference in Tune gem), then describe any frame. Returns a Nano Banana prompt that draws that exact shot as a <b>storyboard panel</b> in your style. Attach a character reference to keep them recognizable.' },
-  'seedance': { name: 'Seedance Prompter', blurb: 'Attach asset sheets (⚡ from the Assets tab) + describe the scene. Returns <b>one</b> paste-ready Seedance prompt — reference definitions, technical block, choreography — with @-tags matched to a stated upload order for OpenArt.' },
+  'seedance': { name: 'Seedance Prompter', blurb: '① Sort your references into look, location, characters and props — that order is the OpenArt upload order. ② Write the shots as director/DOP, or describe the scene and let the gem cut it. Returns <b>one</b> paste-ready Seedance prompt.' },
 };
 
 // Suggestion lists for the NB Frames per-project cinematography builder (datalists; free text still allowed).
@@ -543,7 +544,12 @@ const state = {
   nbModel: localStorage.getItem('avs:nbModel') || 'nb2',         // 'nb2' (flash) | 'pro' (Nano Banana Pro)
   genAR: localStorage.getItem('avs:genAR') ?? '16:9',            // generator aspect ratio — defaults to 16:9, remembers last pick
   expSplit: localStorage.getItem('avs:expSplit') || 3,           // expense split — defaults to 3 ways, remembers last pick
+  sdBriefs: {},            // Seedance tab: the brief being built, per project id (seedance.js)
 };
+
+// The Seedance tab's brief builder lives in its own module (seedance.js), like the CRM.
+const seedance = createSeedance({ escapeHtml, toast, state, mediaFetch, imgFileToB64, filesFromPaste, insertAtCursor, openLightbox,
+  runTurn: (turn) => runChatTurn('seedance', turn) });
 
 // ── boot ──────────────────────────────────────────────────────────────────────
 async function boot() {
@@ -1098,8 +1104,25 @@ function renderChat(body, gemId) {
           <button class="seg ${sv === '2.5' ? 'active' : ''}" data-version="2.5" type="button">2.5 · 30s</button>
           <button class="seg ${sv === '2.0' ? 'active' : ''}" data-version="2.0" type="button">2.0 · 15s</button>
         </div>` : '';
+  // Seedance swaps the attach-and-type composer for its brief builder (seedance.js); the chat
+  // moves to a side column, and its box is left for text follow-ups on the last prompt.
+  const sd = gemId === 'seedance';
+  const composer = `
+    <div class="composer">
+      ${sd ? '' : `<div class="fav-picker hidden" id="favPicker"></div>
+      <div class="fav-picker hidden" id="refPicker"></div>
+      <div class="composer-attach" id="composerAttach"></div>`}
+      <div class="composer-row">
+        ${sd ? '' : `<button class="attach-btn" id="attachBtn" title="Attach or paste an image">📎</button>
+        <button class="attach-btn fav-open" id="favBtn" title="Add from this project's favorites">★</button>
+        <button class="attach-btn fav-open" id="refBtn" title="Re-attach a reference you've used before in this project">🕘</button>
+        <input type="file" id="fileInput" accept="image/*" multiple hidden />`}
+        <textarea id="chatInput" data-draft rows="1" placeholder="${chatPlaceholder(gemId)}"></textarea>
+        <button class="send-btn" id="sendBtn">Send</button>
+      </div>
+    </div>`;
   const panel = document.createElement('div');
-  panel.className = 'chat-panel';
+  panel.className = 'chat-panel' + (sd ? ' sd-panel' : '');
   panel.innerHTML = `
     <div class="chat-intro">
       <div class="ci-text"><b>${meta.name}.</b> ${meta.blurb}</div>
@@ -1112,20 +1135,13 @@ function renderChat(body, gemId) {
     <div class="gem-editor hidden" id="gemEditor">
       <div class="gem-body">${gemEditorBody(gemId, meta)}</div>
     </div>
-    <div class="chat-scroll" id="chatScroll"></div>
-    <div class="composer">
-      <div class="fav-picker hidden" id="favPicker"></div>
-      <div class="fav-picker hidden" id="refPicker"></div>
-      <div class="composer-attach" id="composerAttach"></div>
-      <div class="composer-row">
-        <button class="attach-btn" id="attachBtn" title="Attach or paste an image">📎</button>
-        <button class="attach-btn fav-open" id="favBtn" title="Add from this project's favorites">★</button>
-        <button class="attach-btn fav-open" id="refBtn" title="Re-attach a reference you've used before in this project">🕘</button>
-        <input type="file" id="fileInput" accept="image/*" multiple hidden />
-        <textarea id="chatInput" data-draft rows="1" placeholder="${chatPlaceholder(gemId)}"></textarea>
-        <button class="send-btn" id="sendBtn">Send</button>
+    ${sd ? `<div class="sd-body" id="sdBody">
+      <div class="sd-main" id="sdMain"></div>
+      <div class="sd-out">
+        <div class="sd-out-head field-label">Prompts</div>
+        <div class="chat-scroll" id="chatScroll"></div>${composer}
       </div>
-    </div>`;
+    </div>` : `<div class="chat-scroll" id="chatScroll"></div>${composer}`}`;
   body.appendChild(panel);
 
   // gem editor (guided cinematography builder for nb-frames, freetext for others)
@@ -1146,6 +1162,7 @@ function renderChat(body, gemId) {
       state.seedanceVersion = b.dataset.version;
       try { localStorage.setItem('avs:seedanceVersion', state.seedanceVersion); } catch {}
       $$('#seedanceVersionToggle .seg').forEach(s => s.classList.toggle('active', s.dataset.version === state.seedanceVersion));
+      seedance.refresh();   // the brief's length and image limits follow the version
     });
   }
   $('#clearChat').onclick = async () => {
@@ -1154,10 +1171,24 @@ function renderChat(body, gemId) {
     renderMessages(gemId);
   };
 
-  // attachments
   state.current.chats = state.current.chats || {};
   state.current.chats[gemId] = state.current.chats[gemId] || [];   // a brand-new gem has no chat doc yet
   state.attachments[gemId] = state.attachments[gemId] || [];
+  if (!sd) wireAttachments(panel, gemId);   // Seedance collects its images in the brief builder
+
+  // textarea autosize + enter to send
+  const ta = $('#chatInput');
+  ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; };
+  ta.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(gemId); } };
+  $('#sendBtn').onclick = () => sendChat(gemId);
+
+  renderMessages(gemId);
+  if (sd) seedance.mount($('#sdMain'));
+  else renderAttachments(gemId);
+}
+
+// The chat composer's image inputs: browse, favorites, kept references, drag & drop, paste.
+function wireAttachments(panel, gemId) {
   $('#attachBtn').onclick = () => $('#fileInput').click();
   $('#fileInput').onchange = async (e) => {
     for (const f of e.target.files) {
@@ -1206,10 +1237,8 @@ function renderChat(body, gemId) {
     toast(`${files.length} image${files.length > 1 ? 's' : ''} added.`);
   });
 
-  // textarea autosize + enter to send
+  // paste image(s) into the message box
   const ta = $('#chatInput');
-  ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; };
-  ta.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(gemId); } };
   ta.addEventListener('paste', async (e) => {
     const files = filesFromPaste(e);
     if (!files.length) return;            // text-only → let the default paste happen
@@ -1222,10 +1251,6 @@ function renderChat(body, gemId) {
     }
     renderAttachments(gemId);
   });
-  $('#sendBtn').onclick = () => sendChat(gemId);
-
-  renderMessages(gemId);
-  renderAttachments(gemId);
 }
 
 function chatPlaceholder(gemId) {
@@ -1236,7 +1261,7 @@ function chatPlaceholder(gemId) {
     'nb-advisor': 'What do you want to change in the attached image?',
     'gpt-advisor': 'Describe the swap / edit / image you want (attach the frame + any reference)…',
     'storyboard': 'Describe the frame / shot to draw as a storyboard panel (attach a character reference to keep them recognizable)…',
-    'seedance': 'Describe the scene, shots, and action — attach asset sheets with ⚡ from the Assets tab (duration & ratio if you know them)…',
+    'seedance': 'Ask for a change to the last prompt — e.g. make shot 2 slower, move it to night…',
   }[gemId];
 }
 
@@ -1358,6 +1383,13 @@ async function urlToAttachment(url) {
 }
 async function dropImageOnTab(tab, url) {
   if (!DROP_TABS.includes(tab) || !state.current) return;
+  // Seedance sorts its images into roles, so a dropped one waits in the Unsorted tray.
+  if (tab === 'seedance') {
+    const adding = seedance.addToInbox(url);
+    switchTab('seedance');
+    if (await adding) toast('Image added to Seedance — drag it into its section.');
+    return;
+  }
   try {
     const att = await urlToAttachment(url);
     switchTab(tab);
@@ -1453,6 +1485,8 @@ async function reusePromptInComposer(btn) {
   try { imgs = JSON.parse(decodeURIComponent(btn.dataset.imgs || '%5B%5D')); } catch {}
   const ta = $('#chatInput');
   if (ta) { ta.value = prompt; ta.dispatchEvent(new Event('input')); ta.focus(); }
+  // Seedance keeps its images in the brief builder, so only the text comes back.
+  if (gemId === 'seedance') { toast('Prompt loaded into the follow-up box — edit it and send, or copy it.'); return; }
   state.attachments[gemId] = state.attachments[gemId] || [];
   let added = 0;
   for (const im of imgs) {
@@ -1811,32 +1845,13 @@ async function sendChat(gemId) {
   if (!text && atts.length === 0) return;
   if (!state.config.hasAnthropic) { toast('Add your ANTHROPIC_API_KEY to .env first.', true); return; }
 
-  // Seedance: prefix the turn with an upload-order manifest so the gem binds @image tags to the
-  // exact files (assets carry their tag/type from the Assets tab; plain images list by filename).
-  let sendText = text;
-  if (gemId === 'seedance' && atts.length) {
-    const lines = atts.map((a, i) => a.asset
-      ? `Image ${i + 1} = @${a.asset.tag} — ${(a.asset.type || 'character').toUpperCase()} asset "${a.asset.name}" (reference sheet)`
-      : `Image ${i + 1} = attached image "${a.name || 'untitled'}"`);
-    sendText = `ATTACHED REFERENCE FILES — upload to OpenArt in this exact order:\n${lines.join('\n')}\n\n${text}`;
-  }
-
   const sendBtn = $('#sendBtn');
   sendBtn.disabled = true; sendBtn.innerHTML = '<span class="spinner"></span>';
-
-  // optimistic user msg (keep a reference so we can fill in saved image refs from the response)
-  const userMsg = { role: 'user', content: sendText || '(image)', hadImages: atts.length > 0, at: Date.now() };
-  state.current.chats = state.current.chats || {};
-  state.current.chats[gemId] = state.current.chats[gemId] || [];   // guard: new gem (no Firestore doc yet)
-  state.current.chats[gemId].push(userMsg);
-  renderMessages(gemId);
-  ta.value = ''; ta.style.height = 'auto';
-  if (state.drafts) delete state.drafts[`${gemId}:chatInput`];   // sent → clear this tab's draft
 
   // Build history, scoped to the CURRENT scene so old references/prompts don't bleed in.
   // - Attaching new image(s) starts a fresh scene → send no prior history.
   // - A text-only follow-up keeps history only back to the most recent image-bearing turn.
-  const priorAll = state.current.chats[gemId].slice(0, -1);  // everything before this turn
+  const priorAll = state.current.chats?.[gemId] || [];  // everything before this turn
   let prior;
   if (atts.length > 0) {
     prior = [];
@@ -1849,23 +1864,45 @@ async function sendChat(gemId) {
     prior = priorAll.slice(start).map(m => ({ role: m.role, content: m.content }));
   }
   const images = atts.map(a => ({ mimeType: a.mimeType, data: a.data }));
+  ta.value = ''; ta.style.height = 'auto';
+  if (state.drafts) delete state.drafts[`${gemId}:chatInput`];   // sent → clear this tab's draft
 
+  // A Seedance follow-up carries the brief's mode, so the revised prompt keeps its shot format.
+  const extra = gemId === 'seedance' ? seedance.followupExtra() : {};
+  const ok = await runChatTurn(gemId, { sendText: text, images, history: prior, extra });
+  if (ok) {
+    state.attachments[gemId] = [];
+    if (state.activeTab === gemId) renderAttachments(gemId);
+  }
+  sendBtn.disabled = false; sendBtn.textContent = 'Send';
+}
+
+// One gem turn: show the message at once, post it, then append the reply — or take the message
+// back out if the call fails. Shared by the chat composer and the Seedance brief builder.
+// Holds on to the project it started in, and only redraws if the user is still looking at it.
+async function runChatTurn(gemId, { sendText, images = [], history = [], extra = {} }) {
+  const proj = state.current;
+  const redraw = () => { if (state.current === proj && state.activeTab === gemId) renderMessages(gemId); };
+  // optimistic user msg (keep a reference so we can fill in saved image refs from the response)
+  const userMsg = { role: 'user', content: sendText || '(image)', hadImages: images.length > 0, at: Date.now() };
+  proj.chats = proj.chats || {};
+  proj.chats[gemId] = proj.chats[gemId] || [];   // guard: new gem (no Firestore doc yet)
+  proj.chats[gemId].push(userMsg);
+  redraw();
   try {
-    const { text: reply, images: savedImgs } = await api(`/api/projects/${state.current.id}/chat`, {
+    const { text: reply, images: savedImgs } = await api(`/api/projects/${proj.id}/chat`, {
       method: 'POST',
-      body: JSON.stringify({ gemId, userText: sendText, images, history: prior, klingMode: state.klingMode, seedanceVersion: state.seedanceVersion }),
+      body: JSON.stringify({ gemId, userText: sendText, images, history, klingMode: state.klingMode, seedanceVersion: state.seedanceVersion, ...extra }),
     });
     if (savedImgs && savedImgs.length) userMsg.images = savedImgs;  // so "Send to Nano Banana" can carry them
-    state.current.chats[gemId].push({ role: 'assistant', content: reply, at: Date.now() });
-    state.attachments[gemId] = [];
-    renderMessages(gemId);
-    renderAttachments(gemId);
+    proj.chats[gemId].push({ role: 'assistant', content: reply, at: Date.now() });
+    redraw();
+    return true;
   } catch (e) {
     toast(e.message, true);
-    state.current.chats[gemId].pop(); // remove optimistic on failure
-    renderMessages(gemId);
-  } finally {
-    sendBtn.disabled = false; sendBtn.textContent = 'Send';
+    proj.chats[gemId].pop(); // remove optimistic on failure
+    redraw();
+    return false;
   }
 }
 
@@ -2321,27 +2358,14 @@ async function doCreateCharacter() {
   }
 }
 
-// Attach an asset's reference sheet to the Seedance composer, carrying its @tag + type so the
-// sent message can state the upload-order manifest.
+// Put an asset's reference sheet into the Seedance brief, in the section its type belongs to
+// (a character gets its own block, named after it), then open the tab on its assets step.
 async function useAssetInSeedance(char) {
   if (!char) return;
-  try {
-    const tag = char.tag || tagSlug(char.name);
-    const url = `/media/${state.current.id}/images/${char.reference.file}`;
-    const blob = await (await mediaFetch(url)).blob();
-    const data = await fileToB64(blob);
-    switchTab('seedance');
-    state.attachments = state.attachments || {};
-    state.attachments['seedance'] = state.attachments['seedance'] || [];
-    if (!state.attachments['seedance'].some(r => r.url === url)) {
-      state.attachments['seedance'].push({
-        name: `${char.name} (@${tag})`, mimeType: blob.type || 'image/png', data, url,
-        asset: { tag, type: char.type || 'character', name: char.name },
-      });
-    }
-    renderAttachments('seedance');
-    toast(`@${tag} attached to Seedance — add more assets, then describe the scene.`);
-  } catch { toast('Could not attach the asset.', true); }
+  const { status, section } = await seedance.addAsset(char);
+  switchTab('seedance');
+  if (status === 'added') toast(`${char.name} added to ${section} — add the rest, then write the prompt.`);
+  else if (status === 'exists') toast(`${char.name} is already in the brief, under ${section}.`);
 }
 
 async function useCharacterInFrames(char) {

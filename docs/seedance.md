@@ -105,6 +105,12 @@ rest of the video; she never moves from it"), and give reflective surfaces expli
   location plates, look frames — each with an `@tag` name.
 - **Seedance tab** (Claude gem → paste into OpenArt) writes the full three-block prompt —
   REFERENCE DEFINITIONS / TECHNICAL / PROMPT — with `@imageN` tags matching a stated upload order.
+  It builds the brief in two steps (`public/seedance.js`): ① images sorted into Look → Location(s)
+  → Characters (one block each) → Props, which is also the upload order and gives every file its
+  role; ② the brief as **Director / DOP** (numbered shots with size, lens, move and a length
+  slider each — the gem keeps them exactly and times each shot) or **Creative** (a description
+  the gem cuts into shots itself), with the film length on a slider. Mode, length and aspect are
+  pinned in the system prompt (`server/seedance.js`), the same way the version toggle is.
 - **Seedance ⚙ Tune gem** works like NB Frames' tune: attach a graded look frame → Analyze reads it
   into structured VIDEO look fields (locked film/style line, grade, lighting, lens family, movement
   energy) → compiled into the project direction the gem folds into every TECHNICAL block.
