@@ -46,6 +46,11 @@ body {
   display: flex; flex-direction: column;
   padding: 22px 16px;
   gap: 18px;
+  /* min-height:0 is load-bearing: a grid item defaults to min-height:auto, which lets a long
+     project list stretch the sidebar past the window (the page itself doesn't scroll).
+     overflow-y covers a window too short for even the fixed parts. */
+  min-height: 0;
+  overflow-y: auto;
 }
 .brand { display: flex; align-items: center; gap: 12px; padding: 0 4px; flex-shrink: 0; }
 .brand-mark {
@@ -67,9 +72,10 @@ body {
 .new-project-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 28px -10px rgba(232,176,75,.85); }
 .new-project-btn.big { font-size: 14px; padding: 14px 22px; margin-top: 8px; }
 
-/* min-height:0 is load-bearing: a flex item defaults to min-height:auto, so a long list
-   would grow past the sidebar (pushing the footer off-screen) instead of scrolling. */
-.project-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin: 0 -4px; padding: 0 4px; }
+/* min-height must not be auto (a flex item's default): the list would grow past the sidebar,
+   pushing the footer off-screen, instead of scrolling. The floor keeps ~2 rows in a very
+   short window, where the sidebar scrolls instead. */
+.project-list { flex: 1; min-height: 110px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin: 0 -4px; padding: 0 4px; }
 .project-item {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer;
